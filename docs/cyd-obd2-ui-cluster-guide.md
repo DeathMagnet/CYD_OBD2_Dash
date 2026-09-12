@@ -6,6 +6,19 @@ This document provides complete, technical design and implementation instruction
 
 ---
 
+## ✅ Implementation Status
+
+All six pages render live OBD-II telemetry today, but with these deliberate deviations from the design above:
+
+- **Only Modern Flat is implemented.** `getTheme()` (`src/display/theme.cpp`) returns the Modern Flat palette regardless of the requested `ThemeId`; Mustang S197 and Torque Neon are reserved enum values with no color table yet. Page 5's "Active Theme" row is display-only and reads "MODERN FLAT (ACTIVE) - OTHERS COMING SOON".
+- **Direct-to-TFT rendering, not sprites.** This board's ESP32-32E has no PSRAM, and a full-frame RGB565 sprite (~300KB) does not fit in 320KB of SRAM alongside the Bluetooth stack and SD buffers. Each page has a `drawStatic()` pass (chrome/labels, called once per page change) and a `drawDynamic()` pass (values only, called on a throttled `config::kUiRefreshIntervalMs` cadence) that redraws its own bounded region using TFT_eSPI's background-color text redraw to avoid flicker. There is no slide/fade page-transition animation; page switches redraw immediately.
+- **Redline arc**: drawn as 12 interpolated-color segments between `config::kRedlineArcStartRpm` (fixed at 5500) and Page 5's user-configurable "Redline RPM" setting (default 6200, range 5000-7000), via `gaugewidgets::drawArcGauge`'s `redlineStart`/`redlineEnd` parameters.
+- **Page 6 DTC list shows codes only** (e.g. `P0133`), not human-readable descriptions — no DTC description database is included. A read is triggered automatically whenever Page 6 is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
+- **Page 5 adds a log-management row** beyond the settings table below: a live count of session log files and their total size (`CsvLogger::getLogSummary()`), plus a "DELETE ALL LOGS" button (same 5-second tap-to-confirm pattern) that closes the active file, deletes every `mustang_log_*.csv`, and immediately opens a fresh session file. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space.
+- **Actual source layout** differs from the "Proposed" structure at the bottom of this doc — see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#proposed-source-layout) for the as-built tree.
+
+---
+
 ## 🎨 Theme Engine Architecture
 
 The UI supports three distinct visual themes switchable at runtime or persisted via config.
@@ -14,7 +27,6 @@ The UI supports three distinct visual themes switchable at runtime or persisted 
 - **Inspiration**: 2005–2010 Ford Mustang S197 instrument cluster.
 - **Color Palette**: Ice Blue / MyColor cyan dials (`0x051D`), metallic chrome bezels (`0xC618`), vibrant red needle (`0xF800`), deep midnight background (`0x0821`).
 - **Typography**: Retro-block / racing numerals, tick marks every 500 RPM / 10 MPH.
-- **Redline Arc**: Gradient arc starting at 5500 RPM up to 6200 RPM matching the Mustang 4.6L 3V Modular V8 torque/power drop curve.
 
 ### 2. Torque Neon Theme
 - **Inspiration**: Classic Torque Pro OBD Android App interface.
@@ -25,6 +37,9 @@ The UI supports three distinct visual themes switchable at runtime or persisted 
 - **Inspiration**: Minimalist modern electric/performance vehicle HUD.
 - **Color Palette**: Slate gray background (`0x18C3`), crisp white gauges (`0xFFFF`), accent blue (`0x03FF`), crimson warning badges (`0xD800`).
 - **Typography**: Clean vector/bitmap font layout, flat geometric bars, minimal chrome.
+
+### 4. All Themes
+- **Redline Arc**: Gradient arc starting at 5500 RPM up to 6200 RPM matching the Mustang 4.6L 3V Modular V8 torque/power drop curve.
 
 ### Implementation Structure (`src/display/theme.h`)
 
