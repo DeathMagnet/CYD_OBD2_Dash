@@ -6,39 +6,32 @@ namespace {
 constexpr float kGaugeStartAngle = 30.0F;
 constexpr float kGaugeEndAngle = 330.0F;
 constexpr int32_t kArcThicknessPx = 12;
-constexpr int kRedlineGradientSegments = 12;
-
-uint16_t lerpColor565(uint16_t colorA, uint16_t colorB, float t) {
-    uint8_t r1 = (colorA >> 11) & 0x1F, g1 = (colorA >> 5) & 0x3F, b1 = colorA & 0x1F;
-    uint8_t r2 = (colorB >> 11) & 0x1F, g2 = (colorB >> 5) & 0x3F, b2 = colorB & 0x1F;
-    uint8_t r = static_cast<uint8_t>(r1 + (r2 - r1) * t);
-    uint8_t g = static_cast<uint8_t>(g1 + (g2 - g1) * t);
-    uint8_t b = static_cast<uint8_t>(b1 + (b2 - b1) * t);
-    return static_cast<uint16_t>((r << 11) | (g << 5) | b);
-}
 } // namespace
 
 void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t centerY, int32_t radius,
-                   float value, float maxValue, float redlineStart, float redlineEnd, uint16_t bgColor,
+                   float value, float maxValue, float cautionStart, float dangerStart, uint16_t bgColor,
                    const ThemeColors& theme) {
     float clampedValue = value < 0.0F ? 0.0F : (value > maxValue ? maxValue : value);
     float valueFraction = (maxValue > 0.0F) ? (clampedValue / maxValue) : 0.0F;
     float valueAngle = kGaugeStartAngle + valueFraction * (kGaugeEndAngle - kGaugeStartAngle);
     int32_t innerRadius = radius - kArcThicknessPx;
 
-    // redlineEnd may be below redlineStart if a user-configured redline
-    // (Page 5) is set lower than the fixed OEM curve start; clamp so the
-    // zone never inverts and always ends by maxValue.
-    float clampedRedlineEnd = redlineEnd > maxValue ? maxValue : redlineEnd;
-    bool hasRedline = redlineStart < clampedRedlineEnd;
-    float redlineStartAngle = kGaugeEndAngle;
-    if (hasRedline) {
-        redlineStartAngle = kGaugeStartAngle + (redlineStart / maxValue) * (kGaugeEndAngle - kGaugeStartAngle);
-    }
+    // dangerStart may exceed maxValue if a user-configured redline (Page 5)
+    // sits above the gauge's fixed max; clamp so the danger zone never runs
+    // past the arc. cautionStart (Shift Light RPM) is likewise clamped so it
+    // can never sit past dangerStart, which would invert the caution zone.
+    float clampedDangerStart = dangerStart > maxValue ? maxValue : dangerStart;
+    float clampedCautionStart = cautionStart > clampedDangerStart ? clampedDangerStart : cautionStart;
+    bool hasCaution = clampedCautionStart < clampedDangerStart;
+    bool hasDanger = clampedDangerStart < maxValue;
 
-    // The redline zone paints over the value arc, so inside it the fill state is
-    // invisible and only the sweep below redlineStartAngle ever needs repainting.
-    int32_t limitDeg = static_cast<int32_t>(redlineStartAngle);
+    // The caution/danger zones paint over the value arc, so inside them the fill
+    // state is invisible and only the sweep below zoneStartAngle ever needs repainting.
+    float zoneStartValue = hasCaution ? clampedCautionStart : clampedDangerStart;
+    float zoneStartAngle = kGaugeStartAngle + (zoneStartValue / maxValue) * (kGaugeEndAngle - kGaugeStartAngle);
+    float dangerStartAngle = kGaugeStartAngle + (clampedDangerStart / maxValue) * (kGaugeEndAngle - kGaugeStartAngle);
+
+    int32_t limitDeg = static_cast<int32_t>(zoneStartAngle);
     int32_t newDeg = static_cast<int32_t>(valueAngle);
 
     if (!state.needsFullRedraw && maxValue == state.lastMaxValue) {
@@ -49,21 +42,22 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
         int32_t valueTo = newDeg > limitDeg ? limitDeg : newDeg;
 
         if (newDeg < lastDeg) {
-            // Erased as one continuous run out to the redline (rather than just the
+            // Erased as one continuous run out to the first zone (rather than just the
             // vacated slice) for the same anti-aliasing reason as the fill below.
             if (limitDeg > valueTo) {
                 tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
                                    static_cast<uint32_t>(valueTo), static_cast<uint32_t>(limitDeg),
                                    theme.secondaryGaugeArc, bgColor, false);
             }
-            // That run's end feathers into the redline's first segment; repaint it.
-            if (hasRedline) {
-                float redlineEndAngle =
-                    kGaugeStartAngle + (clampedRedlineEnd / maxValue) * (kGaugeEndAngle - kGaugeStartAngle);
-                float segEnd = redlineStartAngle + (redlineEndAngle - redlineStartAngle) / kRedlineGradientSegments;
+            // That run's end feathers into the first zone's edge; repaint it.
+            if (hasCaution) {
                 tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
-                                   static_cast<uint32_t>(redlineStartAngle), static_cast<uint32_t>(segEnd),
-                                   theme.redlineGradientStart, bgColor, false);
+                                   static_cast<uint32_t>(zoneStartAngle), static_cast<uint32_t>(dangerStartAngle),
+                                   theme.cautionArc, bgColor, false);
+            } else if (hasDanger) {
+                tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
+                                   static_cast<uint32_t>(zoneStartAngle), static_cast<uint32_t>(kGaugeEndAngle),
+                                   theme.dangerArc, bgColor, false);
             }
         }
 
@@ -93,32 +87,18 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
         }
     }
 
-    if (hasRedline) {
-        // Drawn as short interpolated-color segments rather than one solid
-        // arc so the redline reads as a true gradient (per the UI cluster
-        // guide's "Redline Arc" spec), since drawSmoothArc only takes one
-        // flat foreground color per call.
-        float redlineEndFraction = clampedRedlineEnd / maxValue;
-        float redlineEndAngle = kGaugeStartAngle + redlineEndFraction * (kGaugeEndAngle - kGaugeStartAngle);
-        float totalSweep = redlineEndAngle - redlineStartAngle;
+    if (hasCaution) {
+        tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
+                           static_cast<uint32_t>(zoneStartAngle), static_cast<uint32_t>(dangerStartAngle),
+                           theme.cautionArc, bgColor, false);
+    }
 
-        for (int segment = 0; segment < kRedlineGradientSegments; ++segment) {
-            float segStart = redlineStartAngle + (totalSweep * segment) / kRedlineGradientSegments;
-            float segEnd = redlineStartAngle + (totalSweep * (segment + 1)) / kRedlineGradientSegments;
-            float t = static_cast<float>(segment) / (kRedlineGradientSegments - 1);
-            uint16_t segColor = lerpColor565(theme.redlineGradientStart, theme.redlineGradientEnd, t);
-            tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
-                               static_cast<uint32_t>(segStart), static_cast<uint32_t>(segEnd),
-                               segColor, bgColor, false);
-        }
-
-        // Hold the full redline color out to the end of the arc rather than
+    if (hasDanger) {
+        // Hold the danger color out to the end of the arc rather than
         // dropping back to the unlit track past the configured redline.
-        if (redlineEndAngle < kGaugeEndAngle) {
-            tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
-                               static_cast<uint32_t>(redlineEndAngle), static_cast<uint32_t>(kGaugeEndAngle),
-                               theme.redlineGradientEnd, bgColor, false);
-        }
+        tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
+                           static_cast<uint32_t>(dangerStartAngle), static_cast<uint32_t>(kGaugeEndAngle),
+                           theme.dangerArc, bgColor, false);
     }
 
     state.lastValueAngle = valueAngle;
@@ -126,17 +106,35 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
     state.needsFullRedraw = false;
 }
 
-void drawBarGauge(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width, int32_t height,
+void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int32_t width, int32_t height,
                    float percent, uint16_t fillColor, const ThemeColors& theme) {
     float clamped = percent < 0.0F ? 0.0F : (percent > 100.0F ? 100.0F : percent);
     int32_t innerWidth = width - 4;
     int32_t fillWidth = static_cast<int32_t>((clamped / 100.0F) * innerWidth);
+    int32_t innerY = y + 2, innerH = height - 4;
+
+    if (!state.needsFullRedraw) {
+        if (fillWidth == state.lastFillWidth) {
+            return;
+        }
+        if (fillWidth > state.lastFillWidth) {
+            // Grew: paint only the newly covered sliver in fill color.
+            tft.fillRect(x + 2 + state.lastFillWidth, innerY, fillWidth - state.lastFillWidth, innerH, fillColor);
+        } else {
+            // Shrank: paint only the vacated sliver back to background.
+            tft.fillRect(x + 2 + fillWidth, innerY, state.lastFillWidth - fillWidth, innerH, theme.panel);
+        }
+        state.lastFillWidth = fillWidth;
+        return;
+    }
 
     tft.drawRect(x, y, width, height, theme.bezel);
-    tft.fillRect(x + 2, y + 2, innerWidth, height - 4, theme.panel);
+    tft.fillRect(x + 2, innerY, innerWidth, innerH, theme.panel);
     if (fillWidth > 0) {
-        tft.fillRect(x + 2, y + 2, fillWidth, height - 4, fillColor);
+        tft.fillRect(x + 2, innerY, fillWidth, innerH, fillColor);
     }
+    state.lastFillWidth = fillWidth;
+    state.needsFullRedraw = false;
 }
 
 void drawValueBox(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width,

@@ -88,7 +88,6 @@ constexpr uint16_t kMinRedlineRpm = 5000;
 constexpr uint16_t kMaxRedlineRpm = 7000;
 constexpr uint16_t kRedlineStepRpm = 100;
 constexpr uint16_t kDefaultRedlineRpm = 6200;
-constexpr uint16_t kRedlineArcStartRpm = 5500; // Fixed OEM 4.6L 3V power-drop curve start
 
 constexpr float kMinBaroBaselinePsi = 12.0F;
 constexpr float kMaxBaroBaselinePsi = 15.5F;

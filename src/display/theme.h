@@ -19,8 +19,8 @@ struct ThemeColors {
     uint16_t secondaryGaugeArc;
     uint16_t needle;
     uint16_t needleCap;
-    uint16_t redlineGradientStart;
-    uint16_t redlineGradientEnd;
+    uint16_t cautionArc;
+    uint16_t dangerArc;
     uint16_t bezel;
     uint16_t textPrimary;
     uint16_t textSecondary;

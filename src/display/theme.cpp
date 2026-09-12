@@ -12,8 +12,8 @@ constexpr ThemeColors kModernFlatTheme = {
     0x7BEF, // secondaryGaugeArc: muted gray-blue
     0xFFFF, // needle: crisp white
     0x03FF, // needleCap: accent blue
-    0xD800, // redlineGradientStart: crimson
-    0x9000, // redlineGradientEnd: deep red
+    0xFD20, // cautionArc: orange (Shift Light RPM -> Redline RPM zone)
+    0xF800, // dangerArc: red (Redline RPM -> end of sweep)
     0xC618, // bezel: light silver
     0xFFFF, // textPrimary: white
     0xC618, // textSecondary: silver

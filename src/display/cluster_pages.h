@@ -9,6 +9,7 @@
 #include "obd/obd_client.h"
 #include "system/connection_state.h"
 #include "system/config_store.h"
+#include "system/dtc_decoder.h"
 #include "logging/csv_logger.h"
 
 enum class ClusterPage : uint8_t {
@@ -47,11 +48,39 @@ struct ClusterPageRuntimeState {
     char statusMessage[48] = {0};
     uint32_t statusMessageSetAtMs = 0;
 
+    // Page 6 - last-drawn state, so drawPage6Dynamic() only repaints regions
+    // whose content actually changed instead of every UI refresh tick.
+    // -1 means "not drawn yet" and forces a redraw the first time; reset
+    // whenever drawPage6Static() reopens the page.
+    int8_t dtcMilOnDrawn = -1;
+    int8_t dtcHaveResultDrawn = -1;
+    DtcList dtcListDrawn;
+    int8_t dtcClearConfirmDrawn = -1;
+
     // Page 5 - delete-all-logs confirmation and save feedback.
     bool deleteLogsConfirmArmed = false;
     uint32_t deleteLogsConfirmArmedAtMs = 0;
     char configStatusMessage[32] = {0};
     uint32_t configStatusMessageSetAtMs = 0;
+
+    // Page 5 - last-drawn field text/button state, so drawPage5Dynamic() only
+    // repaints a field when its value actually changed instead of every UI
+    // refresh tick. Empty string / -1 means "not drawn yet" and forces a
+    // redraw the first time; reset whenever drawPage5Static() reopens the
+    // page.
+    char cfgShiftLightRpmDrawn[24] = {0};
+    char cfgRedlineRpmDrawn[24] = {0};
+    char cfgLogIntervalDrawn[24] = {0};
+    char cfgBaroBaselineDrawn[24] = {0};
+    int8_t cfgSaveButtonDrawn = -1;
+    int8_t cfgDeleteConfirmDrawn = -1;
+
+    // Page 5 - log summary (file count/size) is expensive to compute (it
+    // scans the SD card directory), so it's only rescanned periodically
+    // rather than on every UI refresh tick. Setting cfgLogSummaryNextScanMs
+    // to 0 forces an immediate rescan on the next drawPage5Dynamic() call.
+    char cfgLogSummaryDrawn[32] = {0};
+    uint32_t cfgLogSummaryNextScanMs = 0;
 };
 
 class ClusterPages {
@@ -100,7 +129,11 @@ private:
     NeedlePhysics rpmNeedle_;
     NeedlePhysics speedNeedle_;
     gaugewidgets::ArcGaugeState rpmArc_;
+    gaugewidgets::ArcGaugeState speedArc_;
     gaugewidgets::ArcGaugeState loadArc_;
     gaugewidgets::ArcGaugeState vacuumArc_;
+    gaugewidgets::BarGaugeState throttleBar_;
+    gaugewidgets::BarGaugeState stftBar_;
+    gaugewidgets::BarGaugeState ltftBar_;
     uint32_t lastFrameMs_ = 0;
 };
