@@ -1,0 +1,254 @@
+# CYD OBD-II Digital Cluster & UI Implementation Guide
+
+## Purpose
+
+This document provides complete, technical design and implementation instructions for the touch-driven, multi-page digital cluster UI on the Hosyond 4.0-inch ST7796S display (480x320 landscape). It covers screen layout, gauge animation mechanics, rendering pipeline, theme engine, touch interaction, transition physics, and page specifications.
+
+---
+
+## 🎨 Theme Engine Architecture
+
+The UI supports three distinct visual themes switchable at runtime or persisted via config.
+
+### 1. Mustang OEM S197 Theme
+- **Inspiration**: 2005–2010 Ford Mustang S197 instrument cluster.
+- **Color Palette**: Ice Blue / MyColor cyan dials (`0x051D`), metallic chrome bezels (`0xC618`), vibrant red needle (`0xF800`), deep midnight background (`0x0821`).
+- **Typography**: Retro-block / racing numerals, tick marks every 500 RPM / 10 MPH.
+- **Redline Arc**: Gradient arc starting at 5500 RPM up to 6200 RPM matching the Mustang 4.6L 3V Modular V8 torque/power drop curve.
+
+### 2. Torque Neon Theme
+- **Inspiration**: Classic Torque Pro OBD Android App interface.
+- **Color Palette**: High-contrast black background (`0x0000`), neon green primary gauge arcs (`0x07E0`), electric cyan secondary accents (`0x07FF`), hot orange warning highlights (`0xFDA0`).
+- **Typography**: High-tech digital segments and crisp sans-serif labels.
+
+### 3. Modern Flat Theme
+- **Inspiration**: Minimalist modern electric/performance vehicle HUD.
+- **Color Palette**: Slate gray background (`0x18C3`), crisp white gauges (`0xFFFF`), accent blue (`0x03FF`), crimson warning badges (`0xD800`).
+- **Typography**: Clean vector/bitmap font layout, flat geometric bars, minimal chrome.
+
+### Implementation Structure (`src/display/theme.h`)
+
+```cpp
+#pragma once
+#include <stdint.h>
+
+enum class ThemeId : uint8_t {
+    MustangS197 = 0,
+    TorqueNeon  = 1,
+    ModernFlat  = 2
+};
+
+struct ThemeColors {
+    uint16_t background;
+    uint16_t primaryGaugeArc;
+    uint16_t secondaryGaugeArc;
+    uint16_t needle;
+    uint16_t needleCap;
+    uint16_t redlineGradientStart;
+    uint16_t redlineGradientEnd;
+    uint16_t bezel;
+    uint16_t textPrimary;
+    uint16_t textSecondary;
+    uint16_t warningActive;
+    uint16_t touchHighlight;
+};
+
+const ThemeColors& getTheme(ThemeId id);
+```
+
+---
+
+## ⚡ Display Pipeline & Animation Physics
+
+To achieve flicker-free 30 FPS rendering on the ST7796S (20MHz SPI), use `TFT_eSPI` double-buffered Sprites for active gauges and dynamic screen regions.
+
+### 1. Gauge Needle Interpolation & Boot Sweep
+Needles use critically damped spring smoothing for realistic weight and zero jitter.
+
+```cpp
+struct NeedlePhysics {
+    float currentAngle = 0.0f;
+    float targetAngle  = 0.0f;
+    float velocity     = 0.0f;
+
+    void update(float target, float dt, float stiffness = 180.0f, float damping = 22.0f) {
+        float force = (target - currentAngle) * stiffness;
+        float dampingForce = velocity * damping;
+        float accel = force - dampingForce;
+        velocity += accel * dt;
+        currentAngle += velocity * dt;
+    }
+};
+```
+
+#### Boot Needle Sweep Sequence
+On system boot (after boot animation fade-out), all gauge needles execute a cluster gauge sweep:
+1. Interpolate needles from minimum (0%) to maximum (100% scale) in 600ms.
+2. Hold at 100% for 150ms.
+3. Return smoothly to 0% (or live OBD value) in 500ms.
+4. Transition display state to `Live`.
+
+### 2. Page Transition Animations
+- **Slide Transition**: When user swipes left/right or taps navigation arrows, draw current page to Sprite A, target page to Sprite B, and slide the offset across X (`0` to `±480` px) over 200ms using ease-out easing.
+- **Fade Transition**: Used during boot screen initialization and page switching if low RAM prevents double horizontal buffer allocation. Alpha-blend or step backlight brightness (`TFT_BL` PWM pin 27) smoothly from `0` to `255` over 300ms.
+
+---
+
+## 📱 Touch Navigation & Multi-Page Cluster Architecture
+
+The display is divided into a 6-page interactive cluster.
+
+```
++-------------------------------------------------------------------+
+|  [<] PAGE 1: PRIMARY CLUSTER                   MIL [OFF]  [>]    |
++-------------------------------------------------------------------+
+|                                                                   |
+|              ( RPM Gauge: Redline 5500-6200 )                      |
+|                                                                   |
+|    Speed         Coolant         IAT         Throttle             |
+|   72 MPH          195 °F        88 °F          24 %               |
++-------------------------------------------------------------------+
+```
+
+### Navigation Touch Zones
+- **Header Touch Bar (Y: 0..40)**:
+  - Left region `(X: 0..60)`: Previous Page
+  - Right region `(X: 420..480)`: Next Page
+  - Title center `(X: 61..350)`: Open Config Menu (Page 5)
+- **Check Engine Light (MIL) Touch Zone (X: 351..419, Y: 0..40)**: Tapping the MIL icon when active (or inactive) jumps directly to **Page 6 (Diagnostics)**.
+- **Swipe Gestures**: Horizontal swipe left (>60px delta) advances page; horizontal swipe right returns.
+
+---
+
+## 📄 Cluster Pages Detailed Specification
+
+### Page 1 — Primary Cluster
+- **RPM Gauge (Large, Center)**:
+  - Dial range: 0 – 7000 RPM.
+  - **OEM Mustang Redline Arc**: Exact 4.6L 3V curve with red arc gradient from 5500 RPM to 6200 RPM (`0xF800` to `0x9000`).
+  - **Shift Light**: Flashes the RPM gauge bezel bright red/white at configurable threshold (default: 5800 RPM).
+  - Center digital readout for exact RPM.
+- **Speedometer**: Digital + analog scale (0–160 MPH or 0–240 KPH).
+- **Coolant Temperature**: Analog/digital gauge with high-temp threshold highlight (>220 °F).
+- **Intake Air Temperature (IAT)**: Auxiliary digital display.
+- **Throttle Position (TPS)**: Live percentage bar graph (0–100%).
+- **Check Engine Light (MIL) Indicator**:
+  - Lit bright yellow/orange when ECU reports active Check Engine Light (`PID 01 01` / MIL flag).
+  - Acts as a touch zone: Tapping it instantly switches display to **Page 6 (Diagnostics)**.
+- **Boot Needle Sweep**: Triggers automatically on initial display transition.
+
+---
+
+### Page 2 — Engine Load & Airflow
+Focused on engine intake efficiency and fuel trim diagnostics.
+- **Engine Load**: Percentage dial (0–100%).
+- **Mass Air Flow (MAF)**: Live grams/sec (g/s) value with peak hold indicator.
+- **Timing Advance**: Spark advance in degrees BTDC (-64° to +63.5°).
+- **Short Term Fuel Trim (STFT Bank 1)**: Percentage readout (-25% to +25%).
+- **Long Term Fuel Trim (LTFT Bank 1)**: Percentage readout (-25% to +25%).
+
+---
+
+### Page 3 — Car-Specific Sensors (Mustang / Ford Focus)
+Custom PID calculations for key Ford engine parameters.
+- **Battery Voltage**: Measured via OBD PID `01 42` or ELM `ATRVR` command (9.0V – 16.0V range).
+- **Fuel Rail Pressure**: Ford specific PID `01 23` (PSI / kPa).
+- **MAP & Calculated Vacuum / Boost Gauge**:
+  - Uses Manifold Absolute Pressure (`PID 01 0B`) minus Barometric Baseline (configured in Page 5, default 14.7 PSI / 101.3 kPa).
+  - Displays as **Vacuum (inHg)** when MAP < Baro, and **Boost (PSI)** when MAP > Baro.
+  - Vacuum range: 0 – 30 inHg; Boost range: 0 – 25 PSI.
+- **O2 Sensor B1S1**: Upstream Oxygen Sensor Voltage / Lambda (`PID 01 14`).
+- **O2 Sensor B2S1**: Upstream Oxygen Sensor Bank 2 Voltage (`PID 01 18`).
+
+---
+
+### Page 4 — 'My Car' Performance & Telemetry
+Performance estimation and real-time intake graph.
+- **Calculated Horsepower (HP)**:
+  - Estimated from MAF sensor airflow:
+    $$\text{HP}_{\text{wheel}} \approx \text{MAF (g/s)} \times 0.8$$
+- **Calculated Torque (lb-ft)**:
+  - Derived from estimated HP and engine RPM:
+    $$\text{Torque (lb-ft)} = \frac{\text{HP} \times 5252}{\text{RPM}}$$
+  - Clamped when RPM < 500.
+- **0–60 MPH Timer**:
+  - Automatic start when Speed transitions from 0 to >0 MPH.
+  - Timer stops when Speed reaches 60 MPH (displays result in seconds, e.g. `5.42 s`).
+  - Reset by tapping timer touch box.
+- **Intake Airflow Rolling Graph**:
+  - 120-pixel wide line chart showing last 60 seconds of MAF / Throttle readings.
+
+---
+
+### Page 5 — Config Menu
+Touch interactive settings menu. All values persist across reboots by saving to `/config.json` or `/config.txt` on the SD card (or LittleFS fallback).
+
+| Setting Field | Options / Range | Default | Description |
+| --- | --- | --- | --- |
+| **Active Theme** | Mustang S197, Torque Neon, Modern Flat | Mustang S197 | UI visual style |
+| **Shift Light RPM** | 3000 – 6800 RPM (step 100) | 5800 RPM | RPM bezel flash trigger |
+| **Redline RPM** | 5000 – 7000 RPM (step 100) | 6200 RPM | Redline gauge arc start |
+| **Logging Interval** | 50ms, 100ms, 250ms, 500ms, 1000ms | 100ms | SD CSV log row write cadence |
+| **Boost Baro Baseline** | 12.0 – 15.5 PSI (step 0.1) | 14.7 PSI | Baseline pressure for boost calc |
+| **Save Settings** | [ SAVE TO SD ] button | - | Writes current config to SD card |
+
+---
+
+### Page 6 — Diagnostics (DTC Reader)
+Read and display OBD-II Diagnostic Trouble Codes.
+- **Check Engine Light (MIL) Status**: `MIL ACTIVE (ON)` or `MIL INACTIVE (OFF)`.
+- **DTC Decoding**:
+  - Requests Mode 03 (`03`) stored trouble codes and Mode 07 (`07`) pending codes from ELM327.
+  - Decodes raw 2-byte response into standard OBD-II format:
+    - `0x00` -> `P0xxx` (Powertrain)
+    - `0x01` -> `C0xxx` (Chassis)
+    - `0x02` -> `B0xxx` (Body)
+    - `0x03` -> `U0xxx` (Network)
+  - Displays formatted code list (e.g. `P0420 - Catalyst System Efficiency Below Threshold`).
+- **Clear Codes Touch Zone**: [ CLEAR CODES ] button issues Mode 04 (`04`) command with confirmation prompt.
+
+---
+
+## 🚀 Boot Sequence & Transitions
+
+1. **Power On / Reset**: Initialize TFT display & SPI at 20MHz.
+2. **Boot Screen (Build Option `BOOT_IMAGE_MODE`)**:
+   - `BOOT_IMAGE_MODE = 0`: Static Ford Mustang pony splash screen with 300ms **fade-in** and 300ms **fade-out**.
+   - `BOOT_IMAGE_MODE = 1`: Animated frame-by-frame RGB666 sequence at 20 FPS with fade-in/fade-out transitions.
+3. **SD Card & Config Load**: Load saved preferences from SD (`/config.json`).
+4. **Gauge Needle Sweep**: Execute 1.2-second full range gauge sweep animation on Page 1.
+5. **OBD Connection**: Display connection status badge (`CONNECTING...`) until Bluetooth ELM327 handshake completes, then transition to `LIVE`.
+
+---
+
+## 🛠️ File Structure & Code Responsibilities
+
+Add these files under `src/display/` and `src/system/`:
+
+```text
+src/
+  display/
+    theme.h / theme.cpp             # Color definitions and theme manager
+    gauge_widgets.h / .cpp           # Smooth gauge needle, arc rendering, shift light
+    cluster_pages.h / .cpp           # Pages 1 to 6 layout and draw functions
+    page_transitions.h / .cpp        # Slide/fade animation engine
+    touch_handler.h / .cpp           # Touch calibration, gesture detection, tap zones
+    boot_player.h / .cpp             # Static/animated boot screen with fade
+  system/
+    config_store.h / .cpp            # Persistence manager for SD card configuration
+    dtc_decoder.h / .cpp             # OBD Mode 03/07 DTC parser (P/C/B/U format)
+```
+
+---
+
+## 🧪 Verification Checklist
+
+- [ ] All 6 pages render cleanly at 480x320 landscape resolution.
+- [ ] Theme switching immediately recolors gauges, bezels, needles, and text.
+- [ ] Page 1 RPM gauge correctly displays Mustang 5500-6200 RPM redline arc and triggers bezel shift light flash.
+- [ ] Needles perform a smooth full-scale sweep on boot and update continuously without jitter.
+- [ ] Tapping the MIL indicator on Page 1 switches instantly to Page 6.
+- [ ] Calculated Horsepower, Torque, Vacuum/Boost, and 0-60 timer update correctly on Pages 3 & 4.
+- [ ] Config menu settings save to SD card and persist after power cycle.
+- [ ] Page 6 correctly decodes and displays DTCs in `P0xxx` / `C0xxx` format.
+- [ ] Boot screen executes smooth fade-in and fade-out transitions before launching the cluster.
