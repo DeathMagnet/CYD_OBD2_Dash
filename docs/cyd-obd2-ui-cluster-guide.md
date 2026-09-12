@@ -12,7 +12,7 @@ All six pages render live OBD-II telemetry today, but with these deliberate devi
 
 - **Only Modern Flat is implemented.** `getTheme()` (`src/display/theme.cpp`) returns the Modern Flat palette regardless of the requested `ThemeId`; Mustang S197 and Torque Neon are reserved enum values with no color table yet. Page 5's "Active Theme" row is display-only and reads "MODERN FLAT (ACTIVE) - OTHERS COMING SOON".
 - **Direct-to-TFT rendering, not sprites.** This board's ESP32-32E has no PSRAM, and a full-frame RGB565 sprite (~300KB) does not fit in 320KB of SRAM alongside the Bluetooth stack and SD buffers. Each page has a `drawStatic()` pass (chrome/labels, called once per page change) and a `drawDynamic()` pass (values only, called on a throttled `config::kUiRefreshIntervalMs` cadence) that redraws its own bounded region using TFT_eSPI's background-color text redraw to avoid flicker. There is no slide/fade page-transition animation; page switches redraw immediately.
-- **Redline arc**: drawn as 12 interpolated-color segments between `config::kRedlineArcStartRpm` (fixed at 5500) and Page 5's user-configurable "Redline RPM" setting (default 6200, range 5000-7000), via `gaugewidgets::drawArcGauge`'s `redlineStart`/`redlineEnd` parameters. Past the configured redline the full redline color is held out to the end of the arc, so the sweep never drops back to unlit track.
+- **RPM warning arc**: drawn as two solid zones, not a gradient, via `gaugewidgets::drawArcGauge`'s `cautionStart`/`dangerStart` parameters — orange (`theme.cautionArc`) from Page 5's "Shift Light RPM" setting (default 5800) up to its "Redline RPM" setting (default 6200), then red (`theme.dangerArc`) held from Redline RPM out to the end of the arc, so the sweep never drops back to unlit track.
 - **Page 6 DTC list shows codes only** (e.g. `P0133`), not human-readable descriptions — no DTC description database is included. A read is triggered automatically whenever Page 6 is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
 - **Page 5 adds a log-management row** beyond the settings table below: a live count of session log files and their total size (`CsvLogger::getLogSummary()`), plus a "DELETE ALL LOGS" button (same 5-second tap-to-confirm pattern) that closes the active file, deletes every `mustang_log_*.csv`, and immediately opens a fresh session file. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space.
 - **Actual source layout** differs from the "Proposed" structure at the bottom of this doc — see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#proposed-source-layout) for the as-built tree.
@@ -59,8 +59,8 @@ struct ThemeColors {
     uint16_t secondaryGaugeArc;
     uint16_t needle;
     uint16_t needleCap;
-    uint16_t redlineGradientStart;
-    uint16_t redlineGradientEnd;
+    uint16_t cautionArc;
+    uint16_t dangerArc;
     uint16_t bezel;
     uint16_t textPrimary;
     uint16_t textSecondary;
@@ -281,7 +281,7 @@ src/
 
 - [ ] All 6 pages render cleanly at 480x320 landscape resolution.
 - [ ] Theme switching immediately recolors gauges, bezels, needles, and text.
-- [ ] Page 1 RPM gauge correctly displays Mustang 5500-6200 RPM redline arc, holds redline color to the end of the sweep, and triggers bezel shift light flash.
+- [ ] Page 1 RPM gauge correctly displays the orange Shift Light-to-Redline arc and the red Redline-to-max arc, holds the red zone to the end of the sweep, and triggers bezel shift light flash.
 - [ ] Needles perform a smooth full-scale sweep on boot and update continuously without jitter.
 - [ ] Sweeping a gauge up and back down leaves no seam lines in either the fill or the unlit track.
 - [ ] Readouts that lose a digit or change caption (RPM, coolant, vacuum/boost, MIL line) leave no leftover characters.

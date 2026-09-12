@@ -125,36 +125,40 @@ void ClusterPages::drawPage1Static() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
     rpmArc_.invalidate();
+    speedArc_.invalidate();
+    throttleBar_.invalidate();
 
-    constexpr int32_t kRowY = 250, kRowH = 60, kColW = 118, kColGap = 4;
-    for (int i = 0; i < 4; ++i) {
+    constexpr int32_t kRowY = 250, kRowH = 60, kColW = 154, kColGap = 5;
+    for (int i = 0; i < 3; ++i) {
         int32_t x = 4 + i * (kColW + kColGap);
         tft_.fillRoundRect(x, kRowY, kColW, kRowH, 6, theme_.panel);
     }
 }
 
 void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
-    constexpr int32_t kGaugeCx = 240, kGaugeCy = 150, kGaugeRadius = 95;
+    constexpr int32_t kRpmGaugeCx = 130, kSpeedGaugeCx = 350, kGaugeCy = 150, kGaugeRadius = 95;
     constexpr float kRpmMax = 7000.0F;
+    constexpr float kSpeedMax = 200.0F;
 
     const AppSettings& settings = configStore_.settings();
 
     float targetRpm = snapshot.rpm.valid ? snapshot.rpm.value : 0.0F;
+    float targetSpeed = snapshot.speedMph.valid ? snapshot.speedMph.value : 0.0F;
     float dt = (lastFrameMs_ == 0) ? 0.033F : (nowMs - lastFrameMs_) / 1000.0F;
     if (dt > 0.25F) {
         dt = 0.25F; // Clamp huge gaps (page switches, stalls) so the spring doesn't overshoot.
     }
     rpmNeedle_.update(targetRpm, dt);
+    speedNeedle_.update(targetSpeed, dt);
     lastFrameMs_ = nowMs;
 
-    // Redline gradient spans the fixed OEM curve start (5500) up to the
-    // user's configured Redline RPM (Page 5, default 6200); clamp the start
-    // down if the user sets a redline below 5500 so the zone never inverts.
-    float redlineStart = static_cast<float>(config::kRedlineArcStartRpm) < settings.redlineRpm
-                              ? static_cast<float>(config::kRedlineArcStartRpm)
-                              : static_cast<float>(settings.redlineRpm);
-    gaugewidgets::drawArcGauge(tft_, rpmArc_, kGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue, kRpmMax,
-                                redlineStart, static_cast<float>(settings.redlineRpm), theme_.background, theme_);
+    // Orange from Shift Light RPM (Page 5) up to Redline RPM, then solid red
+    // from Redline RPM out to the end of the sweep.
+    gaugewidgets::drawArcGauge(tft_, rpmArc_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue, kRpmMax,
+                                static_cast<float>(settings.shiftLightRpm),
+                                static_cast<float>(settings.redlineRpm), theme_.background, theme_);
+    gaugewidgets::drawArcGauge(tft_, speedArc_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
+                                kSpeedMax, kSpeedMax, kSpeedMax, theme_.background, theme_);
 
     bool shiftLightOn = snapshot.rpm.valid && snapshot.rpm.value >= settings.shiftLightRpm;
     bool flashPhase = ((nowMs / 200) % 2) == 0;
@@ -169,21 +173,31 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextDatum(MC_DATUM);
     tft_.setTextColor(rpmTextColor, theme_.background);
     tft_.setTextSize(4);
-    gaugewidgets::drawFieldText(tft_, rpmBuf, kGaugeCx, kGaugeCy - 5, 120, theme_.background);
+    gaugewidgets::drawFieldText(tft_, rpmBuf, kRpmGaugeCx, kGaugeCy - 5, 120, theme_.background);
     tft_.setTextSize(1);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
-    tft_.drawString("RPM", kGaugeCx, kGaugeCy + 25);
+    tft_.drawString("RPM", kRpmGaugeCx, kGaugeCy + 25);
 
-    constexpr int32_t kRowY = 250, kColW = 118, kColGap = 4;
+    char speedBuf[8];
+    if (snapshot.speedMph.valid) {
+        snprintf(speedBuf, sizeof(speedBuf), "%d", static_cast<int>(speedNeedle_.currentValue));
+    } else {
+        strcpy(speedBuf, "--");
+    }
+    tft_.setTextDatum(MC_DATUM);
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    tft_.setTextSize(4);
+    gaugewidgets::drawFieldText(tft_, speedBuf, kSpeedGaugeCx, kGaugeCy - 5, 120, theme_.background);
+    tft_.setTextSize(1);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    tft_.drawString("MPH", kSpeedGaugeCx, kGaugeCy + 25);
+
+    constexpr int32_t kRowY = 250, kColW = 154, kColGap = 5;
     char valueBuf[16];
-
-    snprintf(valueBuf, sizeof(valueBuf), "%d MPH", static_cast<int>(snapshot.speedMph.value));
-    gaugewidgets::drawValueBox(tft_, 4 + 0 * (kColW + kColGap), kRowY + 8, kColW, "SPEED", valueBuf,
-                                snapshot.speedMph.valid, theme_);
 
     bool coolantHot = snapshot.coolantF.valid && snapshot.coolantF.value > config::kHighCoolantWarningF;
     snprintf(valueBuf, sizeof(valueBuf), "%d F", static_cast<int>(snapshot.coolantF.value));
-    int32_t coolantColX = 4 + 1 * (kColW + kColGap);
+    int32_t coolantColX = 4 + 0 * (kColW + kColGap);
     tft_.setTextDatum(TC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
     tft_.setTextSize(1);
@@ -196,15 +210,15 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
                                  kColW - 4, theme_.panel);
 
     snprintf(valueBuf, sizeof(valueBuf), "%d F", static_cast<int>(snapshot.iatF.value));
-    gaugewidgets::drawValueBox(tft_, 4 + 2 * (kColW + kColGap), kRowY + 8, kColW, "IAT", valueBuf,
+    gaugewidgets::drawValueBox(tft_, 4 + 1 * (kColW + kColGap), kRowY + 8, kColW, "IAT", valueBuf,
                                 snapshot.iatF.valid, theme_);
 
-    int32_t throttleColX = 4 + 3 * (kColW + kColGap);
+    int32_t throttleColX = 4 + 2 * (kColW + kColGap);
     tft_.setTextDatum(TC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
     tft_.setTextSize(1);
     tft_.drawString("THROTTLE", throttleColX + kColW / 2, kRowY + 8);
-    gaugewidgets::drawBarGauge(tft_, throttleColX + 8, kRowY + 24, kColW - 16, 24,
+    gaugewidgets::drawBarGauge(tft_, throttleBar_, throttleColX + 8, kRowY + 24, kColW - 16, 24,
                                 snapshot.throttlePct.valid ? snapshot.throttlePct.value : 0.0F,
                                 theme_.primaryGaugeArc, theme_);
 }
@@ -215,6 +229,8 @@ void ClusterPages::drawPage2Static() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
     loadArc_.invalidate();
+    stftBar_.invalidate();
+    ltftBar_.invalidate();
     tft_.fillRoundRect(250, 50, 220, 100, 6, theme_.panel);
     tft_.fillRoundRect(20, 220, 210, 80, 6, theme_.panel);
     tft_.fillRoundRect(250, 220, 210, 80, 6, theme_.panel);
@@ -222,7 +238,7 @@ void ClusterPages::drawPage2Static() {
 
 void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
     (void)nowMs;
-    constexpr int32_t kGaugeCx = 130, kGaugeCy = 150, kGaugeRadius = 95;
+    constexpr int32_t kGaugeCx = 130, kGaugeCy = 130, kGaugeRadius = 78;
     char buf[24];
 
     float targetLoad = snapshot.engineLoadPct.valid ? snapshot.engineLoadPct.value : 0.0F;
@@ -260,7 +276,7 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.drawString("STFT BANK 1", 125, 228);
     // Map -25%..+25% onto the 0-100% bar widget so the fill visually centers.
     float stftCentered = snapshot.stftPct.valid ? (snapshot.stftPct.value + 25.0F) * 2.0F : 0.0F;
-    gaugewidgets::drawBarGauge(tft_, 30, 250, 190, 30, stftCentered, theme_.primaryGaugeArc, theme_);
+    gaugewidgets::drawBarGauge(tft_, stftBar_, 30, 250, 190, 30, stftCentered, theme_.primaryGaugeArc, theme_);
     snprintf(buf, sizeof(buf), "%.1f%%", snapshot.stftPct.value);
     tft_.setTextColor(theme_.textPrimary, theme_.panel);
     gaugewidgets::drawFieldText(tft_, snapshot.stftPct.valid ? buf : "--", 125, 288, 190, theme_.panel);
@@ -268,7 +284,7 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
     tft_.drawString("LTFT BANK 1", 355, 228);
     float ltftCentered = snapshot.ltftPct.valid ? (snapshot.ltftPct.value + 25.0F) * 2.0F : 0.0F;
-    gaugewidgets::drawBarGauge(tft_, 260, 250, 190, 30, ltftCentered, theme_.primaryGaugeArc, theme_);
+    gaugewidgets::drawBarGauge(tft_, ltftBar_, 260, 250, 190, 30, ltftCentered, theme_.primaryGaugeArc, theme_);
     snprintf(buf, sizeof(buf), "%.1f%%", snapshot.ltftPct.value);
     tft_.setTextColor(theme_.textPrimary, theme_.panel);
     gaugewidgets::drawFieldText(tft_, snapshot.ltftPct.valid ? buf : "--", 355, 288, 190, theme_.panel);
@@ -454,78 +470,148 @@ void ClusterPages::drawPage5Static() {
 
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow3Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
-}
 
-void ClusterPages::drawPage5Dynamic(uint32_t nowMs) {
-    const AppSettings& settings = configStore_.settings();
-    char buf[24];
-
+    // Theme name never changes today (only one theme exists), so it only
+    // needs to be drawn once here rather than every drawPage5Dynamic() tick.
     tft_.setTextDatum(MC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     tft_.setTextSize(1);
     tft_.drawString("MODERN FLAT (ACTIVE) - OTHERS COMING SOON", (layout::kConfigMinusX + layout::kScreenWidth) / 2,
                      layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
 
-    tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(2);
+    // Force drawPage5Dynamic() to repaint every region the next time it
+    // runs, since the static redraw above just wiped them all.
+    runtimeState_.cfgShiftLightRpmDrawn[0] = '\0';
+    runtimeState_.cfgRedlineRpmDrawn[0] = '\0';
+    runtimeState_.cfgLogIntervalDrawn[0] = '\0';
+    runtimeState_.cfgBaroBaselineDrawn[0] = '\0';
+    runtimeState_.cfgSaveButtonDrawn = -1;
+    runtimeState_.cfgDeleteConfirmDrawn = -1;
+    runtimeState_.cfgLogSummaryDrawn[0] = '\0';
+    runtimeState_.cfgLogSummaryNextScanMs = 0;
+}
+
+void ClusterPages::drawPage5Dynamic(uint32_t nowMs) {
+    const AppSettings& settings = configStore_.settings();
+    char buf[24];
+
     snprintf(buf, sizeof(buf), "%u", settings.shiftLightRpm);
-    gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
-                                 layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
-                                 theme_.background);
+    if (strcmp(buf, runtimeState_.cfgShiftLightRpmDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
+                                     layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgShiftLightRpmDrawn, buf, sizeof(runtimeState_.cfgShiftLightRpmDrawn) - 1);
+    }
 
     snprintf(buf, sizeof(buf), "%u", settings.redlineRpm);
-    gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
-                                 layout::kConfigRow2Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
-                                 theme_.background);
+    if (strcmp(buf, runtimeState_.cfgRedlineRpmDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
+                                     layout::kConfigRow2Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgRedlineRpmDrawn, buf, sizeof(runtimeState_.cfgRedlineRpmDrawn) - 1);
+    }
 
     snprintf(buf, sizeof(buf), "%lu ms", static_cast<unsigned long>(settings.logIntervalMs));
-    gaugewidgets::drawFieldText(tft_, buf, layout::kConfigCycleX + layout::kConfigCycleW / 2,
-                                 layout::kConfigRow3Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
-                                 theme_.background);
+    if (strcmp(buf, runtimeState_.cfgLogIntervalDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigCycleX + layout::kConfigCycleW / 2,
+                                     layout::kConfigRow3Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgLogIntervalDrawn, buf, sizeof(runtimeState_.cfgLogIntervalDrawn) - 1);
+    }
 
     snprintf(buf, sizeof(buf), "%.1f PSI", settings.baroBaselinePsi);
-    gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
-                                 layout::kConfigRow4Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
-                                 theme_.background);
+    if (strcmp(buf, runtimeState_.cfgBaroBaselineDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
+                                     layout::kConfigRow4Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgBaroBaselineDrawn, buf, sizeof(runtimeState_.cfgBaroBaselineDrawn) - 1);
+    }
 
     bool showSavedFeedback = runtimeState_.configStatusMessage[0] != '\0' &&
                               (nowMs - runtimeState_.configStatusMessageSetAtMs < 1500);
     if (runtimeState_.configStatusMessage[0] != '\0' && !showSavedFeedback) {
         runtimeState_.configStatusMessage[0] = '\0';
     }
-    tft_.fillRoundRect(layout::kConfigSaveX, layout::kConfigRow5Y + layout::kConfigButtonInsetY,
-                        layout::kConfigSaveW, layout::kConfigButtonH, 6, theme_.primaryGaugeArc);
-    tft_.setTextColor(theme_.background, theme_.primaryGaugeArc);
-    tft_.drawString(showSavedFeedback ? "SAVED!" : "SAVE TO SD", layout::kScreenWidth / 2,
-                     layout::kConfigRow5Y + layout::kConfigRowHeight / 2);
+    if (runtimeState_.cfgSaveButtonDrawn != static_cast<int8_t>(showSavedFeedback)) {
+        tft_.fillRoundRect(layout::kConfigSaveX, layout::kConfigRow5Y + layout::kConfigButtonInsetY,
+                            layout::kConfigSaveW, layout::kConfigButtonH, 6, theme_.primaryGaugeArc);
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextSize(2);
+        tft_.setTextColor(theme_.background, theme_.primaryGaugeArc);
+        tft_.drawString(showSavedFeedback ? "SAVED!" : "SAVE TO SD", layout::kScreenWidth / 2,
+                         layout::kConfigRow5Y + layout::kConfigRowHeight / 2);
+        runtimeState_.cfgSaveButtonDrawn = static_cast<int8_t>(showSavedFeedback);
+    }
 
-    LogSummary summary = csvLogger_.getLogSummary();
-    float totalMb = static_cast<float>(summary.totalBytes) / (1024.0F * 1024.0F);
-    snprintf(buf, sizeof(buf), "%lu LOGS, %.1f MB", static_cast<unsigned long>(summary.fileCount), totalMb);
-    tft_.setTextDatum(ML_DATUM);
-    tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(1);
-    gaugewidgets::drawFieldText(tft_, buf, 12, layout::kConfigRow6Y + layout::kConfigRowHeight / 2,
-                                 layout::kConfigDeleteX - 20, theme_.background);
+    // getLogSummary() scans the SD card's log directory, so it's only
+    // rescanned periodically rather than on every UI refresh tick.
+    if (nowMs >= runtimeState_.cfgLogSummaryNextScanMs) {
+        constexpr uint32_t kLogSummaryScanIntervalMs = 2000;
+        runtimeState_.cfgLogSummaryNextScanMs = nowMs + kLogSummaryScanIntervalMs;
+
+        LogSummary summary = csvLogger_.getLogSummary();
+        float totalMb = static_cast<float>(summary.totalBytes) / (1024.0F * 1024.0F);
+        snprintf(buf, sizeof(buf), "%lu LOGS, %.1f MB", static_cast<unsigned long>(summary.fileCount), totalMb);
+        if (strcmp(buf, runtimeState_.cfgLogSummaryDrawn) != 0) {
+            tft_.setTextDatum(ML_DATUM);
+            tft_.setTextColor(theme_.textPrimary, theme_.background);
+            tft_.setTextSize(1);
+            gaugewidgets::drawFieldText(tft_, buf, 12, layout::kConfigRow6Y + layout::kConfigRowHeight / 2,
+                                         layout::kConfigDeleteX - 20, theme_.background);
+            strncpy(runtimeState_.cfgLogSummaryDrawn, buf, sizeof(runtimeState_.cfgLogSummaryDrawn) - 1);
+        }
+    }
 
     bool confirmArmed =
         runtimeState_.deleteLogsConfirmArmed && (nowMs - runtimeState_.deleteLogsConfirmArmedAtMs < 5000);
     if (runtimeState_.deleteLogsConfirmArmed && !confirmArmed) {
         runtimeState_.deleteLogsConfirmArmed = false;
     }
-    uint16_t deleteColor = confirmArmed ? theme_.warningActive : theme_.panel;
-    tft_.fillRoundRect(layout::kConfigDeleteX, layout::kConfigRow6Y + layout::kConfigButtonInsetY,
-                        layout::kConfigDeleteW, layout::kConfigButtonH, 6, deleteColor);
-    tft_.drawRoundRect(layout::kConfigDeleteX, layout::kConfigRow6Y + layout::kConfigButtonInsetY,
-                        layout::kConfigDeleteW, layout::kConfigButtonH, 6, theme_.bezel);
-    tft_.setTextDatum(MC_DATUM);
-    tft_.setTextColor(confirmArmed ? theme_.background : theme_.textPrimary, deleteColor);
-    tft_.drawString(confirmArmed ? "TAP TO CONFIRM" : "DELETE ALL LOGS",
-                     layout::kConfigDeleteX + layout::kConfigDeleteW / 2,
-                     layout::kConfigRow6Y + layout::kConfigRowHeight / 2);
+    if (runtimeState_.cfgDeleteConfirmDrawn != static_cast<int8_t>(confirmArmed)) {
+        uint16_t deleteColor = confirmArmed ? theme_.warningActive : theme_.panel;
+        tft_.fillRoundRect(layout::kConfigDeleteX, layout::kConfigRow6Y + layout::kConfigButtonInsetY,
+                            layout::kConfigDeleteW, layout::kConfigButtonH, 6, deleteColor);
+        tft_.drawRoundRect(layout::kConfigDeleteX, layout::kConfigRow6Y + layout::kConfigButtonInsetY,
+                            layout::kConfigDeleteW, layout::kConfigButtonH, 6, theme_.bezel);
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextSize(1);
+        tft_.setTextColor(confirmArmed ? theme_.background : theme_.textPrimary, deleteColor);
+        tft_.drawString(confirmArmed ? "TAP TO CONFIRM" : "DELETE ALL LOGS",
+                         layout::kConfigDeleteX + layout::kConfigDeleteW / 2,
+                         layout::kConfigRow6Y + layout::kConfigRowHeight / 2);
+        runtimeState_.cfgDeleteConfirmDrawn = static_cast<int8_t>(confirmArmed);
+    }
 }
 
 // ---------------------------------------------------------------- Page 6: Diagnostics --
+
+namespace {
+
+bool dtcListsEqual(const DtcList& a, const DtcList& b) {
+    if (a.count != b.count) {
+        return false;
+    }
+    for (uint8_t i = 0; i < a.count; ++i) {
+        if (strcmp(a.codes[i], b.codes[i]) != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+} // namespace
 
 void ClusterPages::drawPage6Static() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
@@ -533,47 +619,8 @@ void ClusterPages::drawPage6Static() {
     tft_.drawRoundRect(20, layout::kDtcListY - 10, 440,
                         layout::kDtcListLineHeight * layout::kDtcListVisibleLines + 20, 6, theme_.bezel);
 
-    // Kick off a fresh DTC read every time this page is opened.
-    obdClient_.requestDtcRead();
-}
-
-void ClusterPages::drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
-    bool milOn = snapshot.milOn.valid && snapshot.milOn.value != 0.0F;
-    tft_.setTextDatum(TL_DATUM);
-    tft_.setTextColor(milOn ? theme_.warningActive : theme_.textPrimary, theme_.background);
-    tft_.setTextSize(2);
-    gaugewidgets::drawFieldText(tft_, milOn ? "MIL: ACTIVE (ON)" : "MIL: INACTIVE (OFF)", 20, 46, 300,
-                                 theme_.background);
-
-    DtcList dtcList;
-    obdClient_.getDtcList(dtcList);
-    bool haveResult = obdClient_.hasDtcResult();
-
-    tft_.setTextSize(1);
-    for (uint8_t line = 0; line < layout::kDtcListVisibleLines; ++line) {
-        int32_t y = layout::kDtcListY + line * layout::kDtcListLineHeight;
-        tft_.fillRect(30, y, 420, layout::kDtcListLineHeight - 2, theme_.background);
-        tft_.setTextDatum(TL_DATUM);
-        if (!haveResult) {
-            if (line == 0) {
-                tft_.setTextColor(theme_.textSecondary, theme_.background);
-                tft_.drawString("Reading codes...", 34, y);
-            }
-        } else if (line < dtcList.count) {
-            tft_.setTextColor(theme_.textPrimary, theme_.background);
-            tft_.drawString(dtcList.codes[line], 34, y);
-        } else if (line == 0 && dtcList.count == 0) {
-            tft_.setTextColor(theme_.textSecondary, theme_.background);
-            tft_.drawString("No stored or pending codes.", 34, y);
-        }
-    }
-
-    bool confirmArmed =
-        runtimeState_.clearCodesConfirmArmed && (nowMs - runtimeState_.clearCodesConfirmArmedAtMs < 5000);
-    if (runtimeState_.clearCodesConfirmArmed && !confirmArmed) {
-        runtimeState_.clearCodesConfirmArmed = false;
-    }
-
+    // REFRESH CODES never changes appearance, so it only needs to be drawn
+    // once here rather than every drawPage6Dynamic() tick.
     tft_.fillRoundRect(layout::kDtcReadButtonX, layout::kDtcButtonY, layout::kDtcReadButtonW, layout::kDtcButtonH, 6,
                         theme_.primaryGaugeArc);
     tft_.setTextDatum(MC_DATUM);
@@ -582,13 +629,75 @@ void ClusterPages::drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.drawString("REFRESH CODES", layout::kDtcReadButtonX + layout::kDtcReadButtonW / 2,
                      layout::kDtcButtonY + layout::kDtcButtonH / 2);
 
-    uint16_t clearColor = confirmArmed ? theme_.warningActive : theme_.panel;
-    tft_.fillRoundRect(layout::kDtcClearButtonX, layout::kDtcButtonY, layout::kDtcClearButtonW, layout::kDtcButtonH,
-                        6, clearColor);
-    tft_.drawRoundRect(layout::kDtcClearButtonX, layout::kDtcButtonY, layout::kDtcClearButtonW, layout::kDtcButtonH,
-                        6, theme_.bezel);
-    tft_.setTextColor(confirmArmed ? theme_.background : theme_.textPrimary, clearColor);
-    tft_.drawString(confirmArmed ? "TAP TO CONFIRM" : "CLEAR CODES",
-                     layout::kDtcClearButtonX + layout::kDtcClearButtonW / 2,
-                     layout::kDtcButtonY + layout::kDtcButtonH / 2);
+    // Force drawPage6Dynamic() to repaint every region the next time it
+    // runs, since the static redraw above just wiped them all.
+    runtimeState_.dtcMilOnDrawn = -1;
+    runtimeState_.dtcHaveResultDrawn = -1;
+    runtimeState_.dtcListDrawn = DtcList();
+    runtimeState_.dtcClearConfirmDrawn = -1;
+
+    // Kick off a fresh DTC read every time this page is opened.
+    obdClient_.requestDtcRead();
+}
+
+void ClusterPages::drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
+    bool milOn = snapshot.milOn.valid && snapshot.milOn.value != 0.0F;
+    if (runtimeState_.dtcMilOnDrawn != static_cast<int8_t>(milOn)) {
+        tft_.setTextDatum(TC_DATUM);
+        tft_.setTextColor(milOn ? theme_.warningActive : theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, milOn ? "MIL: ACTIVE (ON)" : "MIL: INACTIVE (OFF)",
+                                     layout::kScreenWidth / 2, 46, 300, theme_.background);
+        runtimeState_.dtcMilOnDrawn = static_cast<int8_t>(milOn);
+    }
+
+    DtcList dtcList;
+    obdClient_.getDtcList(dtcList);
+    bool haveResult = obdClient_.hasDtcResult();
+
+    bool dtcListChanged = runtimeState_.dtcHaveResultDrawn != static_cast<int8_t>(haveResult) ||
+                           (haveResult && !dtcListsEqual(dtcList, runtimeState_.dtcListDrawn));
+    if (dtcListChanged) {
+        tft_.setTextSize(1);
+        for (uint8_t line = 0; line < layout::kDtcListVisibleLines; ++line) {
+            int32_t y = layout::kDtcListY + line * layout::kDtcListLineHeight;
+            tft_.fillRect(30, y, 420, layout::kDtcListLineHeight - 2, theme_.background);
+            tft_.setTextDatum(TL_DATUM);
+            if (!haveResult) {
+                if (line == 0) {
+                    tft_.setTextColor(theme_.textSecondary, theme_.background);
+                    tft_.drawString("Reading codes...", 34, y);
+                }
+            } else if (line < dtcList.count) {
+                tft_.setTextColor(theme_.textPrimary, theme_.background);
+                tft_.drawString(dtcList.codes[line], 34, y);
+            } else if (line == 0 && dtcList.count == 0) {
+                tft_.setTextColor(theme_.textSecondary, theme_.background);
+                tft_.drawString("No stored or pending codes.", 34, y);
+            }
+        }
+        runtimeState_.dtcHaveResultDrawn = static_cast<int8_t>(haveResult);
+        runtimeState_.dtcListDrawn = dtcList;
+    }
+
+    bool confirmArmed =
+        runtimeState_.clearCodesConfirmArmed && (nowMs - runtimeState_.clearCodesConfirmArmedAtMs < 5000);
+    if (runtimeState_.clearCodesConfirmArmed && !confirmArmed) {
+        runtimeState_.clearCodesConfirmArmed = false;
+    }
+
+    if (runtimeState_.dtcClearConfirmDrawn != static_cast<int8_t>(confirmArmed)) {
+        uint16_t clearColor = confirmArmed ? theme_.warningActive : theme_.panel;
+        tft_.fillRoundRect(layout::kDtcClearButtonX, layout::kDtcButtonY, layout::kDtcClearButtonW,
+                            layout::kDtcButtonH, 6, clearColor);
+        tft_.drawRoundRect(layout::kDtcClearButtonX, layout::kDtcButtonY, layout::kDtcClearButtonW,
+                            layout::kDtcButtonH, 6, theme_.bezel);
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextSize(1);
+        tft_.setTextColor(confirmArmed ? theme_.background : theme_.textPrimary, clearColor);
+        tft_.drawString(confirmArmed ? "TAP TO CONFIRM" : "CLEAR CODES",
+                         layout::kDtcClearButtonX + layout::kDtcClearButtonW / 2,
+                         layout::kDtcButtonY + layout::kDtcButtonH / 2);
+        runtimeState_.dtcClearConfirmDrawn = static_cast<int8_t>(confirmArmed);
+    }
 }

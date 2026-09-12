@@ -44,9 +44,9 @@ constexpr int32_t kConfigDeleteX = 300, kConfigDeleteW = 160; // Row 6: delete-a
 constexpr int32_t kPerfTimerX0 = 140, kPerfTimerY0 = 125, kPerfTimerX1 = 340, kPerfTimerY1 = 180;
 
 // Page 6 (Diagnostics).
-constexpr int32_t kDtcListY = 70;
+constexpr int32_t kDtcListY = 85;
 constexpr int32_t kDtcListLineHeight = 20;
-constexpr uint8_t kDtcListVisibleLines = 8;
+constexpr uint8_t kDtcListVisibleLines = 7;
 constexpr int32_t kDtcButtonY = 270;
 constexpr int32_t kDtcButtonH = 40;
 constexpr int32_t kDtcReadButtonX = 40, kDtcReadButtonW = 180;

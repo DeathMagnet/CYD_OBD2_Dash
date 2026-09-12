@@ -117,6 +117,7 @@ bool ClusterTouchHandler::handleConfigMenuTap(uint16_t x, uint16_t y, uint32_t n
         if (state.deleteLogsConfirmArmed && (nowMs - state.deleteLogsConfirmArmedAtMs < 5000)) {
             csvLogger_.deleteAllLogs();
             state.deleteLogsConfirmArmed = false;
+            state.cfgLogSummaryNextScanMs = 0; // Force an immediate rescan to reflect the deletion.
         } else {
             state.deleteLogsConfirmArmed = true;
             state.deleteLogsConfirmArmedAtMs = nowMs;

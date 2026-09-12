@@ -55,18 +55,29 @@ struct ArcGaugeState {
 // Circular arc gauge, 0..maxValue swept from 30 degrees to 330 degrees
 // (bottom-left to bottom-right, opening at 6 o'clock) per TFT_eSPI's
 // drawSmoothArc angle convention. `bgColor` must match the surface color
-// immediately behind the gauge so anti-aliased edges blend correctly. The
-// redline gradient starts at redlineStart, reaches the full redline color at
-// redlineEnd, then holds it out to the end of the arc; pass
-// redlineStart >= redlineEnd (e.g. both equal to maxValue) to disable it for
-// gauges that don't have a redline concept (load, vacuum/boost, etc).
+// immediately behind the gauge so anti-aliased edges blend correctly. Solid
+// caution color (theme.cautionArc) paints from cautionStart to dangerStart,
+// then solid danger color (theme.dangerArc) holds from dangerStart out to
+// the end of the arc; pass cautionStart >= dangerStart (e.g. both equal to
+// maxValue) to disable both zones for gauges that don't have a warning
+// concept (load, vacuum/boost, etc).
 void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t centerY, int32_t radius,
-                   float value, float maxValue, float redlineStart, float redlineEnd, uint16_t bgColor,
+                   float value, float maxValue, float cautionStart, float dangerStart, uint16_t bgColor,
                    const ThemeColors& theme);
+
+// Lets a bar gauge repaint only the sliver of fill that changed between
+// frames instead of clearing and redrawing the whole bar. Call invalidate()
+// whenever the area behind the gauge is cleared (page redraw).
+struct BarGaugeState {
+    int32_t lastFillWidth = -1;
+    bool needsFullRedraw = true;
+
+    void invalidate() { needsFullRedraw = true; }
+};
 
 // Flat horizontal bar (0-100%) with outline and fill, used for
 // throttle/load/trim style readouts.
-void drawBarGauge(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width, int32_t height,
+void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int32_t width, int32_t height,
                    float percent, uint16_t fillColor, const ThemeColors& theme);
 
 // A caption above a large numeric readout. Renders "--" in textSecondary
