@@ -125,6 +125,46 @@ The exact filenames may follow local conventions once source exists, but preserv
 - `csv_logger`: Mount the SD card, create session files, write header and rows, batch/flush writes, and expose errors.
 - `connection_state`: Express startup, connecting, live, stale, and fault states shared by the renderer and OBD client.
 
+### As-Built Source Layout
+
+The tree above was the starting proposal; the cluster UI and OBD/logging work landed with a more granular split (each `.h` has a matching `.cpp` except where noted):
+
+```text
+src/
+  main.cpp
+  app_config.h
+  secrets/
+    local_config.example.h   # Copy to local_config.h (gitignored) for your adapter's name/PIN
+  display/
+    display_manager.h/.cpp   # TFT init, backlight, boot image (pre-existing)
+    theme.h/.cpp             # ThemeColors + getTheme() - Modern Flat only today
+    gauge_widgets.h/.cpp     # Arc gauge, bar gauge, value box, status badge, MIL indicator, NeedlePhysics
+    cluster_layout.h         # Shared pixel geometry (header only) used by both drawing and touch hit-testing
+    cluster_pages.h/.cpp     # Pages 1-6 drawStatic()/drawDynamic()
+    touch_handler.h/.cpp     # ClusterTouchHandler: nav zones, Page 5/6 button taps
+  input/
+    touch_manager.h/.cpp     # Raw touch + calibration (pre-existing)
+  obd/
+    telemetry.h              # TelemetryValue / TelemetrySnapshot (header only)
+    obd_pids.h/.cpp          # PID table, decode formulas, response-line parser
+    obd_client.h/.cpp        # ELM327 Bluetooth client (see below)
+  logging/
+    csv_logger.h/.cpp        # Session files, buffered writes, capacity pruning, log summary/delete
+  storage/
+    sd_manager.h/.cpp        # SD mount + touch-calibration persistence (pre-existing)
+  system/
+    connection_state.h       # ConnectionState enum (header only)
+    dtc_decoder.h/.cpp       # Mode 03/07 DTC byte-pair decoding
+    config_store.h/.cpp      # Page 5 settings, persisted to /config.txt
+```
+
+Notable deviations from the original proposal, and why:
+
+- **No `dashboard_renderer`/`boot_player` split yet.** Boot image drawing still lives in the pre-existing `display_manager.cpp`; the new gauge/page rendering went into `cluster_pages.cpp` + `gauge_widgets.cpp` instead of a single `dashboard_renderer`, since the UI cluster guide's six-page spec didn't map cleanly onto one renderer file.
+- **`obd_client` runs on its own FreeRTOS task**, not a non-blocking state machine driven from `loop()`. `BluetoothSerial::connect()` and every ELM327 command round-trip are blocking calls with multi-second worst cases; rather than build a hand-rolled AT-command scheduler that still bottoms out on a blocking `connect()`, `ObdClient::begin()` starts a task pinned to `config::kObdTaskCore` (core 0, away from the Arduino loop task). The render loop reads a mutex-guarded `TelemetrySnapshot` copy every iteration and never touches Bluetooth directly, which satisfies "never block the display loop on Bluetooth I/O" more directly than a cooperative scheduler could on this library.
+- **No `scheduler.h`.** `loop()` uses plain `millis()`-delta checks per subsystem (touch poll, UI refresh, CSV row/flush), matching the coding standards' preference for plain direct code over a scheduling abstraction at this project's size.
+- **`config_store` and `dtc_decoder`** were not in the original proposal; they exist to back Page 5's persisted settings and Page 6's DTC list, respectively.
+
 ## Application Lifecycle
 
 Implement the lifecycle as an explicit state machine rather than a sequence of delays:
@@ -185,6 +225,8 @@ struct TelemetrySnapshot {
 ```
 
 Treat the snapshot as the renderer and logger boundary. The OBD client updates it only after parsing a response; the renderer must not perform Bluetooth I/O. Poll high-priority values such as RPM and speed more frequently than secondary PIDs, while avoiding adapter overload. Start with measured refresh behavior and tune using serial timing data rather than hard-coded optimistic intervals.
+
+**As built**, `ObdClient` polls the full set of standard Mode 01 PIDs a 2006 Mustang GT (4.6L 3V) exposes over generic OBD-II — RPM and speed every cycle, plus one of the remaining 16 PIDs round-robined per cycle (monitor status/MIL+DTC count, engine load, coolant, STFT/LTFT bank 1, MAP, timing advance, IAT, MAF, throttle, O2 B1S1/B2S1, fuel rail pressure, fuel level, barometric pressure, and control module voltage — see `src/obd/obd_pids.cpp` for the exact PID bytes and decode formulas). Mode 03/07 (DTC read) and Mode 04 (clear codes) are issued on demand from Page 6, not on the polling cycle. The adapter's Bluetooth SPP device name and legacy PIN default to `"OBDII"`/`"1234"` (`config::kObdDefaultAdapterName/Pin`); override them per-device by copying `src/secrets/local_config.example.h` to `src/secrets/local_config.h` (gitignored) rather than editing checked-in source, per the Configuration and Secrets section below.
 
 ## Display and Gauge Behavior
 

@@ -32,4 +32,66 @@ constexpr size_t kTouchCalDataSize = 5;
 constexpr uint32_t kTouchPollIntervalMs = 20;
 constexpr uint16_t kTouchPressureThreshold = 200;
 
+// ---- OBD-II / ELM327 Bluetooth Configuration ----
+// Adapter identity defaults; override per-device via src/secrets/local_config.h
+// (see src/secrets/local_config.example.h) rather than editing these.
+constexpr const char* kObdDefaultAdapterName = "OBDII";
+constexpr const char* kObdDefaultAdapterPin = "1234";
+
+constexpr uint32_t kObdResetCommandTimeoutMs = 3000;   // ATZ reset needs extra settle time
+constexpr uint32_t kObdCommandTimeoutMs = 1000;        // Normal AT/PID command timeout
+constexpr uint32_t kObdReconnectBackoffMs = 3000;
+constexpr uint32_t kObdMaxReconnectBackoffMs = 30000;
+constexpr uint8_t kObdConsecutiveFailuresForDisconnect = 6;
+constexpr uint32_t kObdTaskStackWords = 8192;          // FreeRTOS task stack, in words (uint32_t units)
+constexpr uint8_t kObdTaskPriority = 1;
+constexpr int8_t kObdTaskCore = 0;                     // Keep Bluetooth I/O off the Arduino loop core (1)
+constexpr uint32_t kObdSecondaryPidIntervalMs = 40;    // Pace between queued command sends
+constexpr uint32_t kTelemetryStaleThresholdMs = 3000;  // No fresh update within this window -> STALE badge
+
+// ---- Warning / Tunable Dashboard Thresholds (persisted defaults) ----
+constexpr uint16_t kMinShiftLightRpm = 3000;
+constexpr uint16_t kMaxShiftLightRpm = 6800;
+constexpr uint16_t kShiftLightStepRpm = 100;
+constexpr uint16_t kDefaultShiftLightRpm = 5800;
+
+constexpr uint16_t kMinRedlineRpm = 5000;
+constexpr uint16_t kMaxRedlineRpm = 7000;
+constexpr uint16_t kRedlineStepRpm = 100;
+constexpr uint16_t kDefaultRedlineRpm = 6200;
+constexpr uint16_t kRedlineArcStartRpm = 5500; // Fixed OEM 4.6L 3V power-drop curve start
+
+constexpr float kMinBaroBaselinePsi = 12.0F;
+constexpr float kMaxBaroBaselinePsi = 15.5F;
+constexpr float kBaroBaselineStepPsi = 0.1F;
+constexpr float kDefaultBaroBaselinePsi = 14.7F;
+
+constexpr float kHighCoolantWarningF = 220.0F;
+constexpr float kLowVoltageWarningV = 11.5F;
+
+// ---- SD CSV Telemetry Logging ----
+constexpr const char* kLogFilePrefix = "/mustang_log_";
+constexpr const char* kLogFileSuffix = ".csv";
+constexpr uint8_t kLogFileIndexDigits = 3;
+constexpr const char* kSessionIndexNamespace = "obd_dash";
+constexpr const char* kSessionIndexKey = "session_idx";
+
+constexpr uint32_t kLogRowIntervalOptionsMs[] = {50, 100, 250, 500, 1000};
+constexpr size_t kLogRowIntervalOptionCount = 5;
+constexpr uint32_t kDefaultLogRowIntervalMs = 100;
+constexpr uint32_t kSdFlushIntervalMs = 500;
+
+// Auto-pruning: once free space drops below this floor, delete the oldest
+// session log(s) to make room for the active session before every write.
+constexpr uint64_t kSdMinFreeBytes = 5ULL * 1024 * 1024; // 5 MB headroom
+constexpr uint8_t kSdPruneBatchCount = 1;
+
+// ---- Page / Theme ----
+constexpr uint8_t kPageCount = 6;
+constexpr uint8_t kHeaderHeight = 40;
+constexpr uint32_t kUiRefreshIntervalMs = 100; // Throttled dynamic-region redraw cadence
+
+// ---- Persisted Config File ----
+constexpr const char* kConfigFilePath = "/config.txt";
+
 } // namespace config
