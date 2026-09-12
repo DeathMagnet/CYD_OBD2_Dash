@@ -1,7 +1,7 @@
 A feature-rich, real-time automotive dashboard for the **Hosyond 4.0-inch ESP32-32E
 CYD** with a 320×480 ST7796S TFT, used in **480×320 landscape** orientation. It is
 purpose-built for Ford Mustang enthusiasts and displays live OBD-II data with a
-Mustang-themed UI, configurable RGB666 boot image, SD card logging, and a
+Mustang-themed UI, configurable boot splash image, SD card logging, and a
 fully configurable theme system.
 
 ## Hardware Requirements & Wiring
@@ -34,7 +34,16 @@ uses the ST7796S controller over SPI and the dashboard uses it in landscape orie
 | SD MISO | GPIO 19 |
 | SD CLK | GPIO 18 |
 
-> **Note:** The SD card shares its own SPI bus (VSPI) separate from the TFT bus (HSPI). Both can operate simultaneously without bus conflicts.
+> **Note:** The SD card uses its own SPI bus (VSPI, via `SdManager`), while the TFT and
+> resistive touch controller share a separate SPI bus (HSPI, enabled by the
+> `USE_HSPI_PORT` build flag in `platformio.ini`). Both buses can then operate
+> simultaneously without conflict. Without `USE_HSPI_PORT`, `TFT_eSPI` defaults to the
+> same VSPI peripheral the SD card uses; GPIO output signals (MOSI/SCLK) fan out to
+> both sets of pins so drawing still appears to work, but the shared peripheral's MISO
+> **input** can only listen to one bus's pins at a time — whichever `begin()` call runs
+> last wins. Since `SdManager::begin()` runs after the display/touch init, it silently
+> steals the touch controller's read line, and touch input stops responding even though
+> the screen keeps rendering normally.
 
 ### Wiring Overview Diagram
 

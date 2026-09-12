@@ -207,9 +207,13 @@ Keep layout dimensions, colors, gauge ranges, units, polling intervals, animatio
 
 Support static and animated boot assets selected at compile time through `BOOT_IMAGE_MODE`. Use `BOOT_RGB666_ASSETS_AVAILABLE` to guard asset-dependent code so a build without generated assets still compiles and reaches the dashboard.
 
-For RGB666 data:
+The current static boot image is stored as a standard RGB565 `uint16_t` PROGMEM array (`src/assets/boot_0_rgb565.h`) and drawn with `TFT_eSPI::pushImage()`; TFT_eSPI's own SPI write path already handles this panel's actual output format, so asset generation does not need to pre-pack pixels to 18-bit RGB666. (`BOOT_RGB666_ASSETS_AVAILABLE` names the planned animated-frame format described below, not the current static asset's in-memory layout.)
+
+For generated boot image/frame data:
 
 - Store generated assets in a clearly named source or include directory and document the generator/source format.
+- After (re)generating an asset, verify it against its source image — for example, compare average per-channel values between the source and the decoded array — rather than trusting the conversion tool. A conversion bug that truncates or mis-packs pixels (such as silently dropping the high byte of every RGB565 value) still compiles and renders; it just shows up as an incorrect tint, not a build or runtime failure.
+- Call `setSwapBytes(true)` before `pushImage()` for boot/animation frames on this panel. The array holds a standard (non-pre-swapped) RGB565 constant per pixel, and `pushImage`'s internal `pushPixels` path only emits the byte order this panel expects when swap is enabled. `fillScreen`/`fillRect` do not need this — they swap bytes internally.
 - Validate width, height, byte count, and frame count before drawing.
 - Render only assets matching the configured orientation, or rotate/convert them during asset generation rather than at runtime.
 - Limit per-frame work so animation timing does not starve Bluetooth or the watchdog.
