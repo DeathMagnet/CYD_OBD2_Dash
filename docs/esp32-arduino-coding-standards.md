@@ -80,6 +80,7 @@ public:
 - Forward-declare types in headers when a pointer or reference is sufficient.
 - Avoid global `using namespace ...` directives in headers and source files.
 - Add libraries only through `lib_deps` in `platformio.ini`, with a pinned or compatible version. Verify that a dependency supports the ESP32 Arduino framework before adding it.
+- Pull `TFT_eSPI` from its GitHub source (`https://github.com/Bodmer/TFT_eSPI.git`) rather than a versioned registry entry. The PlatformIO registry mirror has lagged behind the version Arduino Library Manager serves, and the two have shipped with different `TFT_eSPI.cpp`/`TFT_eSPI.h`/ESP32 processor backends despite similar version numbers; a stale registry copy is a real source of hard-to-diagnose display/touch behavior differences from what was verified in Arduino IDE.
 
 ## Modern C++ That Fits Arduino
 
@@ -221,6 +222,8 @@ The ESP32 has more room than an 8-bit Arduino, but the display, Bluetooth stack,
 - Do not request PIDs faster than the adapter can reliably answer. Use measurements from the monitor to set intervals.
 - Guard optional functionality with the applicable build flags, including `SD_LOGGING_ENABLED` and `BOOT_RGB666_ASSETS_AVAILABLE`.
 - Provide a visible status for connecting, live, stale, OBD unavailable, and SD offline states.
+- Keep the TFT/touch SPI bus on HSPI (`USE_HSPI_PORT` in `platformio.ini`) and the SD card on its own VSPI instance (`SdManager`). Classic ESP32 exposes one active MISO input source per SPI peripheral; if both subsystems default to the same peripheral, whichever `begin()` runs later silently reassigns the shared read line, breaking touch input while display writes keep working normally (writes fan out to all attached pins, reads do not). Do not remove `USE_HSPI_PORT` without re-verifying touch after any SD-path change.
+- When regenerating a boot/splash image array (e.g. `boot_0_rgb565.h`), verify the generated pixels against the source image (e.g. compare average per-channel values) rather than trusting the conversion tool — a truncated or mis-packed pixel format will compile and run but render with an incorrect tint. `pushImage()` also requires `setSwapBytes(true)` on this panel for a standard (non-pre-swapped) RGB565 array; `fillScreen`/`fillRect` do not need it because they swap bytes internally.
 
 ## Logging and Diagnostics
 
