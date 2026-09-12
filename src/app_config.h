@@ -49,6 +49,35 @@ constexpr int8_t kObdTaskCore = 0;                     // Keep Bluetooth I/O off
 constexpr uint32_t kObdSecondaryPidIntervalMs = 40;    // Pace between queued command sends
 constexpr uint32_t kTelemetryStaleThresholdMs = 3000;  // No fresh update within this window -> STALE badge
 
+// ---- OBD-II Simulation (only used by OBD_SIMULATION_ENABLED builds) ----
+// Multiplies the scripted drive cycle's clock so a full lap can be swept faster
+// during manual UI checks. Override per-build with -D SIM_TIME_SCALE=2.0F.
+#ifndef SIM_TIME_SCALE
+#define SIM_TIME_SCALE 1.0F
+#endif
+constexpr float kSimTimeScale = SIM_TIME_SCALE;
+
+constexpr uint32_t kSimConnectDelayMs = 2500;          // Fake adapter handshake before LIVE
+constexpr uint32_t kSimDtcAppearAfterMs = 20000;       // Cycle time before MIL + fake codes latch
+constexpr uint32_t kSimWarmupMs = 120000;              // Cold-to-operating coolant ramp
+constexpr float kSimColdCoolantF = 72.0F;
+constexpr float kSimHotCoolantF = 196.0F;
+
+// Periodic dropout that walks the status badge through LIVE -> STALE ->
+// RECONNECTING -> CONNECTING -> LIVE. Scheduled off real millis(), never
+// kSimTimeScale, so STALE detection stays true to production timing.
+constexpr bool kSimReconnectBlipEnabled = true;
+constexpr uint32_t kSimReconnectBlipIntervalMs = 45000;
+constexpr uint32_t kSimBlipStaleHoldMs = 4000;         // Must exceed kTelemetryStaleThresholdMs
+constexpr uint32_t kSimBlipReconnectingMs = 4000;
+constexpr uint32_t kSimBlipConnectingMs = 1500;
+
+// Drives coolant past kHighCoolantWarningF and voltage below kLowVoltageWarningV
+// so the warning paths on Pages 1/3 are reachable without a fault injection.
+constexpr bool kSimWarningSweepEnabled = true;
+constexpr uint32_t kSimWarningSweepIntervalMs = 180000;
+constexpr uint32_t kSimWarningSweepDurationMs = 12000;
+
 // ---- Warning / Tunable Dashboard Thresholds (persisted defaults) ----
 constexpr uint16_t kMinShiftLightRpm = 3000;
 constexpr uint16_t kMaxShiftLightRpm = 6800;

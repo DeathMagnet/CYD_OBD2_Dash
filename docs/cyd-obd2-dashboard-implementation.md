@@ -32,7 +32,7 @@ The target experience is a readable Mustang-themed dashboard, but styling must n
 
 ## Hardware and Build Contract
 
-Use the existing `env:cyd_4inch` environment. The current configuration is authoritative unless the hardware is physically changed.
+Use the existing `env:cyd_4inch` environment. The current configuration is authoritative unless the hardware is physically changed. `env:cyd_4inch_sim` inherits everything from it and only adds `OBD_SIMULATION_ENABLED`; see "Simulated Telemetry Build" below.
 
 | Component | Required configuration |
 | --- | --- |
@@ -48,6 +48,7 @@ Use the existing `env:cyd_4inch` environment. The current configuration is autho
 | SD Card SPI pins | CS 5, MOSI 23, MISO 19, CLK 18 (VSPI) |
 | TFT SPI frequency | 20 MHz |
 | SD logging switch | `SD_LOGGING_ENABLED` build flag |
+| Simulated telemetry switch | `OBD_SIMULATION_ENABLED` build flag (set by `env:cyd_4inch_sim`) |
 | Boot image mode | `BOOT_IMAGE_MODE` build flag |
 | RGB666 assets | `BOOT_RGB666_ASSETS_AVAILABLE` build flag |
 
@@ -62,7 +63,7 @@ Build, flash, and monitor this project through the PlatformIO extension in Visua
 1. Install Visual Studio Code and the official PlatformIO IDE extension.
 2. Open the repository root (`CYD_OBD2_Dash`) as the VS Code workspace folder. Do not open `src/` or an individual source file as the workspace.
 3. Allow PlatformIO to finish installing the Espressif32 platform, Arduino framework, and the dependencies declared in `platformio.ini`.
-4. In the PlatformIO environment selector, choose `cyd_4inch`. All project actions must target this environment.
+4. In the PlatformIO environment selector, choose `cyd_4inch`. All project actions must target this environment, except bench sessions that deliberately select `cyd_4inch_sim`.
 5. Connect the ESP32 over a data-capable USB cable and select its serial device under **PlatformIO: Serial Port** when automatic detection does not choose the correct port.
 
 ### Daily Build, Upload, and Monitor Cycle
@@ -78,11 +79,12 @@ Use the PlatformIO toolbar, the PlatformIO sidebar, or the Command Palette for t
 | Inspect runtime logs | **Project Tasks > cyd_4inch > General > Monitor** | Serial output opens at `115200` baud |
 | Erase a development device | **Project Tasks > cyd_4inch > Platform > Erase Flash** | Flash is cleared before a known-clean upload |
 
-The terminal equivalent, `pio run -e cyd_4inch`, may be used to diagnose a CI or extension failure, but the intended development and deployment workflow remains the PlatformIO VS Code extension.
+The terminal equivalent, `pio run -e cyd_4inch`, may be used to diagnose a CI or extension failure, but the intended development and deployment workflow remains the PlatformIO VS Code extension. Substitute `cyd_4inch_sim` in any of the above to run the simulated build; the task names are otherwise identical.
 
 ### Extension Troubleshooting Rules
 
-- Confirm the environment selector still reads `cyd_4inch` before diagnosing a failed build or upload.
+- Confirm the environment selector still reads `cyd_4inch` before diagnosing a failed build or upload. A device showing plausible telemetry with no adapter paired is running a `cyd_4inch_sim` build.
+- After editing `platformio.ini` section structure, verify the *resolved* flags with `pio project config --json-output` rather than reading the file. Moving settings between sections can silently drop lines from a multi-line `build_flags` value, and losing the `LOAD_FONT*` flags makes every `drawString()` call render nothing while graphics still appear.
 - Use **Clean** followed by **Build** after changing `platformio.ini`, compiler flags, partitions, or library versions; this avoids stale `.pio` artifacts.
 - Verify that the selected serial port is the ESP32 device before uploading. Disconnect other serial devices when port selection is ambiguous.
 - Close any other serial terminal before opening the PlatformIO monitor, because only one process can normally own the port.
@@ -148,6 +150,7 @@ src/
     telemetry.h              # TelemetryValue / TelemetrySnapshot (header only)
     obd_pids.h/.cpp          # PID table, decode formulas, response-line parser
     obd_client.h/.cpp        # ELM327 Bluetooth client (see below)
+    obd_simulator.h/.cpp     # Scripted drive-cycle generator (OBD_SIMULATION_ENABLED builds only)
   logging/
     csv_logger.h/.cpp        # Session files, buffered writes, capacity pruning, log summary/delete
   storage/
@@ -164,6 +167,36 @@ Notable deviations from the original proposal, and why:
 - **`obd_client` runs on its own FreeRTOS task**, not a non-blocking state machine driven from `loop()`. `BluetoothSerial::connect()` and every ELM327 command round-trip are blocking calls with multi-second worst cases; rather than build a hand-rolled AT-command scheduler that still bottoms out on a blocking `connect()`, `ObdClient::begin()` starts a task pinned to `config::kObdTaskCore` (core 0, away from the Arduino loop task). The render loop reads a mutex-guarded `TelemetrySnapshot` copy every iteration and never touches Bluetooth directly, which satisfies "never block the display loop on Bluetooth I/O" more directly than a cooperative scheduler could on this library.
 - **No `scheduler.h`.** `loop()` uses plain `millis()`-delta checks per subsystem (touch poll, UI refresh, CSV row/flush), matching the coding standards' preference for plain direct code over a scheduling abstraction at this project's size.
 - **`config_store` and `dtc_decoder`** were not in the original proposal; they exist to back Page 5's persisted settings and Page 6's DTC list, respectively.
+- **`obd_simulator`** is bench-only. Building the `cyd_4inch_sim` environment defines `OBD_SIMULATION_ENABLED`, which compiles `BluetoothSerial` and the whole AT/PID path out of `obd_client.*` and runs `ObdClient::simulationLoop()` on the same task instead. Because the swap happens behind `ObdClient`'s existing public interface, `main.cpp`, `cluster_pages`, `touch_handler`, and `csv_logger` are untouched and the mutex/task timing under test matches production.
+
+## Simulated Telemetry Build
+
+`env:cyd_4inch_sim` replaces the ELM327 link with a scripted drive cycle so the entire UI can be exercised with no adapter, no vehicle, and no Bluetooth pairing. It inherits every flag from `env:cyd_4inch` and adds only `-D OBD_SIMULATION_ENABLED=1`; dropping the Bluetooth stack also cuts roughly 770 KB of flash.
+
+```powershell
+pio run -e cyd_4inch_sim --target upload
+```
+
+Design rules for this mode:
+
+- The swap is **compile-time and confined to `ObdClient`**. No consumer of telemetry may branch on `OBD_SIMULATION_ENABLED`; if a page or logger needs to know, the design is wrong.
+- Simulated values are **deterministic** (fixed-seed LCG jitter, no hardware entropy) so a rendering regression reproduces identically between runs.
+- The simulator runs on the same FreeRTOS task and core as the real client and publishes through the same mutex, so timing and concurrency behavior under test match production.
+- `SD_LOGGING_ENABLED` stays **orthogonal**: simulated builds log to SD normally, which doubles as a dense exercise of `CsvLogger`.
+
+The cycle is a fixed segment table in `obd_simulator.cpp` (idle, three gear pulls, cruise, highway, decel fuel cut, stop-and-go, idle) lasting about 95 seconds. RPM, speed, and throttle are interpolated from the table; every other PID is derived from those three so no two readings can contradict each other. Segments are chosen to reach specific UI states — the second pull crosses the shift light, the third reaches the redline arc, and the decel segment produces fuel-cut values on Page 3.
+
+Tunables live in the `kSim*` block of `src/app_config.h`:
+
+| Constant | Purpose |
+| --- | --- |
+| `kSimTimeScale` | Multiplies the cycle clock; override per build with `-D SIM_TIME_SCALE=2.0F` |
+| `kSimConnectDelayMs` | Simulated handshake before the badge reaches `Live` |
+| `kSimReconnectBlipEnabled` and `kSimBlip*Ms` | Periodic dropout that walks the badge through `Live` -> `Stale` -> `Reconnecting` -> `ObdConnecting` -> `Live` |
+| `kSimWarningSweep*` | Periodically drives coolant and voltage past their warning thresholds |
+| `kSimDtcAppearAfterMs` | Delay before the MIL and the fake DTC list latch |
+
+The reconnect blip is scheduled from real `millis()`, never `kSimTimeScale`, so stale detection stays true to `kTelemetryStaleThresholdMs`. The cycle clock freezes for the duration of a blip so gauges resume mid-segment instead of jumping.
 
 ## Application Lifecycle
 
@@ -307,6 +340,7 @@ Run these checks as implementation progresses:
 
 - In the PlatformIO extension, run **Build** for `cyd_4inch` with the default feature flags.
 - Temporarily remove `SD_LOGGING_ENABLED`, use **Clean** and then **Build** for `cyd_4inch`, and confirm logging is cleanly optional. Restore the flag after the check.
+- Build `cyd_4inch_sim` and confirm it still links without `BluetoothSerial`; its flash usage should be roughly 770 KB lower than `cyd_4inch`. An unexplained size change in either environment usually means `platformio.ini` flags moved or went missing.
 - Use **Upload and Monitor** for `cyd_4inch`, verify the ESP32 upload completes, and confirm runtime logs are readable at `115200` baud.
 - Flash the board and verify the display reports 480 x 320 after selecting landscape rotation.
 - Boot with valid and missing boot assets; both paths must reach the connection screen.

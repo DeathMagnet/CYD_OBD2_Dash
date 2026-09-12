@@ -8,7 +8,7 @@ The goal is reliable, understandable firmware on a memory-constrained ESP32. Pre
 
 ## Baseline Rules
 
-- Build, upload, and monitor with the PlatformIO extension in VS Code using the `cyd_4inch` environment.
+- Build, upload, and monitor with the PlatformIO extension in VS Code using the `cyd_4inch` environment. Use `cyd_4inch_sim` only for bench work without an ELM327 adapter; it must never be the environment that ships.
 - Write C++ compatible with the Arduino framework and the ESP32 toolchain configured by `platformio.ini`.
 - Keep application source under `src/`; organize by responsibility rather than by file type alone.
 - Use UTF-8 source files, but keep identifiers, comments, logs, and messages in clear English.
@@ -257,7 +257,7 @@ Update [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementa
 
 Before uploading firmware:
 
-- Confirm the PlatformIO environment is `cyd_4inch`.
+- Confirm the PlatformIO environment is `cyd_4inch` (or `cyd_4inch_sim` when bench-testing without an adapter).
 - Build with the PlatformIO VS Code extension and resolve all compiler errors.
 - Use **Clean** then **Build** after any `platformio.ini`, dependency, partition, or compile-flag change.
 - Test the edited behavior through the PlatformIO monitor at `115200` baud.

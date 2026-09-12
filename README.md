@@ -58,3 +58,22 @@ Vehicle OBD-II Port
                                               │
                                       12V→5V USB adapter (from OBD port pin 16)
 ```
+
+## Build Environments
+
+| Environment | Purpose |
+| --- | --- |
+| `cyd_4inch` | Default. Live telemetry over Bluetooth from an ELM327 adapter. |
+| `cyd_4inch_sim` | Bench/demo. Replaces the adapter with a scripted drive cycle, so the whole UI can be exercised with no adapter or vehicle connected. |
+
+```powershell
+pio run -e cyd_4inch_sim --target upload
+```
+
+The simulated ~95-second cycle runs idle → three gear pulls (crossing the shift
+light and redline) → cruise → decel fuel cut → stop-and-go → idle, and periodically
+drops the link so the badge walks LIVE → STALE → RECONNECTING → CONNECTING → LIVE.
+Page 6 serves a fixed set of fake DTCs that "Clear Codes" clears. Tunables live in
+the `kSim*` block of [src/app_config.h](src/app_config.h); add
+`-D SIM_TIME_SCALE=2.0F` to the environment's `build_flags` to sweep the cycle at
+double speed. SD logging is independent of simulation mode and stays enabled.

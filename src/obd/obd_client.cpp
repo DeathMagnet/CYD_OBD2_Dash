@@ -3,6 +3,8 @@
 #include <string.h>
 #include "app_config.h"
 
+#if !OBD_SIMULATION_ENABLED
+
 #if __has_include("secrets/local_config.h")
 #include "secrets/local_config.h"
 #define OBD_LOCAL_CONFIG_AVAILABLE 1
@@ -35,6 +37,8 @@ void decodeAllLinesForDtc(char* mutableBuffer, uint8_t modeAckByte, DtcList& out
 
 } // namespace
 
+#endif // !OBD_SIMULATION_ENABLED
+
 bool ObdClient::begin() {
     mutex_ = xSemaphoreCreateMutex();
     if (mutex_ == nullptr) {
@@ -51,12 +55,21 @@ bool ObdClient::begin() {
         return false;
     }
 
+#if OBD_SIMULATION_ENABLED
+    Serial.printf("[SIM] Simulated OBD task started (time scale %.2fx).\n",
+                  static_cast<double>(config::kSimTimeScale));
+#else
     Serial.println("[OBD] Background task started.");
+#endif
     return true;
 }
 
 void ObdClient::taskEntry(void* param) {
+#if OBD_SIMULATION_ENABLED
+    static_cast<ObdClient*>(param)->simulationLoop();
+#else
     static_cast<ObdClient*>(param)->taskLoop();
+#endif
 }
 
 void ObdClient::setSnapshotConnected(bool connected) {
@@ -65,6 +78,8 @@ void ObdClient::setSnapshotConnected(bool connected) {
         xSemaphoreGive(mutex_);
     }
 }
+
+#if !OBD_SIMULATION_ENABLED
 
 bool ObdClient::sendCommand(const char* command, char* responseOut, size_t responseCapacity, uint32_t timeoutMs) {
     while (btSerial_.available()) {
@@ -255,6 +270,8 @@ void ObdClient::performClearCodes() {
     dtcResultReady_.store(false); // Force a fresh read next time Page 6 asks.
 }
 
+#endif // !OBD_SIMULATION_ENABLED
+
 void ObdClient::getSnapshot(TelemetrySnapshot& out) const {
     if (mutex_ != nullptr && xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
         out = snapshot_;
@@ -268,6 +285,88 @@ void ObdClient::getDtcList(DtcList& out) const {
         xSemaphoreGive(mutex_);
     }
 }
+
+#if OBD_SIMULATION_ENABLED
+
+void ObdClient::runSimulationBlip() {
+    // Holds the last snapshot untouched long enough for main.cpp to derive STALE,
+    // then walks the transport states the real client would report on a dropout.
+    Serial.println("[SIM] Reconnect blip: holding telemetry stale.");
+    vTaskDelay(pdMS_TO_TICKS(config::kSimBlipStaleHoldMs));
+
+    connectionState_.store(ConnectionState::Reconnecting);
+    setSnapshotConnected(false);
+    vTaskDelay(pdMS_TO_TICKS(config::kSimBlipReconnectingMs));
+
+    connectionState_.store(ConnectionState::ObdConnecting);
+    vTaskDelay(pdMS_TO_TICKS(config::kSimBlipConnectingMs));
+
+    connectionState_.store(ConnectionState::Live);
+    Serial.println("[SIM] Reconnect blip complete; resuming drive cycle.");
+}
+
+void ObdClient::simulationLoop() {
+    simulator_.reset();
+
+    connectionState_.store(ConnectionState::ObdConnecting);
+    setSnapshotConnected(false);
+    vTaskDelay(pdMS_TO_TICKS(config::kSimConnectDelayMs));
+    connectionState_.store(ConnectionState::Live);
+    Serial.println("[SIM] Link up; streaming scripted drive cycle.");
+
+    uint32_t lastTickMs = millis();
+    uint32_t nextBlipAtMs = lastTickMs + config::kSimReconnectBlipIntervalMs;
+
+    for (;;) {
+        uint32_t nowMs = millis();
+
+        if (config::kSimReconnectBlipEnabled && static_cast<int32_t>(nowMs - nextBlipAtMs) >= 0) {
+            runSimulationBlip();
+            // Restart both clocks after the blip so the cycle resumes where it paused.
+            lastTickMs = millis();
+            nextBlipAtMs = lastTickMs + config::kSimReconnectBlipIntervalMs;
+            continue;
+        }
+
+        uint32_t deltaMs = nowMs - lastTickMs;
+        lastTickMs = nowMs;
+
+        TelemetrySnapshot simulated;
+        simulator_.update(deltaMs, nowMs, simulated);
+
+        if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
+            snapshot_ = simulated;
+            xSemaphoreGive(mutex_);
+        }
+
+        if (dtcReadRequested_.load()) {
+            DtcList result;
+            simulator_.fillDtcList(result);
+            if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
+                dtcResult_ = result;
+                xSemaphoreGive(mutex_);
+            }
+            dtcResultReady_.store(true);
+            dtcReadRequested_.store(false);
+            Serial.printf("[SIM] DTC read complete: %u code(s).\n", result.count);
+        }
+
+        if (clearCodesRequested_.load()) {
+            simulator_.clearDtcs();
+            if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
+                dtcResult_ = DtcList();
+                xSemaphoreGive(mutex_);
+            }
+            dtcResultReady_.store(false);
+            clearCodesRequested_.store(false);
+            Serial.println("[SIM] Codes cleared.");
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(config::kObdSecondaryPidIntervalMs));
+    }
+}
+
+#else
 
 void ObdClient::taskLoop() {
 #if OBD_LOCAL_CONFIG_AVAILABLE
@@ -350,3 +449,5 @@ void ObdClient::taskLoop() {
         vTaskDelay(pdMS_TO_TICKS(config::kObdSecondaryPidIntervalMs));
     }
 }
+
+#endif // OBD_SIMULATION_ENABLED
