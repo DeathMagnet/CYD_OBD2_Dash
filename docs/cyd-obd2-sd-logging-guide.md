@@ -127,10 +127,10 @@ constexpr uint32_t SD_FLUSH_INTERVAL_MS   = 500;  // Physical flash sync every 5
 
 ## ⚙️ Conditional Compilation (`SD_LOGGING_ENABLED`)
 
-SD Card logging is completely optional. For bench-testing without an SD card inserted, comment out `-D SD_LOGGING_ENABLED` in `platformio.ini`:
+SD Card logging is completely optional. For bench-testing without an SD card inserted, comment out `-D SD_LOGGING_ENABLED` in the shared `[env]` section of `platformio.ini`:
 
 ```ini
-[env:cyd_4inch]
+[env]
 platform = espressif32
 board = esp32dev
 framework = arduino
@@ -139,6 +139,8 @@ build_flags =
     -D ST7796_DRIVER
     ; -D SD_LOGGING_ENABLED   ; Comment out to compile without SD logging calls
 ```
+
+Both `cyd_4inch` and `cyd_4inch_sim` inherit this flag. Logging is deliberately **orthogonal** to `OBD_SIMULATION_ENABLED`: a simulated build logs to SD exactly like a live one, which makes the scripted drive cycle a dense, repeatable exercise of the writer. Never guard logging code on the simulation flag.
 
 ### Module Structure with Preprocessor Wrappers (`src/logging/sd_logger.h` & `sd_logger.cpp`)
 

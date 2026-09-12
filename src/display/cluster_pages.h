@@ -99,5 +99,8 @@ private:
     ClusterPageRuntimeState runtimeState_;
     NeedlePhysics rpmNeedle_;
     NeedlePhysics speedNeedle_;
+    gaugewidgets::ArcGaugeState rpmArc_;
+    gaugewidgets::ArcGaugeState loadArc_;
+    gaugewidgets::ArcGaugeState vacuumArc_;
     uint32_t lastFrameMs_ = 0;
 };

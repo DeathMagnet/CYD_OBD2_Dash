@@ -2,10 +2,20 @@
 
 #include <stdint.h>
 #include <atomic>
-#include <BluetoothSerial.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
+
+// Bench/demo builds replace the Bluetooth transport with a scripted data source.
+#ifndef OBD_SIMULATION_ENABLED
+#define OBD_SIMULATION_ENABLED 0
+#endif
+
+#if OBD_SIMULATION_ENABLED
+#include "obd/obd_simulator.h"
+#else
+#include <BluetoothSerial.h>
+#endif
 
 #include "obd/telemetry.h"
 #include "obd/obd_pids.h"
@@ -58,6 +68,14 @@ public:
 
 private:
     static void taskEntry(void* param);
+    void setSnapshotConnected(bool connected);
+
+#if OBD_SIMULATION_ENABLED
+    void simulationLoop();
+    void runSimulationBlip();
+
+    ObdSimulator simulator_;
+#else
     void taskLoop();
 
     bool runInitSequence();
@@ -65,9 +83,10 @@ private:
     void pollPid(ObdPid id, uint32_t nowMs);
     void performDtcRead();
     void performClearCodes();
-    void setSnapshotConnected(bool connected);
 
     BluetoothSerial btSerial_;
+#endif
+
     SemaphoreHandle_t mutex_ = nullptr;
     TaskHandle_t taskHandle_ = nullptr;
 
@@ -79,8 +98,10 @@ private:
     std::atomic<bool> clearCodesRequested_{false};
     std::atomic<bool> dtcResultReady_{false};
 
+#if !OBD_SIMULATION_ENABLED
     // Task-local; only ever touched from within taskLoop(), so plain fields.
     uint8_t secondaryPollIndex_ = 0;
     uint8_t consecutiveFailures_ = 0;
     uint32_t reconnectBackoffMs_ = 0;
+#endif
 };

@@ -12,7 +12,7 @@ All six pages render live OBD-II telemetry today, but with these deliberate devi
 
 - **Only Modern Flat is implemented.** `getTheme()` (`src/display/theme.cpp`) returns the Modern Flat palette regardless of the requested `ThemeId`; Mustang S197 and Torque Neon are reserved enum values with no color table yet. Page 5's "Active Theme" row is display-only and reads "MODERN FLAT (ACTIVE) - OTHERS COMING SOON".
 - **Direct-to-TFT rendering, not sprites.** This board's ESP32-32E has no PSRAM, and a full-frame RGB565 sprite (~300KB) does not fit in 320KB of SRAM alongside the Bluetooth stack and SD buffers. Each page has a `drawStatic()` pass (chrome/labels, called once per page change) and a `drawDynamic()` pass (values only, called on a throttled `config::kUiRefreshIntervalMs` cadence) that redraws its own bounded region using TFT_eSPI's background-color text redraw to avoid flicker. There is no slide/fade page-transition animation; page switches redraw immediately.
-- **Redline arc**: drawn as 12 interpolated-color segments between `config::kRedlineArcStartRpm` (fixed at 5500) and Page 5's user-configurable "Redline RPM" setting (default 6200, range 5000-7000), via `gaugewidgets::drawArcGauge`'s `redlineStart`/`redlineEnd` parameters.
+- **Redline arc**: drawn as 12 interpolated-color segments between `config::kRedlineArcStartRpm` (fixed at 5500) and Page 5's user-configurable "Redline RPM" setting (default 6200, range 5000-7000), via `gaugewidgets::drawArcGauge`'s `redlineStart`/`redlineEnd` parameters. Past the configured redline the full redline color is held out to the end of the arc, so the sweep never drops back to unlit track.
 - **Page 6 DTC list shows codes only** (e.g. `P0133`), not human-readable descriptions — no DTC description database is included. A read is triggered automatically whenever Page 6 is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
 - **Page 5 adds a log-management row** beyond the settings table below: a live count of session log files and their total size (`CsvLogger::getLogSummary()`), plus a "DELETE ALL LOGS" button (same 5-second tap-to-confirm pattern) that closes the active file, deletes every `mustang_log_*.csv`, and immediately opens a fresh session file. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space.
 - **Actual source layout** differs from the "Proposed" structure at the bottom of this doc — see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#proposed-source-layout) for the as-built tree.
@@ -39,7 +39,7 @@ The UI supports three distinct visual themes switchable at runtime or persisted 
 - **Typography**: Clean vector/bitmap font layout, flat geometric bars, minimal chrome.
 
 ### 4. All Themes
-- **Redline Arc**: Gradient arc starting at 5500 RPM up to 6200 RPM matching the Mustang 4.6L 3V Modular V8 torque/power drop curve.
+- **Redline Arc**: Gradient arc starting at 5500 RPM up to 6200 RPM matching the Mustang 4.6L 3V Modular V8 torque/power drop curve, then held at full redline color to the end of the sweep.
 
 ### Implementation Structure (`src/display/theme.h`)
 
@@ -77,21 +77,41 @@ const ThemeColors& getTheme(ThemeId id);
 
 To achieve flicker-free 30 FPS rendering on the ST7796S (20MHz SPI), use `TFT_eSPI` double-buffered Sprites for active gauges and dynamic screen regions.
 
+> **As-built:** sprites are not used. The ESP32-32E on this board has no PSRAM, and a full-frame RGB565 sprite (480x320x2 bytes, roughly 300 KB) does not fit in 320 KB of SRAM alongside the Bluetooth stack and SD buffers. Widgets instead redraw only their own bounded region each frame, following the two rules below.
+
+### 0. Redraw Rules
+
+Both rules exist because a region painted twice in one frame flickers, and because `drawString()` and `drawSmoothArc()` only repaint the pixels they cover.
+
+- **Variable-width text must clear its own field.** `drawString()` with a background color repaints only the new glyph box, so a readout that loses a character leaves the previous, wider string's outer columns on screen. Draw every value whose rendered width can change through `gaugewidgets::drawFieldText()`, which blanks the margins between the text and its field slot. Readouts drawn over a `fillRoundRect`/`fillRect` painted in the same frame (buttons, badges, the DTC list) are already covered and must not double-clear.
+- **Arcs repaint incrementally, but never in stitched pieces.** `drawArcGauge()` carries a `gaugewidgets::ArcGaugeState`; it paints the full track, redline, and fill only on the first draw, after `invalidate()`, or when `maxValue` changes, and otherwise repaints just the value sweep. Each repaint must be issued as **one continuous arc**, because `drawSmoothArc()` anti-aliases every call's ends against the background color and stitching short segments leaves black seam lines. Call `invalidate()` from the owning page's `drawStatic()`, which clears the background behind the gauge.
+
 ### 1. Gauge Needle Interpolation & Boot Sweep
 Needles use critically damped spring smoothing for realistic weight and zero jitter.
 
+The integration must be sub-stepped. Forward Euler on this spring is only stable while `damping * dt < 2`, and the UI refreshes every `config::kUiRefreshIntervalMs` (100 ms), which with the default `damping = 22` gives 2.2 — the value sign-flips and grows every frame until it reaches NaN, at which point the readout shows garbage and the arc silently stops drawing. Advance in fixed sub-steps instead of one frame-sized step:
+
 ```cpp
 struct NeedlePhysics {
-    float currentAngle = 0.0f;
-    float targetAngle  = 0.0f;
+    float currentValue = 0.0f;
     float velocity     = 0.0f;
 
-    void update(float target, float dt, float stiffness = 180.0f, float damping = 22.0f) {
-        float force = (target - currentAngle) * stiffness;
-        float dampingForce = velocity * damping;
-        float accel = force - dampingForce;
-        velocity += accel * dt;
-        currentAngle += velocity * dt;
+    void update(float target, float dtSeconds, float stiffness = 180.0f, float damping = 22.0f) {
+        if (dtSeconds <= 0.0f) {
+            return;
+        }
+        constexpr float kMaxStepSeconds = 0.01f;
+        constexpr int kMaxSteps = 64;
+        int steps = static_cast<int>(dtSeconds / kMaxStepSeconds) + 1;
+        if (steps > kMaxSteps) {
+            steps = kMaxSteps;
+        }
+        float step = dtSeconds / static_cast<float>(steps);
+        for (int i = 0; i < steps; ++i) {
+            float accel = (target - currentValue) * stiffness - velocity * damping;
+            velocity += accel * step;
+            currentValue += velocity * step;
+        }
     }
 };
 ```
@@ -170,8 +190,9 @@ Custom PID calculations for key Ford engine parameters.
 - **Fuel Rail Pressure**: Ford specific PID `01 23` (PSI / kPa).
 - **MAP & Calculated Vacuum / Boost Gauge**:
   - Uses Manifold Absolute Pressure (`PID 01 0B`) minus Barometric Baseline (configured in Page 5, default 14.7 PSI / 101.3 kPa).
-  - Displays as **Vacuum (inHg)** when MAP < Baro, and **Boost (PSI)** when MAP > Baro.
+  - Displays as **Vacuum (inHg)** when MAP < Baro, and **Boost (PSI)** when MAP > Baro. The caption is stacked on two lines (name above unit) so it clears the arc inside the gauge; with no MAP reading it shows `VAC/BOOST` and a blank unit line.
   - Vacuum range: 0 – 30 inHg; Boost range: 0 – 25 PSI.
+  - Sits centered at (240, 194) with a 70 px radius, in the gap the two bottom panels leave between x 150 and x 330. Because the range flips between 25 and 30 with the mode, the arc state is re-validated on `maxValue` change rather than assuming a fixed scale.
 - **O2 Sensor B1S1**: Upstream Oxygen Sensor Voltage / Lambda (`PID 01 14`).
 - **O2 Sensor B2S1**: Upstream Oxygen Sensor Bank 2 Voltage (`PID 01 18`).
 
@@ -260,8 +281,10 @@ src/
 
 - [ ] All 6 pages render cleanly at 480x320 landscape resolution.
 - [ ] Theme switching immediately recolors gauges, bezels, needles, and text.
-- [ ] Page 1 RPM gauge correctly displays Mustang 5500-6200 RPM redline arc and triggers bezel shift light flash.
+- [ ] Page 1 RPM gauge correctly displays Mustang 5500-6200 RPM redline arc, holds redline color to the end of the sweep, and triggers bezel shift light flash.
 - [ ] Needles perform a smooth full-scale sweep on boot and update continuously without jitter.
+- [ ] Sweeping a gauge up and back down leaves no seam lines in either the fill or the unlit track.
+- [ ] Readouts that lose a digit or change caption (RPM, coolant, vacuum/boost, MIL line) leave no leftover characters.
 - [ ] Tapping the MIL indicator on Page 1 switches instantly to Page 6.
 - [ ] Calculated Horsepower, Torque, Vacuum/Boost, and 0-60 timer update correctly on Pages 3 & 4.
 - [ ] Config menu settings save to SD card and persist after power cycle.
