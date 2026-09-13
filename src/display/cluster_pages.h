@@ -153,6 +153,34 @@ private:
     void beginLargeText(uint8_t size);
     void endLargeText();
 
+    // Page 2 - vertical layout for the MAF + TIMING ADVANCE box. Computed from
+    // the active theme's value-font height (via applyValueFont/fontHeight) so
+    // the 3 MAF lines (label/value/peak) stay snug at the top, the 2 TIMING
+    // ADVANCE lines (label/value) stay snug at the bottom, and the box is
+    // sized to fit both groups with consistent padding in every theme.
+    struct MafTimingLayout {
+        int32_t mafLabelY;
+        int32_t mafLabelToValueGap;
+        int32_t peakY;
+        int32_t taLabelY;
+        int32_t taLabelToValueGap;
+        int32_t boxHeight;
+    };
+    MafTimingLayout computeMafTimingLayout();
+
+    // Page 3 - vertical layout for the Vacuum/Boost panel: label (with its
+    // unit folded in, since the value's font may not support letters) on top,
+    // the bar gauge below it, and the value centered beneath the bar. Sized
+    // from the active theme's value-font height so the box fits all 3 lines
+    // snugly in every theme.
+    struct VacuumLayout {
+        int32_t labelY;
+        int32_t barY;
+        int32_t valueY;
+        int32_t boxHeight;
+    };
+    VacuumLayout computeVacuumLayout();
+
     void drawPage1Static();
     void drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs);
     void drawPage2Static();
@@ -187,7 +215,7 @@ private:
     gaugewidgets::ArcGaugeState rpmArc_;
     gaugewidgets::ArcGaugeState speedArc_;
     gaugewidgets::ArcGaugeState loadArc_;
-    gaugewidgets::ArcGaugeState vacuumArc_;
+    gaugewidgets::BarGaugeState vacuumBar_;
     gaugewidgets::BarGaugeState throttleBar_;
     gaugewidgets::BarGaugeState stftBar_;
     gaugewidgets::BarGaugeState ltftBar_;

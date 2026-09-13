@@ -231,16 +231,6 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     int32_t rpmLabelY = kGaugeCy + 25 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
     tft_.drawString(labels::kUnitRpm, kRpmGaugeCx, rpmLabelY);
-    beginLargeText(4);
-    // Font 7 digits are 32px wide each at size 1, so 4 digits (up to maxRpm=9000) need
-    // 128px - wider than the 120px field sized for the default font. A field narrower
-    // than the actual text leaves part of a shrinking digit uncleared on the next frame.
-    int32_t rpmFieldWidth = theme_.useSevenSegmentFont ? 132 : 120;
-    gaugewidgets::drawFieldText(tft_, rpmBuf, kRpmGaugeCx, kGaugeCy - 5, rpmFieldWidth, theme_.background);
-    endLargeText();
-    tft_.setTextSize(2);
-    tft_.setTextColor(theme_.textSecondary, theme_.background);
-    tft_.drawString(labels::kUnitRpm, kRpmGaugeCx, kGaugeCy + 30);
 
     char speedBuf[8];
     if (snapshot.speedMph.valid) {
@@ -257,12 +247,6 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     int32_t speedLabelY = kGaugeCy + 25 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
     tft_.drawString(units::speedUnitLabel(metric), kSpeedGaugeCx, speedLabelY);
-    beginLargeText(4);
-    gaugewidgets::drawFieldText(tft_, speedBuf, kSpeedGaugeCx, kGaugeCy - 5, 120, theme_.background);
-    endLargeText();
-    tft_.setTextSize(2);
-    tft_.setTextColor(theme_.textSecondary, theme_.background);
-    tft_.drawString(units::speedUnitLabel(metric), kSpeedGaugeCx, kGaugeCy + 30);
 
     constexpr int32_t kRowY = 250, kColW = 154, kColGap = 5;
     char valueBuf[16];
@@ -278,9 +262,10 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(coolantHot ? theme_.warningActive
                                   : (snapshot.coolantF.valid ? theme_.textPrimary : theme_.textSecondary),
                        theme_.panel);
-    tft_.setTextSize(2);
+    applyValueFont(tft_, theme_, 2);
     gaugewidgets::drawFieldText(tft_, snapshot.coolantF.valid ? valueBuf : "--", coolantColX + kColW / 2, kRowY + 22,
                                  kColW - 4, theme_.panel);
+    resetValueFont(tft_);
 
     float displayIat = units::displayTemp(snapshot.iatF.value, metric);
     snprintf(valueBuf, sizeof(valueBuf), "%d %s", static_cast<int>(displayIat), units::tempUnitLabel(metric));
@@ -299,6 +284,33 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
 
 // ---------------------------------------------------------------- Page 2: Engine Load & Airflow --
 
+ClusterPages::MafTimingLayout ClusterPages::computeMafTimingLayout() {
+    constexpr int32_t kBoxY = 50;
+    constexpr int32_t kTopPad = 8;               // box top -> MAF label
+    constexpr int32_t kMafLabelToValueGap = 22;  // MAF label->value gap (wider than drawValueBox()'s 14px default)
+    constexpr int32_t kTaLabelToValueGap = 22;   // Timing Advance label->value gap (wider than the 14px default)
+    constexpr int32_t kPeakTextHeight = 8;       // size-1 default-font line height
+    constexpr int32_t kLineGap = 8;             // MAF value -> PEAK text (same group)
+    constexpr int32_t kGroupGap = 16;            // PEAK text -> TIMING ADVANCE label (new group)
+    constexpr int32_t kBottomPad = 8;            // TIMING ADVANCE value -> box bottom
+
+    applyValueFont(tft_, theme_, 2);
+    int32_t valueFontHeight = tft_.fontHeight();
+    resetValueFont(tft_);
+
+    MafTimingLayout layoutOut;
+    layoutOut.mafLabelY = kBoxY + kTopPad;
+    layoutOut.mafLabelToValueGap = kMafLabelToValueGap;
+    int32_t mafValueBottom = layoutOut.mafLabelY + kMafLabelToValueGap + valueFontHeight;
+    layoutOut.peakY = mafValueBottom + kLineGap;
+    int32_t peakBottom = layoutOut.peakY + kPeakTextHeight;
+    layoutOut.taLabelY = peakBottom + kGroupGap;
+    layoutOut.taLabelToValueGap = kTaLabelToValueGap;
+    int32_t taValueBottom = layoutOut.taLabelY + kTaLabelToValueGap + valueFontHeight;
+    layoutOut.boxHeight = (taValueBottom + kBottomPad) - kBoxY;
+    return layoutOut;
+}
+
 void ClusterPages::drawPage2Static() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
@@ -310,7 +322,9 @@ void ClusterPages::drawPage2Static() {
     constexpr int32_t kGaugeCx = 130, kGaugeCy = 130, kGaugeRadius = 78;
     gaugewidgets::drawGaugeBezel(tft_, kGaugeCx, kGaugeCy, kGaugeRadius, theme_);
 
-    tft_.fillRoundRect(250, 50, 220, 160, 6, theme_.panel); // MAF + TIMING ADVANCE box, 20px taller
+    // Must match the MAF/TIMING ADVANCE layout in drawPage2Dynamic().
+    MafTimingLayout mafLayout = computeMafTimingLayout();
+    tft_.fillRoundRect(250, 50, 220, mafLayout.boxHeight, 6, theme_.panel); // MAF + TIMING ADVANCE box
     tft_.fillRoundRect(20, 220, 210, 80, 6, theme_.panel);
     tft_.fillRoundRect(250, 220, 210, 80, 6, theme_.panel);
 }
@@ -325,7 +339,11 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
                                 theme_.background, theme_);
 
     tft_.setTextDatum(MC_DATUM);
-    snprintf(buf, sizeof(buf), theme_.numberedFonts[1] != 0 ? "%d" : "%d%%", static_cast<int>(targetLoad));
+    if (theme_.useSevenSegmentFont) {
+        snprintf(buf, sizeof(buf), "%d", static_cast<int>(targetLoad)); // Font 7 has no '%' glyph.
+    } else {
+        snprintf(buf, sizeof(buf), "%d%%", static_cast<int>(targetLoad));
+    }
     tft_.setTextColor(theme_.textPrimary, theme_.background);
     applyValueFont(tft_, theme_, 3);
     gaugewidgets::drawFieldText(tft_, snapshot.engineLoadPct.valid ? buf : "--", kGaugeCx, kGaugeCy, 100,
@@ -333,36 +351,27 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     resetValueFont(tft_);
     tft_.setTextSize(1);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
-    int32_t engineLoadLabelY = kGaugeCy + 22 + (theme_.numberedFonts[1] != 0 ? 8 : 0);
-    tft_.drawString(labels::kLabelEngineLoad, kGaugeCx, engineLoadLabelY);
-    if (theme_.useSevenSegmentFont) {
-        snprintf(buf, sizeof(buf), "%d", static_cast<int>(targetLoad)); // Font 7 has no '%' glyph.
-    } else {
-        snprintf(buf, sizeof(buf), "%d%%", static_cast<int>(targetLoad));
-    }
-    tft_.setTextColor(theme_.textPrimary, theme_.background);
-    beginLargeText(3);
-    gaugewidgets::drawFieldText(tft_, snapshot.engineLoadPct.valid ? buf : "--", kGaugeCx, kGaugeCy, 100,
-                                 theme_.background);
-    endLargeText();
-    tft_.setTextSize(1);
-    tft_.setTextColor(theme_.textSecondary, theme_.background);
     tft_.drawString(labels::kLabelEngineLoad, kGaugeCx, kGaugeCy + 34);
+
+    // Must match the box geometry in drawPage2Static().
+    MafTimingLayout mafLayout = computeMafTimingLayout();
 
     if (snapshot.mafGps.valid && snapshot.mafGps.value > runtimeState_.mafPeakGps) {
         runtimeState_.mafPeakGps = snapshot.mafGps.value;
     }
     snprintf(buf, sizeof(buf), "%.1f g/s", snapshot.mafGps.value);
-    gaugewidgets::drawValueBox(tft_, 260, 58, 200, labels::kLabelMaf, buf, snapshot.mafGps.valid, theme_, 2, 2);
+    gaugewidgets::drawValueBox(tft_, 260, mafLayout.mafLabelY, 200, labels::kLabelMaf, buf, snapshot.mafGps.valid,
+                                theme_, 2, 2, mafLayout.mafLabelToValueGap);
     char peakBuf[24];
     snprintf(peakBuf, sizeof(peakBuf), "PEAK %.1f g/s", runtimeState_.mafPeakGps);
     tft_.setTextDatum(TC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
     tft_.setTextSize(1);
-    gaugewidgets::drawFieldText(tft_, peakBuf, 360, 105, 200, theme_.panel);
+    gaugewidgets::drawFieldText(tft_, peakBuf, 360, mafLayout.peakY, 200, theme_.panel);
 
     snprintf(buf, sizeof(buf), "%.1f deg", snapshot.timingAdvanceDeg.value);
-    gaugewidgets::drawValueBox(tft_, 260, 132, 200, labels::kLabelTimingAdvance, buf, snapshot.timingAdvanceDeg.valid, theme_, 2, 2);
+    gaugewidgets::drawValueBox(tft_, 260, mafLayout.taLabelY, 200, labels::kLabelTimingAdvance, buf,
+                                snapshot.timingAdvanceDeg.valid, theme_, 2, 2, mafLayout.taLabelToValueGap);
 
     tft_.setTextDatum(TC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
@@ -386,19 +395,41 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
 
 // ---------------------------------------------------------------- Page 3: Car-Specific Sensors --
 
+ClusterPages::VacuumLayout ClusterPages::computeVacuumLayout() {
+    constexpr int32_t kBoxTop = 130; // 10px below the Battery/Fuel Rail Pressure boxes (y=50, height 70)
+    constexpr int32_t kTopPad = 8;
+    constexpr int32_t kLabelHeight = 8; // size-1 default-font line height
+    constexpr int32_t kBarHeight = 30;
+    constexpr int32_t kLabelToBarGap = 4;
+    constexpr int32_t kBarToValueGap = 6;
+    constexpr int32_t kBottomPad = 8;
+
+    applyValueFont(tft_, theme_, 3);
+    int32_t valueHeight = tft_.fontHeight();
+    resetValueFont(tft_);
+
+    VacuumLayout layoutOut;
+    layoutOut.labelY = kBoxTop + kTopPad;
+    layoutOut.barY = layoutOut.labelY + kLabelHeight + kLabelToBarGap;
+    layoutOut.valueY = layoutOut.barY + kBarHeight + kBarToValueGap;
+    layoutOut.boxHeight = (layoutOut.valueY + valueHeight + kBottomPad) - kBoxTop;
+    return layoutOut;
+}
+
 void ClusterPages::drawPage3Static() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
-    vacuumArc_.invalidate();
-
-    // Must match the Vacuum/Boost gauge geometry in drawPage3Dynamic().
-    constexpr int32_t kVacCx = 240, kVacCy = 211, kVacR = 82;
-    gaugewidgets::drawGaugeBezel(tft_, kVacCx, kVacCy, kVacR, theme_);
+    vacuumBar_.invalidate();
 
     tft_.fillRoundRect(10, 50, 225, 70, 6, theme_.panel);
     tft_.fillRoundRect(245, 50, 225, 70, 6, theme_.panel);
     tft_.fillRoundRect(10, 245, 140, 65, 6, theme_.panel);
     tft_.fillRoundRect(330, 245, 140, 65, 6, theme_.panel);
+
+    // Vacuum/Boost panel - fills the gap between the four corner panels above.
+    // Must match the layout in drawPage3Dynamic().
+    VacuumLayout vacLayout = computeVacuumLayout();
+    tft_.fillRoundRect(150, 130, 180, vacLayout.boxHeight, 6, theme_.panel);
 }
 
 void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
@@ -454,34 +485,37 @@ void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
             gaugeUnit = metric ? labels::kUnitKpa : labels::kUnitInHg;
         }
     }
-    // Sits in the gap between the two bottom panels (x 150..330), so it can run
-    // lower and wider than the top-row gauges.
-    constexpr int32_t kVacCx = 240, kVacCy = 211, kVacR = 82;
-    gaugewidgets::drawArcGauge(tft_, vacuumArc_, kVacCx, kVacCy, kVacR, gaugeValue, gaugeMax, gaugeMax, gaugeMax,
-                                theme_.background, theme_);
-    tft_.setTextDatum(MC_DATUM);
+    // Fills the panel box between the four corner panels (x 150..330).
+    constexpr int32_t kVacCx = 240;
+    constexpr int32_t kVacBarWidth = 170, kVacBarHeight = 30;
+    constexpr int32_t kVacFieldWidth = 160;
+
+    // Must match the box geometry in drawPage3Static().
+    VacuumLayout vacLayout = computeVacuumLayout();
+
+    tft_.setTextDatum(TC_DATUM);
+    tft_.setTextSize(1);
+    tft_.setTextColor(theme_.textSecondary, theme_.panel);
+    // Font 7 (used for the value under some themes) can't render letters, so
+    // the unit rides on the label line instead of the value line.
+    char labelBuf[24];
+    if (haveMap) {
+        snprintf(labelBuf, sizeof(labelBuf), "%s (%s)", gaugeLabel, gaugeUnit);
+    } else {
+        snprintf(labelBuf, sizeof(labelBuf), "%s", gaugeLabel);
+    }
+    gaugewidgets::drawFieldText(tft_, labelBuf, kVacCx, vacLayout.labelY, 170, theme_.panel);
+
+    float vacPercent = haveMap ? (gaugeValue / gaugeMax) * 100.0F : 0.0F;
+    gaugewidgets::drawBarGauge(tft_, vacuumBar_, kVacCx - kVacBarWidth / 2, vacLayout.barY, kVacBarWidth,
+                                kVacBarHeight, vacPercent, theme_.primaryGaugeArc, theme_);
+
     snprintf(buf, sizeof(buf), "%.1f", gaugeValue);
-    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    tft_.setTextColor(theme_.textPrimary, theme_.panel);
     applyValueFont(tft_, theme_, 3);
-    int32_t vacFieldWidth = (theme_.numberedFonts[1] != 0) ? 140 : 96;
-    int32_t vacDigitY = (theme_.numberedFonts[1] != 0) ? (kVacCy - 20) : (kVacCy - 14);
-    int32_t vacLabelY = (theme_.numberedFonts[1] != 0) ? (kVacCy + 22) : (kVacCy + 14);
-    gaugewidgets::drawFieldText(tft_, haveMap ? buf : "--", kVacCx, vacDigitY, vacFieldWidth, theme_.background);
+    gaugewidgets::drawFieldText(tft_, haveMap ? buf : "--", kVacCx, vacLayout.valueY, kVacFieldWidth, theme_.panel);
     resetValueFont(tft_);
     tft_.setTextSize(1);
-    tft_.setTextColor(theme_.textSecondary, theme_.background);
-    gaugewidgets::drawFieldText(tft_, gaugeLabel, kVacCx, vacLabelY, 90, theme_.background);
-    gaugewidgets::drawFieldText(tft_, gaugeUnit, kVacCx, kVacCy + 26, 90, theme_.background);
-    beginLargeText(3);
-    // A 2-digit reading plus the decimal point needs more room under Font 7 (32px/digit)
-    // than the default font, same reasoning as the RPM field fix.
-    int32_t vacFieldWidth = theme_.useSevenSegmentFont ? 112 : 96;
-    gaugewidgets::drawFieldText(tft_, haveMap ? buf : "--", kVacCx, kVacCy - 14, vacFieldWidth, theme_.background);
-    endLargeText();
-    tft_.setTextSize(1);
-    tft_.setTextColor(theme_.textSecondary, theme_.background);
-    gaugewidgets::drawFieldText(tft_, gaugeLabel, kVacCx, kVacCy + 24, 90, theme_.background);
-    gaugewidgets::drawFieldText(tft_, gaugeUnit, kVacCx, kVacCy + 36, 90, theme_.background);
 
     snprintf(buf, sizeof(buf), "%.2f V", snapshot.o2B1S1V.value);
     gaugewidgets::drawValueBox(tft_, 10, 253, 140, labels::kLabelO2B1S1, buf, snapshot.o2B1S1V.valid, theme_);

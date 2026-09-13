@@ -195,41 +195,27 @@ void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int
 
 void drawValueBox(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width,
                    const char* label, const char* formattedValue, bool valid, const ThemeColors& theme,
-                   uint8_t labelTextSize, uint8_t valueTextSize) {
+                   uint8_t labelTextSize, uint8_t valueTextSize, int32_t labelToValueGap) {
     tft.setTextDatum(TC_DATUM);
     tft.setTextColor(theme.textSecondary, theme.panel);
     tft.setTextSize(labelTextSize);
     tft.drawString(label, x + width / 2, y);
 
-    // Default label height (size 1) is ~8px; scale the gap with labelTextSize so a
-    // bumped caption doesn't collide with the value below it. 8*1+6=14, matching the
-    // original fixed offset exactly when labelTextSize is left at its default.
-    int32_t valueY = y + 8 * labelTextSize + 6;
     tft.setTextColor(valid ? theme.textPrimary : theme.textSecondary, theme.panel);
     applyValueFont(tft, theme, 2);
-    drawFieldText(tft, valid ? formattedValue : "--", x + width / 2, y + 14, width - 4, theme.panel);
+    drawFieldText(tft, valid ? formattedValue : "--", x + width / 2, y + labelToValueGap, width - 4, theme.panel);
     resetValueFont(tft);
-    tft.setTextSize(valueTextSize);
-    drawFieldText(tft, valid ? formattedValue : "--", x + width / 2, valueY, width - 4, theme.panel);
 }
 
 void drawFieldText(TFT_eSPI& tft, const char* text, int32_t x, int32_t y,
                     int32_t fieldWidth, uint16_t background) {
-    int32_t textWidth = tft.textWidth(text);
     int32_t textHeight = tft.fontHeight();
     uint8_t datum = tft.getTextDatum();
 
-    int32_t textLeft = x;
     int32_t fieldLeft = x;
     switch (datum % 3) {
-        case 1: // Centered
-            textLeft = x - textWidth / 2;
-            fieldLeft = x - fieldWidth / 2;
-            break;
-        case 2: // Right aligned
-            textLeft = x - textWidth;
-            fieldLeft = x - fieldWidth;
-            break;
+        case 1: fieldLeft = x - fieldWidth / 2; break; // Centered
+        case 2: fieldLeft = x - fieldWidth; break;      // Right aligned
         default: break;
     }
 
@@ -242,16 +228,11 @@ void drawFieldText(TFT_eSPI& tft, const char* text, int32_t x, int32_t y,
         }
     }
 
-    int32_t leftGap = textLeft - fieldLeft;
-    if (leftGap > 0) {
-        tft.fillRect(fieldLeft, top, leftGap, textHeight, background);
-    }
-    int32_t textRight = textLeft + textWidth;
-    int32_t rightGap = (fieldLeft + fieldWidth) - textRight;
-    if (rightGap > 0) {
-        tft.fillRect(textRight, top, rightGap, textHeight, background);
-    }
-
+    // Always clear the full field before drawing, rather than only the gaps
+    // left/right of the new text's own bounds: relying on drawString()'s own
+    // opaque-background erase to fully cover its footprint, combined with a
+    // differential side-only clear here, left ghosting on some fonts/values.
+    tft.fillRect(fieldLeft, top, fieldWidth, textHeight, background);
     tft.drawString(text, x, y);
 }
 
