@@ -86,6 +86,8 @@ struct ClusterPageRuntimeState {
     // reset whenever the owning page's Static function reopens the page.
     char cfgShiftLightRpmDrawn[24] = {0};  // Gauges page
     char cfgRedlineRpmDrawn[24] = {0};     // Gauges page
+    char cfgMaxRpmDrawn[24] = {0};         // Gauges page
+    char cfgMaxSpeedDrawn[24] = {0};       // Gauges page
     char cfgBaroBaselineDrawn[24] = {0};   // User Vars page
     char cfgLogIntervalDrawn[24] = {0};    // Logs page
     int8_t cfgDeleteConfirmDrawn = -1;     // Logs page

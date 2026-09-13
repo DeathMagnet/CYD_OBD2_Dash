@@ -124,6 +124,28 @@ bool ClusterTouchHandler::handleConfigGaugesTap(uint16_t x, uint16_t y, uint32_t
         return false;
     }
 
+    int32_t row2 = layout::kConfigRow2Y + layout::kConfigButtonInsetY;
+    int32_t row2End = row2 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigMinusX, row2, layout::kConfigMinusX + layout::kConfigMinusW, row2End)) {
+        configStore_.setMaxRpm(settings.maxRpm - config::kMaxRpmStepRpm);
+        return false;
+    }
+    if (within(x, y, layout::kConfigPlusX, row2, layout::kConfigPlusX + layout::kConfigPlusW, row2End)) {
+        configStore_.setMaxRpm(settings.maxRpm + config::kMaxRpmStepRpm);
+        return false;
+    }
+
+    int32_t row3 = layout::kConfigRow3Y + layout::kConfigButtonInsetY;
+    int32_t row3End = row3 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigMinusX, row3, layout::kConfigMinusX + layout::kConfigMinusW, row3End)) {
+        configStore_.setMaxSpeedMph(settings.maxSpeedMph - config::kMaxSpeedStepMph);
+        return false;
+    }
+    if (within(x, y, layout::kConfigPlusX, row3, layout::kConfigPlusX + layout::kConfigPlusW, row3End)) {
+        configStore_.setMaxSpeedMph(settings.maxSpeedMph + config::kMaxSpeedStepMph);
+        return false;
+    }
+
     return false;
 }
 

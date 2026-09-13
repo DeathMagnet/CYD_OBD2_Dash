@@ -153,10 +153,10 @@ void ClusterPages::drawPage1Static() {
 
 void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
     constexpr int32_t kRpmGaugeCx = 130, kSpeedGaugeCx = 350, kGaugeCy = 150, kGaugeRadius = 95;
-    constexpr float kRpmMax = 7000.0F;
-    constexpr float kSpeedMax = 200.0F;
 
     const AppSettings& settings = configStore_.settings();
+    const float kRpmMax = static_cast<float>(settings.maxRpm);
+    const float kSpeedMax = static_cast<float>(settings.maxSpeedMph);
 
     float targetRpm = snapshot.rpm.valid ? snapshot.rpm.value : 0.0F;
     float targetSpeed = snapshot.speedMph.valid ? snapshot.speedMph.value : 0.0F;
@@ -534,7 +534,7 @@ void ClusterPages::drawConfigGaugesStatic() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
 
-    for (int i = 0; i <= 2; ++i) {
+    for (int i = 0; i <= 4; ++i) {
         int32_t y = layout::kHeaderHeight + i * layout::kConfigRowHeight;
         tft_.drawFastHLine(0, y, layout::kScreenWidth, theme_.bezel);
     }
@@ -544,6 +544,8 @@ void ClusterPages::drawConfigGaugesStatic() {
     tft_.setTextSize(1);
     tft_.drawString("SHIFT LIGHT RPM", 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
     tft_.drawString("REDLINE RPM", 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
+    tft_.drawString("MAX RPM", 12, layout::kConfigRow2Y + layout::kConfigRowHeight / 2);
+    tft_.drawString("MAX SPEED MPH", 12, layout::kConfigRow3Y + layout::kConfigRowHeight / 2);
 
     auto drawMinusPlusChrome = [&](int32_t rowY) {
         tft_.drawRoundRect(layout::kConfigMinusX, rowY + layout::kConfigButtonInsetY, layout::kConfigMinusW,
@@ -558,11 +560,15 @@ void ClusterPages::drawConfigGaugesStatic() {
     };
     drawMinusPlusChrome(layout::kConfigRow0Y);
     drawMinusPlusChrome(layout::kConfigRow1Y);
+    drawMinusPlusChrome(layout::kConfigRow2Y);
+    drawMinusPlusChrome(layout::kConfigRow3Y);
 
     // Force drawConfigGaugesDynamic() to repaint every region the next time
     // it runs, since the static redraw above just wiped them all.
     runtimeState_.cfgShiftLightRpmDrawn[0] = '\0';
     runtimeState_.cfgRedlineRpmDrawn[0] = '\0';
+    runtimeState_.cfgMaxRpmDrawn[0] = '\0';
+    runtimeState_.cfgMaxSpeedDrawn[0] = '\0';
 }
 
 void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
@@ -590,6 +596,28 @@ void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
                                      layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
                                      theme_.background);
         strncpy(runtimeState_.cfgRedlineRpmDrawn, buf, sizeof(runtimeState_.cfgRedlineRpmDrawn) - 1);
+    }
+
+    snprintf(buf, sizeof(buf), "%u", settings.maxRpm);
+    if (strcmp(buf, runtimeState_.cfgMaxRpmDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
+                                     layout::kConfigRow2Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgMaxRpmDrawn, buf, sizeof(runtimeState_.cfgMaxRpmDrawn) - 1);
+    }
+
+    snprintf(buf, sizeof(buf), "%u", settings.maxSpeedMph);
+    if (strcmp(buf, runtimeState_.cfgMaxSpeedDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
+                                     layout::kConfigRow3Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgMaxSpeedDrawn, buf, sizeof(runtimeState_.cfgMaxSpeedDrawn) - 1);
     }
 }
 

@@ -12,6 +12,8 @@
 struct AppSettings {
     uint16_t shiftLightRpm = config::kDefaultShiftLightRpm;
     uint16_t redlineRpm = config::kDefaultRedlineRpm;
+    uint16_t maxRpm = config::kDefaultMaxRpm;
+    uint16_t maxSpeedMph = config::kDefaultMaxSpeedMph;
     uint32_t logIntervalMs = config::kDefaultLogRowIntervalMs;
     float baroBaselinePsi = config::kDefaultBaroBaselinePsi;
     // Theme selection is persisted for forward compatibility, but only
@@ -32,6 +34,8 @@ public:
 
     void setShiftLightRpm(uint16_t rpm);
     void setRedlineRpm(uint16_t rpm);
+    void setMaxRpm(uint16_t rpm);
+    void setMaxSpeedMph(uint16_t mph);
     void setLogIntervalMs(uint32_t intervalMs);
     void setBaroBaselinePsi(float psi);
 
