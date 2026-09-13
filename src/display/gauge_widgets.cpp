@@ -309,6 +309,76 @@ void drawValueBox(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width,
     resetValueFont(tft);
 }
 
+void drawFixedUnit(TFT_eSPI& tft, const char* unit, int32_t rightX, int32_t y, uint8_t datum,
+                    uint8_t textSize, const ThemeColors& theme, uint16_t background) {
+    tft.setTextDatum(datum);
+    tft.setTextFont(1);
+    tft.setTextSize(textSize);
+    tft.setTextColor(theme.textSecondary, background);
+    tft.drawString(unit, rightX, y);
+}
+
+int32_t fixedUnitWidth(TFT_eSPI& tft, const char* unit, uint8_t textSize) {
+    tft.setTextFont(1);
+    tft.setTextSize(textSize);
+    return tft.textWidth(unit);
+}
+
+int32_t reservedValueWidth(TFT_eSPI& tft, const ThemeColors& theme, uint8_t sizeTier, const char* representative) {
+    applyValueFont(tft, theme, sizeTier);
+    int32_t w = tft.textWidth(representative);
+    resetValueFont(tft);
+    return w;
+}
+
+ValueUnitGroup centerValueUnitGroup(int32_t centerX, int32_t valueWidth, int32_t unitWidth, int32_t gapPx) {
+    int32_t groupWidth = valueWidth + gapPx + unitWidth;
+    int32_t groupLeft = centerX - groupWidth / 2;
+    return {groupLeft + valueWidth, groupLeft + groupWidth};
+}
+
+void drawValueBoxStatic(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width, const char* label,
+                         const char* unit, const char* representativeValue, const ThemeColors& theme,
+                         uint8_t labelTextSize, uint8_t valueTextSize, int32_t labelToValueGap) {
+    tft.setTextDatum(TC_DATUM);
+    tft.setTextColor(theme.textSecondary, theme.panel);
+    tft.setTextSize(labelTextSize);
+    tft.drawString(label, x + width / 2, y);
+
+    if (unit != nullptr && unit[0] != '\0') {
+        constexpr int32_t kGapPx = 4;
+        int32_t unitW = fixedUnitWidth(tft, unit, valueTextSize);
+        int32_t valueW = reservedValueWidth(tft, theme, 2, representativeValue);
+        ValueUnitGroup group = centerValueUnitGroup(x + width / 2, valueW, unitW, kGapPx);
+        drawFixedUnit(tft, unit, group.unitRightX, y + labelToValueGap, TR_DATUM, valueTextSize, theme, theme.panel);
+    }
+}
+
+void drawValueBoxValue(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width, const char* formattedValue,
+                        const char* unit, const char* representativeValue, bool valid, const ThemeColors& theme,
+                        uint8_t valueTextSize, int32_t labelToValueGap) {
+    bool hasUnit = unit != nullptr && unit[0] != '\0';
+    int32_t rightX;
+    int32_t fieldWidth;
+    if (hasUnit) {
+        constexpr int32_t kGapPx = 4;
+        int32_t unitW = fixedUnitWidth(tft, unit, valueTextSize);
+        int32_t valueW = reservedValueWidth(tft, theme, 2, representativeValue);
+        ValueUnitGroup group = centerValueUnitGroup(x + width / 2, valueW, unitW, kGapPx);
+        rightX = group.valueRightX;
+        fieldWidth = valueW;
+    } else {
+        rightX = x + width / 2;
+        fieldWidth = width - 4;
+    }
+
+    tft.setTextDatum(hasUnit ? TR_DATUM : TC_DATUM);
+    tft.setTextColor(valid ? theme.textPrimary : theme.textSecondary, theme.panel);
+    applyValueFont(tft, theme, 2);
+    drawFieldText(tft, valid ? formattedValue : "--", rightX, y + labelToValueGap, fieldWidth, theme.panel);
+    resetValueFont(tft);
+}
+
 void drawFieldText(TFT_eSPI& tft, const char* text, int32_t x, int32_t y,
                     int32_t fieldWidth, uint16_t background) {
     int32_t textHeight = tft.fontHeight();
