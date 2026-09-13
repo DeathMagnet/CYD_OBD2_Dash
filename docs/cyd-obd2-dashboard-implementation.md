@@ -158,6 +158,7 @@ src/
     sd_manager.h/.cpp        # SD mount + touch-calibration persistence (pre-existing)
   system/
     connection_state.h       # ConnectionState enum (header only)
+    status_led.h/.cpp        # Onboard RGB LED: shift-flash (priority) / MIL steady red / off
     dtc_decoder.h/.cpp       # Mode 03/07 DTC byte-pair decoding
     config_store.h/.cpp      # Config page settings (theme, gauge calibration, user vars, logging), persisted to /config.txt
 ```

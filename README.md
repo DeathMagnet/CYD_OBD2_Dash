@@ -29,12 +29,15 @@ uses the ST7796S controller over SPI and the dashboard uses it in landscape orie
 | TFT DC | GPIO 2 |
 | TFT BL (backlight) | GPIO 27 |
 | Touch CS | GPIO 33 |
+| LED Red | GPIO 22 |
+| LED Green | GPIO 16 |
+| LED Blue | GPIO 17 |
 | SD CS | GPIO 5 |
 | SD MOSI | GPIO 23 |
 | SD MISO | GPIO 19 |
 | SD CLK | GPIO 18 |
 
-> **Note:** The SD card uses its own SPI bus (VSPI, via `SdManager`), while the TFT and
+> **Note on SPI buses:** The SD card uses its own SPI bus (VSPI, via `SdManager`), while the TFT and
 > resistive touch controller share a separate SPI bus (HSPI, enabled by the
 > `USE_HSPI_PORT` build flag in `platformio.ini`). Both buses can then operate
 > simultaneously without conflict. Without `USE_HSPI_PORT`, `TFT_eSPI` defaults to the
@@ -44,6 +47,8 @@ uses the ST7796S controller over SPI and the dashboard uses it in landscape orie
 > last wins. Since `SdManager::begin()` runs after the display/touch init, it silently
 > steals the touch controller's read line, and touch input stops responding even though
 > the screen keeps rendering normally.
+
+> **Note on the RGB LED:** The onboard LED is active-low (GPIO state LOW = LED on, HIGH = LED off).
 
 ### Wiring Overview Diagram
 
@@ -102,3 +107,15 @@ A **shared Save button** appears at the bottom of every config page. It is **gre
 
 ### Mode Toggle
 The header includes a mode toggle button: a **cog icon** (⚙️) when viewing dashboard pages (tap to switch to config), and a **steering wheel icon** (🧭) when viewing config pages (tap to switch to dashboard). The button remembers which page you were on in each group, so you don't lose your place when switching back and forth.
+
+## Status LED Behavior
+
+The onboard RGB status LED provides real-time visual feedback for shift point and check-engine conditions:
+
+- **Shift-point flash** (active): When RPM reaches or exceeds the **Shift Light RPM** threshold (configured on the Config: GAUGES page, default 5800), the LED flashes the active theme's warning color at a **200 ms cadence** — the same flash rate as the Page-1 RPM digit shift indicator. This flash takes priority and remains visible even if the Check Engine light is also on, so you never miss the shift point cue.
+- **Check Engine steady** (no shift): If the Check Engine (MIL) light is on but RPM is below the Shift Light threshold, the LED glows a steady **red**.
+- **Off**: Otherwise, the LED is off.
+
+**Modern Flat theme**: Shift flash and MIL red are both pure red; this layout prioritizes the flash's clear on/off visibility over color distinction.
+
+**Torque Neon theme**: Shift flash is hot orange (`0xFDA0`), while MIL red remains red — giving visual separation even though the flash takes priority.
