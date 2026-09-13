@@ -201,8 +201,9 @@ void drawValueBox(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width,
     tft.drawString(label, x + width / 2, y);
 
     tft.setTextColor(valid ? theme.textPrimary : theme.textSecondary, theme.panel);
-    tft.setTextSize(2);
+    applyValueFont(tft, theme, 2);
     drawFieldText(tft, valid ? formattedValue : "--", x + width / 2, y + 14, width - 4, theme.panel);
+    resetValueFont(tft);
 }
 
 void drawFieldText(TFT_eSPI& tft, const char* text, int32_t x, int32_t y,
