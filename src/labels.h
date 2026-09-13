@@ -113,12 +113,6 @@ constexpr const char* kStatusReconnecting = "RECONNECTING";
 constexpr const char* kStatusDegraded = "NO OBD";
 constexpr const char* kStatusUnknown = "UNKNOWN";
 
-// ---- Boot / Calibration Screen ----
-constexpr const char* kBootTitle = "CYD OBD-II DASHBOARD";
-constexpr const char* kHelloWorld = "Hello, World!";
-constexpr const char* kTouchCalibrationActive = "Touch Calibration Active";
-constexpr const char* kTouchAnywhereToCalibrate = "Touch anywhere on screen";
-
 // ---- Theme ----
 constexpr const char* kThemeNameModernFlat = "Modern Flat";
 constexpr const char* kThemeNameTorqueNeon = "Torque Neon";

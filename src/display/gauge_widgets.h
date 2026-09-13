@@ -38,8 +38,7 @@ struct NeedlePhysics {
 // (480x320x2 bytes ~= 300KB) does not fit in its 320KB SRAM alongside the
 // Bluetooth stack and SD buffers. Widgets instead redraw only their own
 // bounded region each frame and rely on TFT_eSPI's built-in background-color
-// text redraw to avoid flicker, matching the pattern already used by
-// DisplayManager::drawHelloWorld.
+// text redraw to avoid flicker.
 namespace gaugewidgets {
 
 // Lets an arc gauge repaint only the sweep that actually moved between frames.
