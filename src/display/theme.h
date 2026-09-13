@@ -29,6 +29,7 @@ struct ThemeColors {
     uint16_t liveActive;    // OBDII status badge while ConnectionState::Live.
     bool showGaugeBezel;    // Draw a decorative chrome ring around round gauges.
     bool showOuterTicks;    // Draw the tick segment outside the gauge ring too (inner segment always drawn).
+    bool useSevenSegmentFont; // Use TFT_eSPI's built-in Font 7 (7-segment LED look) for large text (TextSize > 2).
     const char* name;
 };
 

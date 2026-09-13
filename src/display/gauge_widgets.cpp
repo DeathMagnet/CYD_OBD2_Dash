@@ -194,15 +194,20 @@ void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int
 }
 
 void drawValueBox(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width,
-                   const char* label, const char* formattedValue, bool valid, const ThemeColors& theme) {
+                   const char* label, const char* formattedValue, bool valid, const ThemeColors& theme,
+                   uint8_t labelTextSize, uint8_t valueTextSize) {
     tft.setTextDatum(TC_DATUM);
     tft.setTextColor(theme.textSecondary, theme.panel);
-    tft.setTextSize(1);
+    tft.setTextSize(labelTextSize);
     tft.drawString(label, x + width / 2, y);
 
+    // Default label height (size 1) is ~8px; scale the gap with labelTextSize so a
+    // bumped caption doesn't collide with the value below it. 8*1+6=14, matching the
+    // original fixed offset exactly when labelTextSize is left at its default.
+    int32_t valueY = y + 8 * labelTextSize + 6;
     tft.setTextColor(valid ? theme.textPrimary : theme.textSecondary, theme.panel);
-    tft.setTextSize(2);
-    drawFieldText(tft, valid ? formattedValue : "--", x + width / 2, y + 14, width - 4, theme.panel);
+    tft.setTextSize(valueTextSize);
+    drawFieldText(tft, valid ? formattedValue : "--", x + width / 2, valueY, width - 4, theme.panel);
 }
 
 void drawFieldText(TFT_eSPI& tft, const char* text, int32_t x, int32_t y,
