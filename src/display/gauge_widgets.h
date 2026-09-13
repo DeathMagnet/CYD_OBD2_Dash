@@ -72,8 +72,12 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
 // theme.secondaryGaugeArc while value < that location. Ticks at or above
 // excludeFromValue are skipped entirely (pass >= maxValue to disable exclusion,
 // matching drawArcGauge's convention for gauges with no warning zone).
+// tickMode selects which segment(s) get drawn (Off is a no-op); the outer
+// segment is further gated by theme.showOuterTicks since some themes (Mustang
+// S197) have no room in their bezel art for it regardless of tickMode.
 void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, float value, float maxValue,
-                     float minorInterval, float majorInterval, float excludeFromValue, const ThemeColors& theme);
+                     float minorInterval, float majorInterval, float excludeFromValue, TickMode tickMode,
+                     const ThemeColors& theme);
 
 // Decorative ring drawn just outside a round arc gauge's outer edge (OEM
 // chrome bezel look). No-op unless theme.showGaugeBezel is set, so callers

@@ -92,8 +92,9 @@ bool ConfigStore::parseLine(const char* line) {
         settings_.useMetricUnits = (atol(valueStr) != 0);
     } else if (strcmp(key, "log_units") == 0) {
         settings_.useMetricLogs = (atol(valueStr) != 0);
-    } else if (strcmp(key, "gauge_ticks") == 0) {
-        settings_.showGaugeTicks = (atol(valueStr) != 0);
+    } else if (strcmp(key, "tick_mode") == 0) {
+        long mode = atol(valueStr);
+        settings_.tickMode = (mode >= 0 && mode <= 3) ? static_cast<uint8_t>(mode) : config::kDefaultTickMode;
     } else if (strcmp(key, "obd_adapter_name") == 0) {
         const char* name = isValidObdAdapterName(valueStr) ? valueStr : config::kObdAdapterNameOptions[0];
         strncpy(settings_.obdAdapterName, name, sizeof(settings_.obdAdapterName) - 1);
@@ -141,6 +142,7 @@ void ConfigStore::begin() {
     if (settings_.shiftLightRpm > settings_.redlineRpm) {
         settings_.shiftLightRpm = settings_.redlineRpm;
     }
+    clampTickModeForTheme();
 
     Serial.printf("[Config] Loaded: shiftLight=%u redline=%u maxRpm=%u maxSpeed=%u logIntervalMs=%lu baroBaselinePsi=%.2f theme=%u\n",
                   settings_.shiftLightRpm, settings_.redlineRpm, settings_.maxRpm, settings_.maxSpeedMph,
@@ -181,6 +183,7 @@ void ConfigStore::setBaroBaselinePsi(float psi) {
 
 void ConfigStore::setThemeId(uint8_t id) {
     settings_.themeId = (id <= 2) ? id : 2;
+    clampTickModeForTheme();
 }
 
 void ConfigStore::setUseMetricUnits(bool metric) {
@@ -191,8 +194,19 @@ void ConfigStore::setUseMetricLogs(bool metric) {
     settings_.useMetricLogs = metric;
 }
 
-void ConfigStore::setShowGaugeTicks(bool enabled) {
-    settings_.showGaugeTicks = enabled;
+void ConfigStore::setTickMode(uint8_t mode) {
+    settings_.tickMode = (mode <= 3) ? mode : config::kDefaultTickMode;
+    clampTickModeForTheme();
+}
+
+void ConfigStore::clampTickModeForTheme() {
+    if (static_cast<ThemeId>(settings_.themeId) != ThemeId::MustangS197) {
+        return;
+    }
+    if (settings_.tickMode == static_cast<uint8_t>(TickMode::OutsideOnly) ||
+        settings_.tickMode == static_cast<uint8_t>(TickMode::InsideAndOutside)) {
+        settings_.tickMode = static_cast<uint8_t>(TickMode::InsideOnly);
+    }
 }
 
 void ConfigStore::setObdAdapterName(const char* name) {
@@ -221,7 +235,7 @@ bool ConfigStore::isDirty() const {
            settings_.themeId != savedSettings_.themeId ||
            settings_.useMetricUnits != savedSettings_.useMetricUnits ||
            settings_.useMetricLogs != savedSettings_.useMetricLogs ||
-           settings_.showGaugeTicks != savedSettings_.showGaugeTicks ||
+           settings_.tickMode != savedSettings_.tickMode ||
            strcmp(settings_.obdAdapterName, savedSettings_.obdAdapterName) != 0 ||
            strcmp(settings_.obdAdapterPin, savedSettings_.obdAdapterPin) != 0;
 }
@@ -262,7 +276,7 @@ bool ConfigStore::save() {
     file.printf("baro_baseline_psi=%.2f\n", settings_.baroBaselinePsi);
     file.printf("units=%u\n", settings_.useMetricUnits ? 1 : 0);
     file.printf("log_units=%u\n", settings_.useMetricLogs ? 1 : 0);
-    file.printf("gauge_ticks=%u\n", settings_.showGaugeTicks ? 1 : 0);
+    file.printf("tick_mode=%u\n", settings_.tickMode);
     file.printf("obd_adapter_name=%s\n", settings_.obdAdapterName);
     file.printf("obd_adapter_pin=%s\n", settings_.obdAdapterPin);
     file.flush();

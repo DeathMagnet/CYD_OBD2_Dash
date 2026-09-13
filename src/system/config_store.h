@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include "app_config.h"
+#include "display/theme.h"
 #include "storage/sd_manager.h"
 
 // User-adjustable dashboard settings, persisted to /config.txt on the SD
@@ -22,7 +23,9 @@ struct AppSettings {
     uint8_t themeId = 2;
     bool useMetricUnits = false; // Display units (dashboard pages, config fields)
     bool useMetricLogs = false;  // CSV logging units
-    bool showGaugeTicks = true;  // Page 1 RPM/Speed arc tick marks
+    // Page 1 RPM/Speed arc tick marks (TickMode, display/theme.h). Mustang
+    // S197 only supports Off/InsideOnly; see ConfigStore::clampTickModeForTheme.
+    uint8_t tickMode = config::kDefaultTickMode;
 
     // ELM327 Bluetooth identity, picked from config::kObdAdapterNameOptions/
     // kObdAdapterPinOptions on the Config: OBD Adapter page. Char arrays can't
@@ -53,7 +56,7 @@ public:
     void setThemeId(uint8_t id);
     void setUseMetricUnits(bool metric);
     void setUseMetricLogs(bool metric);
-    void setShowGaugeTicks(bool enabled);
+    void setTickMode(uint8_t mode);
     void setObdAdapterName(const char* name);
     void setObdAdapterPin(const char* pin);
 
@@ -79,6 +82,12 @@ public:
 
 private:
     bool parseLine(const char* line);
+
+    // Forces tickMode down to InsideOnly if it's currently Outside/
+    // InsideAndOutside while the active theme is Mustang S197, which has no
+    // room in its bezel art for outside ticks. Called after any change to
+    // themeId or tickMode, and once after loading from SD.
+    void clampTickModeForTheme();
 
     SdManager& sdManager_;
     AppSettings settings_;

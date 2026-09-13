@@ -11,6 +11,16 @@ enum class ThemeId : uint8_t {
     ModernFlat = 2,
 };
 
+// RPM/Speed gauge tick display mode (Config: UI page). Mustang S197 cannot
+// render outside ticks (ThemeColors::showOuterTicks is false), so only Off
+// and InsideOnly are valid while that theme is active.
+enum class TickMode : uint8_t {
+    Off = 0,
+    InsideOnly = 1,
+    OutsideOnly = 2,
+    InsideAndOutside = 3,
+};
+
 struct ThemeColors {
     uint16_t background;
     uint16_t panel;

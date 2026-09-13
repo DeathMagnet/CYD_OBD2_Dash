@@ -111,11 +111,27 @@ bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t now
         return false;
     }
 
-    // Gauge ticks toggle row (row 2)
+    // Gauge tick mode cycle row (row 2): cycles Off -> Inside -> Outside ->
+    // Inside+Outside -> Off, except Mustang S197 (no outside-tick art) which
+    // only toggles Off <-> Inside.
     int32_t row2 = layout::kConfigRow2Y + layout::kConfigButtonInsetY;
     int32_t row2End = row2 + layout::kConfigButtonH;
     if (within(x, y, layout::kConfigCycleX, row2, layout::kConfigCycleX + layout::kConfigCycleW, row2End)) {
-        configStore_.setShowGaugeTicks(!settings.showGaugeTicks);
+        ThemeId activeTheme = static_cast<ThemeId>(settings.themeId);
+        TickMode current = static_cast<TickMode>(settings.tickMode);
+        TickMode next;
+        if (activeTheme == ThemeId::MustangS197) {
+            next = (current == TickMode::Off) ? TickMode::InsideOnly : TickMode::Off;
+        } else {
+            switch (current) {
+                case TickMode::Off: next = TickMode::InsideOnly; break;
+                case TickMode::InsideOnly: next = TickMode::OutsideOnly; break;
+                case TickMode::OutsideOnly: next = TickMode::InsideAndOutside; break;
+                case TickMode::InsideAndOutside:
+                default: next = TickMode::Off; break;
+            }
+        }
+        configStore_.setTickMode(static_cast<uint8_t>(next));
         return false;
     }
 

@@ -131,6 +131,7 @@ constexpr float kRpmTickIntervalMinor = 500.0F;
 constexpr float kRpmTickIntervalMajor = 1000.0F;
 constexpr float kSpeedTickIntervalMinor = 10.0F;
 constexpr float kSpeedTickIntervalMajor = 50.0F;
+constexpr uint8_t kDefaultTickMode = 3; // TickMode::InsideAndOutside (display/theme.h)
 
 // ---- SD CSV Telemetry Logging ----
 constexpr const char* kLogFilePrefix = "/mustang_log_";
