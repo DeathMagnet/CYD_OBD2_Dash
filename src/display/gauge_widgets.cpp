@@ -107,6 +107,48 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
     state.needsFullRedraw = false;
 }
 
+void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, float value, float maxValue,
+                     float minorInterval, float majorInterval, float excludeFromValue, const ThemeColors& theme) {
+    if (minorInterval <= 0.0F || maxValue <= 0.0F) {
+        return;
+    }
+    constexpr float kDegToRad = 3.14159265F / 180.0F;
+    constexpr int32_t kMinorTickLenPx = 4;
+    constexpr int32_t kMajorTickLenPx = 8;
+    int32_t innerRadius = radius - kArcThicknessPx;
+    int majorStep = static_cast<int>(majorInterval / minorInterval + 0.5F);
+    if (majorStep < 1) {
+        majorStep = 1;
+    }
+
+    int tickCount = static_cast<int>(maxValue / minorInterval);
+    for (int i = 1; i < tickCount; ++i) {
+        float tickValue = static_cast<float>(i) * minorInterval;
+        if (tickValue >= excludeFromValue) {
+            continue;
+        }
+        float angle = kGaugeStartAngle + (tickValue / maxValue) * (kGaugeEndAngle - kGaugeStartAngle);
+        float angleRad = angle * kDegToRad;
+        float dirX = -sinf(angleRad);
+        float dirY = cosf(angleRad);
+
+        bool isMajor = (i % majorStep) == 0;
+        int32_t tickLen = isMajor ? kMajorTickLenPx : kMinorTickLenPx;
+        int32_t xOuter0 = centerX + static_cast<int32_t>(dirX * radius);
+        int32_t yOuter0 = centerY + static_cast<int32_t>(dirY * radius);
+        int32_t xOuter1 = centerX + static_cast<int32_t>(dirX * (radius + tickLen));
+        int32_t yOuter1 = centerY + static_cast<int32_t>(dirY * (radius + tickLen));
+        int32_t xInner0 = centerX + static_cast<int32_t>(dirX * (innerRadius - tickLen));
+        int32_t yInner0 = centerY + static_cast<int32_t>(dirY * (innerRadius - tickLen));
+        int32_t xInner1 = centerX + static_cast<int32_t>(dirX * innerRadius);
+        int32_t yInner1 = centerY + static_cast<int32_t>(dirY * innerRadius);
+
+        uint16_t tickColor = (value >= tickValue) ? theme.primaryGaugeArc : theme.secondaryGaugeArc;
+        tft.drawLine(xOuter0, yOuter0, xOuter1, yOuter1, tickColor);  // outside: radius to radius+tickLen
+        tft.drawLine(xInner0, yInner0, xInner1, yInner1, tickColor);   // inside: innerRadius-tickLen to innerRadius
+    }
+}
+
 void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int32_t width, int32_t height,
                    float percent, uint16_t fillColor, const ThemeColors& theme) {
     float clamped = percent < 0.0F ? 0.0F : (percent > 100.0F ? 100.0F : percent);

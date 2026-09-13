@@ -65,6 +65,16 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
                    float value, float maxValue, float cautionStart, float dangerStart, uint16_t bgColor,
                    const ThemeColors& theme);
 
+// Radial tick marks at fixed value intervals along an arc gauge's scale,
+// straddling the arc's outer edge (tickLen px inside and outside). Ticks at
+// multiples of majorInterval are drawn longer ("a little bigger"). A tick is
+// painted in theme.primaryGaugeArc once value >= that tick's location, and
+// theme.secondaryGaugeArc while value < that location. Ticks at or above
+// excludeFromValue are skipped entirely (pass >= maxValue to disable exclusion,
+// matching drawArcGauge's convention for gauges with no warning zone).
+void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, float value, float maxValue,
+                     float minorInterval, float majorInterval, float excludeFromValue, const ThemeColors& theme);
+
 // Lets a bar gauge repaint only the sliver of fill that changed between
 // frames instead of clearing and redrawing the whole bar. Call invalidate()
 // whenever the area behind the gauge is cleared (page redraw).

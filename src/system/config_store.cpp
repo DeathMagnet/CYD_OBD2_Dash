@@ -92,6 +92,8 @@ bool ConfigStore::parseLine(const char* line) {
         settings_.useMetricUnits = (atol(valueStr) != 0);
     } else if (strcmp(key, "log_units") == 0) {
         settings_.useMetricLogs = (atol(valueStr) != 0);
+    } else if (strcmp(key, "gauge_ticks") == 0) {
+        settings_.showGaugeTicks = (atol(valueStr) != 0);
     } else if (strcmp(key, "obd_adapter_name") == 0) {
         const char* name = isValidObdAdapterName(valueStr) ? valueStr : config::kObdAdapterNameOptions[0];
         strncpy(settings_.obdAdapterName, name, sizeof(settings_.obdAdapterName) - 1);
@@ -189,6 +191,10 @@ void ConfigStore::setUseMetricLogs(bool metric) {
     settings_.useMetricLogs = metric;
 }
 
+void ConfigStore::setShowGaugeTicks(bool enabled) {
+    settings_.showGaugeTicks = enabled;
+}
+
 void ConfigStore::setObdAdapterName(const char* name) {
     if (!isValidObdAdapterName(name)) {
         return;
@@ -215,6 +221,7 @@ bool ConfigStore::isDirty() const {
            settings_.themeId != savedSettings_.themeId ||
            settings_.useMetricUnits != savedSettings_.useMetricUnits ||
            settings_.useMetricLogs != savedSettings_.useMetricLogs ||
+           settings_.showGaugeTicks != savedSettings_.showGaugeTicks ||
            strcmp(settings_.obdAdapterName, savedSettings_.obdAdapterName) != 0 ||
            strcmp(settings_.obdAdapterPin, savedSettings_.obdAdapterPin) != 0;
 }
@@ -255,6 +262,7 @@ bool ConfigStore::save() {
     file.printf("baro_baseline_psi=%.2f\n", settings_.baroBaselinePsi);
     file.printf("units=%u\n", settings_.useMetricUnits ? 1 : 0);
     file.printf("log_units=%u\n", settings_.useMetricLogs ? 1 : 0);
+    file.printf("gauge_ticks=%u\n", settings_.showGaugeTicks ? 1 : 0);
     file.printf("obd_adapter_name=%s\n", settings_.obdAdapterName);
     file.printf("obd_adapter_pin=%s\n", settings_.obdAdapterPin);
     file.flush();

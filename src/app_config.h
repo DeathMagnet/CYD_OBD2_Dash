@@ -126,6 +126,12 @@ constexpr float kDefaultBaroBaselinePsi = 14.7F;
 constexpr float kHighCoolantWarningF = 220.0F;
 constexpr float kLowVoltageWarningV = 11.5F;
 
+// ---- Gauge Tick Marks (Page 1 RPM/Speed arc scales) ----
+constexpr float kRpmTickIntervalMinor = 500.0F;
+constexpr float kRpmTickIntervalMajor = 1000.0F;
+constexpr float kSpeedTickIntervalMinor = 10.0F;
+constexpr float kSpeedTickIntervalMajor = 50.0F;
+
 // ---- SD CSV Telemetry Logging ----
 constexpr const char* kLogFilePrefix = "/mustang_log_";
 constexpr const char* kLogFileSuffix = ".csv";
