@@ -1,11 +1,11 @@
 #include "display/theme.h"
 #include "labels.h"
+#include "display/fonts/Orbitron_Light_24.h"
+#include "display/fonts/Orbitron_Light_32.h"
 
 extern const GFXfont FreeSans12pt7b;
 extern const GFXfont FreeSans18pt7b;
 extern const GFXfont FreeSans24pt7b;
-extern const GFXfont Orbitron_Light_24;
-extern const GFXfont Orbitron_Light_32;
 
 namespace {
 
@@ -140,7 +140,7 @@ void initializeThemeFonts() {
     kModernFlatTheme.valueFonts[1] = &FreeSans18pt7b;
     kModernFlatTheme.valueFonts[2] = &FreeSans24pt7b;
 
-    kTorqueNeonTheme.valueFonts[0] = &Orbitron_Light_24;
-    kTorqueNeonTheme.valueFonts[1] = &Orbitron_Light_24;
-    kTorqueNeonTheme.valueFonts[2] = &Orbitron_Light_32;
+    kTorqueNeonTheme.valueFonts[0] = &Orbitron_Light_24_Fixed;
+    kTorqueNeonTheme.valueFonts[1] = &Orbitron_Light_24_Fixed;
+    kTorqueNeonTheme.valueFonts[2] = &Orbitron_Light_32_Fixed;
 }
