@@ -202,19 +202,25 @@ void drawStatusBadge(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width, int32_t
 }
 
 void drawMilIndicator(TFT_eSPI& tft, int32_t centerX, int32_t centerY, bool milOn, const ThemeColors& theme) {
-    // Clear the indicator's bounding box on every redraw to prevent stale pixels
-    // when the MIL transitions from on to off.
-    constexpr int32_t kClearRadius = 12;
-    tft.fillCircle(centerX, centerY, kClearRadius, theme.panel);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextSize(2);
+
+    // Clear the indicator's full glyph bounding box (plus the 1px bold offset
+    // and a small margin) on every redraw to prevent stale pixels when the
+    // MIL transitions from on to off. A fixed-radius circle here previously
+    // left slivers uncleared since it was narrower than the "!!!" text.
+    int32_t textW = tft.textWidth("!!!") + 1;
+    int32_t textH = tft.fontHeight();
+    constexpr int32_t kClearPad = 3;
+    tft.fillRect(centerX - textW / 2 - kClearPad, centerY - textH / 2 - kClearPad,
+                 textW + kClearPad * 2, textH + kClearPad * 2, theme.panel);
 
     if (!milOn) {
         return; // Indicator only shown when MIL is active
     }
 
     // Draw three bold exclamation points in warning red
-    tft.setTextDatum(MC_DATUM);
     tft.setTextColor(theme.warningActive, theme.panel);
-    tft.setTextSize(2);
 
     // Simulate bold by drawing twice with a 1px horizontal offset
     tft.drawString("!!!", centerX - 1, centerY);
