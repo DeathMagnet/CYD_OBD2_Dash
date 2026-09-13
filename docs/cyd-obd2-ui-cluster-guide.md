@@ -16,6 +16,7 @@ The dashboard displays all six dashboard pages (1–4 and 6) plus five dedicated
 - **Direct-to-TFT rendering, not sprites.** This board's ESP32-32E has no PSRAM, and a full-frame RGB565 sprite (~300KB) does not fit in 320KB of SRAM alongside the Bluetooth stack and SD buffers. Each page has a `drawStatic()` pass (chrome/labels, called once per page change) and a `drawDynamic()` pass (values only, called on a throttled `config::kUiRefreshIntervalMs` cadence) that redraws its own bounded region using TFT_eSPI's background-color text redraw to avoid flicker. There is no slide/fade page-transition animation; page switches redraw immediately.
 - **OBDII connection status badge.** The badge in the header displays the connection state with context-sensitive colors: green for `Live` (connected), blue for `Reconnecting`/`ObdConnecting`/`DisplayReady` (in progress), and crimson for `Boot`/`SdInit`/`Stale`/`Degraded` (error/disconnected).
 - **RPM warning arc**: drawn as two solid zones, not a gradient, via `gaugewidgets::drawArcGauge`'s `cautionStart`/`dangerStart` parameters — orange (`theme.cautionArc`) from the GAUGES config page's "Shift Light RPM" setting (default 5800) up to its "Redline RPM" setting (default 6200), then red (`theme.dangerArc`) held from Redline RPM out to the end of the arc, so the sweep never drops back to unlit track.
+- **Gauge tick marks** (Page 1 RPM/Speed gauges): radial tick marks drawn as two short segments flanking the arc ring — one just outside the outer edge, one just inside the inner edge — at fixed value intervals (RPM: every 500, major every 1000; Speed: every 10, major every 50). Each tick is colored `primaryGaugeArc` once the needle has passed that value and `secondaryGaugeArc` while still short of it, providing an at-a-glance "how far past this mark" reference. Ticks are not drawn inside the RPM redline zone (where the arc is already solid red). Toggleable on the Config: UI page via a "GAUGE TICKS" ON/OFF button (default: ON).
 - **Page 6 DTC list shows codes only** (e.g. `P0133`), not human-readable descriptions — no DTC description database is included. A read is triggered automatically whenever Page 6 is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
 - **Config pages: UI / GAUGES / USER VARS / LOGS / OBD ADAPTER.** Settings are organized into five focused pages with a shared Save button at the bottom. Each config page displays the Save button (green when any value differs from what's saved on SD, default color when everything matches); tapping it persists all settings across all config pages to `/config.txt` on the SD card and displays "SAVED!" feedback. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space. Saving the OBD ADAPTER page also forces an immediate Bluetooth reconnect using the newly saved adapter name/PIN (no reboot needed), unless `secrets/local_config.h` is present, which always takes priority over the on-device selection.
 - **Actual source layout** differs from the "Proposed" structure at the bottom of this doc — see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#proposed-source-layout) for the as-built tree.
@@ -177,8 +178,10 @@ Header layout:
   - Dial range: 0 – 7000 RPM.
   - **OEM Mustang Redline Arc**: Exact 4.6L 3V curve with red arc gradient from 5500 RPM to 6200 RPM (`0xF800` to `0x9000`).
   - **Shift Light**: Flashes the RPM gauge bezel bright red/white at configurable threshold (default: 5800 RPM).
+  - **Tick Marks**: Radial marks at 500 RPM intervals (major at 1000) flanking the gauge ring, recolored as the needle passes each tick (configurable via Config: UI page).
   - Center digital readout for exact RPM.
 - **Speedometer**: Digital + analog scale (0–160 MPH or 0–240 KPH).
+  - **Tick Marks**: Radial marks at 10 unit intervals (major at 50) flanking the gauge ring, recolored as the needle passes each tick (configurable via Config: UI page).
 - **Coolant Temperature**: Analog/digital gauge with high-temp threshold highlight (>220 °F).
 - **Intake Air Temperature (IAT)**: Auxiliary digital display.
 - **Throttle Position (TPS)**: Live percentage bar graph (0–100%).
@@ -242,6 +245,7 @@ Settings for display appearance and unit system.
 | --- | --- | --- | --- |
 | **Active Theme** | Torque Neon, Modern Flat (Mustang S197 reserved, not yet switchable) | Modern Flat | UI visual style; tap-to-cycle button toggles between the implemented themes |
 | **Units** | Standard (MPH/°F/PSI), Metric (KM/H/°C/KPA) | Standard | Display units for speed, temperature, and pressure. Affects all dashboard pages and config field labels/steppers. Does not affect CSV logging (see LOGS page). |
+| **Gauge Ticks** | On, Off | On | Radial tick marks on the RPM/Speed gauge scales (every 500/1000 RPM, every 10/50 MPH or KM/H); tap-to-cycle toggle |
 
 #### Config Page: GAUGES
 Gauge calibration settings for RPM warning zones.
@@ -343,6 +347,8 @@ src/
 - [ ] Prev/next navigation cycles only within the active group (dashboard or config); never crosses into the other group.
 - [ ] OBDII connection badge displays: green when Live, blue when Reconnecting/ObdConnecting/DisplayReady, crimson for Boot/SdInit/Stale/Degraded.
 - [ ] Save button on config pages is green when any value differs from saved, default color when all match saved values.
+- [ ] Gauge tick marks on Page 1 (RPM and Speed) render correctly as two short segments flanking the gauge ring (just outside the outer edge and just inside the inner edge), recolor from secondary to primary as the needle passes each tick, and are absent inside the RPM redline zone.
+- [ ] Gauge ticks can be toggled ON/OFF from the Config: UI page "GAUGE TICKS" button, and the setting persists after Save + power cycle.
 - [ ] Calculated Horsepower, Torque, Vacuum/Boost, and 0-60 timer update correctly on Pages 3 & 4.
 - [ ] Config page settings save to SD card and persist after power cycle.
 - [ ] Page 6 correctly decodes and displays DTCs in `P0xxx` / `C0xxx` format.

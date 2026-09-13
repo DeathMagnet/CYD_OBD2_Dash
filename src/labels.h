@@ -60,6 +60,9 @@ constexpr const char* kLabelActiveTheme = "ACTIVE THEME";
 constexpr const char* kLabelUnits = "UNITS";
 constexpr const char* kLabelUnitsStandard = "STANDARD (MPH/F/PSI)";
 constexpr const char* kLabelUnitsMetric = "METRIC (KM/H/C/KPA)";
+constexpr const char* kLabelGaugeTicks = "GAUGE TICKS";
+constexpr const char* kLabelTicksOn = "ON";
+constexpr const char* kLabelTicksOff = "OFF";
 
 // ---- Config: User Vars ----
 constexpr const char* kLabelBoostBaroBaseline = "BOOST BARO BASELINE";

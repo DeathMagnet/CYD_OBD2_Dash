@@ -106,6 +106,14 @@ bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t now
         return false;
     }
 
+    // Gauge ticks toggle row (row 2)
+    int32_t row2 = layout::kConfigRow2Y + layout::kConfigButtonInsetY;
+    int32_t row2End = row2 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigCycleX, row2, layout::kConfigCycleX + layout::kConfigCycleW, row2End)) {
+        configStore_.setShowGaugeTicks(!settings.showGaugeTicks);
+        return false;
+    }
+
     return false;
 }
 

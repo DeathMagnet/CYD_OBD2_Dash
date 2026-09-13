@@ -179,6 +179,15 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     gaugewidgets::drawArcGauge(tft_, speedArc_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
                                 kSpeedMax, kSpeedMax, kSpeedMax, theme_.background, theme_);
 
+    if (settings.showGaugeTicks) {
+        gaugewidgets::drawGaugeTicks(tft_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue, kRpmMax,
+                                      config::kRpmTickIntervalMinor, config::kRpmTickIntervalMajor,
+                                      static_cast<float>(settings.redlineRpm), theme_);
+        gaugewidgets::drawGaugeTicks(tft_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
+                                      kSpeedMax, config::kSpeedTickIntervalMinor, config::kSpeedTickIntervalMajor,
+                                      kSpeedMax, theme_);
+    }
+
     bool shiftLightOn = snapshot.rpm.valid && snapshot.rpm.value >= settings.shiftLightRpm;
     bool flashPhase = ((nowMs / 200) % 2) == 0;
     uint16_t rpmTextColor = (shiftLightOn && flashPhase) ? theme_.warningActive : theme_.textPrimary;
@@ -497,9 +506,19 @@ void ClusterPages::drawConfigUiStatic() {
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow1Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
 
+    // Gauge ticks toggle row
+    tft_.setTextDatum(ML_DATUM);
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    tft_.setTextSize(1);
+    tft_.drawString(labels::kLabelGaugeTicks, 12, layout::kConfigRow2Y + layout::kConfigRowHeight / 2);
+
+    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow2Y + layout::kConfigButtonInsetY,
+                        layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
+
     // Force drawConfigUiDynamic() to repaint every region the next time it runs
     runtimeState_.cfgUnitsDrawn[0] = '\0';
     runtimeState_.cfgThemeDrawn[0] = '\0';
+    runtimeState_.cfgTicksDrawn[0] = '\0';
 }
 
 void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
@@ -526,6 +545,17 @@ void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
                                      layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
                                      theme_.background);
         strncpy(runtimeState_.cfgUnitsDrawn, buf, sizeof(runtimeState_.cfgUnitsDrawn) - 1);
+    }
+
+    snprintf(buf, sizeof(buf), "%s", settings.showGaugeTicks ? labels::kLabelTicksOn : labels::kLabelTicksOff);
+    if (strcmp(buf, runtimeState_.cfgTicksDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(1);
+        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigCycleX + layout::kConfigCycleW / 2,
+                                     layout::kConfigRow2Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgTicksDrawn, buf, sizeof(runtimeState_.cfgTicksDrawn) - 1);
     }
 }
 

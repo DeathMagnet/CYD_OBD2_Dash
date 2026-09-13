@@ -92,6 +92,7 @@ struct ClusterPageRuntimeState {
     char cfgBaroBaselineDrawn[24] = {0};   // User Vars page
     char cfgUnitsDrawn[32] = {0};          // UI page
     char cfgThemeDrawn[24] = {0};          // UI page
+    char cfgTicksDrawn[8] = {0};           // UI page
     char cfgLogIntervalDrawn[24] = {0};    // Logs page
     char cfgLogUnitsDrawn[32] = {0};       // Logs page
     int8_t cfgDeleteConfirmDrawn = -1;     // Logs page

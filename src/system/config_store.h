@@ -22,6 +22,7 @@ struct AppSettings {
     uint8_t themeId = 2;
     bool useMetricUnits = false; // Display units (dashboard pages, config fields)
     bool useMetricLogs = false;  // CSV logging units
+    bool showGaugeTicks = true;  // Page 1 RPM/Speed arc tick marks
 
     // ELM327 Bluetooth identity, picked from config::kObdAdapterNameOptions/
     // kObdAdapterPinOptions on the Config: OBD Adapter page. Char arrays can't
@@ -52,6 +53,7 @@ public:
     void setThemeId(uint8_t id);
     void setUseMetricUnits(bool metric);
     void setUseMetricLogs(bool metric);
+    void setShowGaugeTicks(bool enabled);
     void setObdAdapterName(const char* name);
     void setObdAdapterPin(const char* pin);
 
