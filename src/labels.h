@@ -1,0 +1,104 @@
+#pragma once
+
+namespace labels {
+
+// ---- Navigation / Header ----
+constexpr const char* kNavPrev = "<";
+constexpr const char* kNavNext = ">";
+
+constexpr const char* kPageTitles[] = {
+    "PRIMARY CLUSTER",
+    "ENGINE LOAD",
+    "CAR-SPECIFIC",
+    "PERFORMANCE",
+    "DIAGNOSTICS",
+    "UI",
+    "GAUGES",
+    "USER VARS",
+    "LOGS",
+};
+
+// ---- Page 1: Primary Cluster ----
+constexpr const char* kUnitRpm = "RPM";
+constexpr const char* kUnitMph = "MPH";
+constexpr const char* kLabelCoolant = "COOLANT";
+constexpr const char* kLabelIat = "IAT";
+constexpr const char* kLabelThrottle = "THROTTLE";
+
+// ---- Page 2: Engine Load & Airflow ----
+constexpr const char* kLabelEngineLoad = "ENGINE LOAD";
+constexpr const char* kLabelMaf = "MAF";
+constexpr const char* kLabelTimingAdvance = "TIMING ADVANCE";
+constexpr const char* kLabelStftBank1 = "STFT BANK 1";
+constexpr const char* kLabelLtftBank1 = "LTFT BANK 1";
+
+// ---- Page 3: Car-Specific Sensors ----
+constexpr const char* kLabelBatteryVoltage = "BATTERY VOLTAGE";
+constexpr const char* kLabelFuelRailPressure = "FUEL RAIL PRESSURE";
+constexpr const char* kLabelBoost = "BOOST";
+constexpr const char* kLabelVacuum = "VACUUM";
+constexpr const char* kLabelVacBoost = "VAC/BOOST";
+constexpr const char* kUnitPsi = "PSI";
+constexpr const char* kUnitInHg = "inHg";
+constexpr const char* kLabelO2B1S1 = "O2 B1S1";
+constexpr const char* kLabelO2B2S1 = "O2 B2S1";
+
+// ---- Page 4: Performance & Telemetry ----
+constexpr const char* kLabelIntakeAirflow60s = "INTAKE AIRFLOW (LAST 60s)";
+constexpr const char* kLabelEstHorsepower = "EST. HORSEPOWER";
+constexpr const char* kLabelEstTorque = "EST. TORQUE";
+constexpr const char* kLabelZeroToSixty = "0-60 MPH (TAP TO RESET)";
+
+// ---- Config: UI ----
+constexpr const char* kLabelActiveTheme = "ACTIVE THEME";
+constexpr const char* kLabelThemeStatus = "MODERN FLAT (ACTIVE) - OTHERS COMING SOON";
+
+// ---- Config: User Vars ----
+constexpr const char* kLabelBoostBaroBaseline = "BOOST BARO BASELINE";
+
+// ---- Config: Gauges ----
+constexpr const char* kLabelShiftLightRpm = "SHIFT LIGHT RPM";
+constexpr const char* kLabelRedlineRpm = "REDLINE RPM";
+constexpr const char* kLabelMaxRpm = "MAX RPM";
+constexpr const char* kLabelMaxSpeedMph = "MAX SPEED MPH";
+
+// ---- Config: Logs ----
+constexpr const char* kLabelLogInterval = "LOG INTERVAL";
+
+// ---- Config: Buttons & Status ----
+constexpr const char* kStepperMinus = "-";
+constexpr const char* kStepperPlus = "+";
+constexpr const char* kButtonTapToConfirm = "TAP TO CONFIRM";
+constexpr const char* kButtonDeleteAllLogs = "DELETE ALL LOGS";
+constexpr const char* kButtonSaved = "SAVED!";
+constexpr const char* kButtonSaveToSd = "SAVE TO SD";
+
+// ---- Page 6: Diagnostics ----
+constexpr const char* kButtonRefreshCodes = "REFRESH CODES";
+constexpr const char* kStatusMilActive = "MIL: ACTIVE (ON)";
+constexpr const char* kStatusMilInactive = "MIL: INACTIVE (OFF)";
+constexpr const char* kStatusReadingCodes = "Reading codes...";
+constexpr const char* kStatusNoCodes = "No stored or pending codes.";
+constexpr const char* kButtonClearCodes = "CLEAR CODES";
+
+// ---- Connection Status Badge ----
+constexpr const char* kStatusBoot = "BOOT";
+constexpr const char* kStatusDisplayReady = "DISPLAY READY";
+constexpr const char* kStatusSdInit = "SD INIT";
+constexpr const char* kStatusObdConnecting = "CONNECTING";
+constexpr const char* kStatusLive = "LIVE";
+constexpr const char* kStatusStale = "STALE";
+constexpr const char* kStatusReconnecting = "RECONNECTING";
+constexpr const char* kStatusDegraded = "NO OBD";
+constexpr const char* kStatusUnknown = "UNKNOWN";
+
+// ---- Boot / Calibration Screen ----
+constexpr const char* kBootTitle = "CYD OBD-II DASHBOARD";
+constexpr const char* kHelloWorld = "Hello, World!";
+constexpr const char* kTouchCalibrationActive = "Touch Calibration Active";
+constexpr const char* kTouchAnywhereToCalibrate = "Touch anywhere on screen";
+
+// ---- Theme ----
+constexpr const char* kThemeNameModernFlat = "Modern Flat";
+
+} // namespace labels

@@ -24,6 +24,7 @@ Use lower snake case for source filenames, `PascalCase` for types, and `camelCas
 src/
   main.cpp
   app_config.h
+  labels.h
   obd/
     obd_client.h
     obd_client.cpp
@@ -135,6 +136,7 @@ void loop() {
 - Exchange data through explicit types such as `TelemetrySnapshot`, not direct access to another module's internal state.
 - Model connection and feature status with `enum class`, not scattered boolean combinations.
 - Centralize user-adjustable values in `app_config.h`; do not duplicate display dimensions, thresholds, intervals, pins, or units across modules.
+- Centralize on-screen UI text (gauge labels, units, button/status strings, page titles) in `src/labels.h` (`namespace labels`) rather than as literals inside `.cpp` files.
 - Do not modify pins, drivers, feature flags, partition tables, or library versions outside `platformio.ini` without documenting why.
 
 ## Non-Blocking Firmware
