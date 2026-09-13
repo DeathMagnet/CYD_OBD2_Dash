@@ -586,11 +586,12 @@ void ClusterPages::drawPage4Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
             }
         }
         for (uint8_t i = 0; i < count - 1; ++i) {
-            int32_t xA = kGraphX + (kGraphW * i) / (ClusterPageRuntimeState::kMafHistorySize - 1);
-            int32_t xB = kGraphX + (kGraphW * (i + 1)) / (ClusterPageRuntimeState::kMafHistorySize - 1);
-            int32_t yA = kGraphY + kGraphH - static_cast<int32_t>((runtimeState_.mafHistory[i] / maxSeen) * kGraphH);
-            int32_t yB =
-                kGraphY + kGraphH - static_cast<int32_t>((runtimeState_.mafHistory[i + 1] / maxSeen) * kGraphH);
+            int32_t xA = kGraphX + ((kGraphW - 1) * i) / (ClusterPageRuntimeState::kMafHistorySize - 1);
+            int32_t xB = kGraphX + ((kGraphW - 1) * (i + 1)) / (ClusterPageRuntimeState::kMafHistorySize - 1);
+            int32_t yA = kGraphY + (kGraphH - 1) -
+                         static_cast<int32_t>((runtimeState_.mafHistory[i] / maxSeen) * (kGraphH - 1));
+            int32_t yB = kGraphY + (kGraphH - 1) -
+                         static_cast<int32_t>((runtimeState_.mafHistory[i + 1] / maxSeen) * (kGraphH - 1));
             tft_.drawLine(xA, yA, xB, yB, theme_.primaryGaugeArc);
         }
     }
