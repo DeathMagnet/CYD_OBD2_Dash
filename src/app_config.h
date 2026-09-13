@@ -24,6 +24,12 @@ constexpr uint32_t kSdSpiFrequency = 20000000; // 20 MHz
 // Touch Pins (Hosyond 4.0" CYD XPT2046 over TFT SPI)
 constexpr uint8_t kTouchCsPin   = 33;
 
+// Onboard RGB LED (active-low: LOW = on)
+constexpr uint8_t kLedRedPin = 22;
+constexpr uint8_t kLedGreenPin = 16;
+constexpr uint8_t kLedBluePin = 17;
+constexpr uint32_t kLedFlashIntervalMs = 200; // Shared cadence for the LED shift-light sync and the Page-1 shift-light text flash
+
 // Touch Calibration File & Array Size
 constexpr const char* kTouchCalFilePath = "/touch_cal.dat";
 constexpr size_t kTouchCalDataSize = 5;
