@@ -1,4 +1,5 @@
 #include "display/gauge_widgets.h"
+#include <math.h>
 
 namespace gaugewidgets {
 
@@ -209,6 +210,49 @@ void drawMilIndicator(TFT_eSPI& tft, int32_t centerX, int32_t centerY, bool milO
     tft.setTextColor(milOn ? theme.background : ringColor, milOn ? ringColor : theme.panel);
     tft.setTextSize(1);
     tft.drawString("CEL", centerX, centerY);
+}
+
+void drawModeToggleButton(TFT_eSPI& tft, int32_t centerX, int32_t centerY, bool showGear, const ThemeColors& theme) {
+    constexpr float kDegToRad = 3.14159265F / 180.0F;
+
+    if (showGear) {
+        // Cog/settings icon: a solid body ring with short radial teeth,
+        // sized to sit just under the steering wheel's footprint below.
+        constexpr int32_t kBodyRadius = 6;
+        constexpr int32_t kToothLength = 4;
+        constexpr float kToothWidth = 3.0F;
+        constexpr int32_t kHubRadius = 2;
+        constexpr int kToothCount = 8;
+
+        tft.fillCircle(centerX, centerY, kBodyRadius, theme.textSecondary);
+        for (int i = 0; i < kToothCount; ++i) {
+            float angle = (360.0F / kToothCount) * static_cast<float>(i) * kDegToRad;
+            float cosA = cosf(angle);
+            float sinA = sinf(angle);
+            float x0 = centerX + cosA * kBodyRadius;
+            float y0 = centerY + sinA * kBodyRadius;
+            float x1 = centerX + cosA * (kBodyRadius + kToothLength);
+            float y1 = centerY + sinA * (kBodyRadius + kToothLength);
+            tft.drawWideLine(x0, y0, x1, y1, kToothWidth, theme.textSecondary);
+        }
+        tft.fillCircle(centerX, centerY, kHubRadius, theme.panel);
+    } else {
+        constexpr int32_t kRimRadius = 12;
+        constexpr int32_t kHubRadius = 3;
+        constexpr float kSpokeAngles[3] = {90.0F, 210.0F, 330.0F};
+
+        tft.drawCircle(centerX, centerY, kRimRadius, theme.textSecondary);
+        tft.drawCircle(centerX, centerY, kRimRadius - 1, theme.textSecondary);
+        for (float angleDeg : kSpokeAngles) {
+            float angle = angleDeg * kDegToRad;
+            int32_t hx = centerX + static_cast<int32_t>(cosf(angle) * kHubRadius);
+            int32_t hy = centerY + static_cast<int32_t>(sinf(angle) * kHubRadius);
+            int32_t rx = centerX + static_cast<int32_t>(cosf(angle) * kRimRadius);
+            int32_t ry = centerY + static_cast<int32_t>(sinf(angle) * kRimRadius);
+            tft.drawLine(hx, hy, rx, ry, theme.textSecondary);
+        }
+        tft.fillCircle(centerX, centerY, kHubRadius, theme.textSecondary);
+    }
 }
 
 } // namespace gaugewidgets

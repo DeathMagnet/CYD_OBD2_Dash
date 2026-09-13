@@ -89,6 +89,16 @@ constexpr uint16_t kMaxRedlineRpm = 7000;
 constexpr uint16_t kRedlineStepRpm = 100;
 constexpr uint16_t kDefaultRedlineRpm = 6200;
 
+constexpr uint16_t kMinMaxRpm = kMaxRedlineRpm; // Never below the highest possible redline.
+constexpr uint16_t kMaxMaxRpm = 9000;
+constexpr uint16_t kMaxRpmStepRpm = 100;
+constexpr uint16_t kDefaultMaxRpm = 7000; // Matches the previous hardcoded gauge scale.
+
+constexpr uint16_t kMinMaxSpeedMph = 120;
+constexpr uint16_t kMaxMaxSpeedMph = 260;
+constexpr uint16_t kMaxSpeedStepMph = 10;
+constexpr uint16_t kDefaultMaxSpeedMph = 200; // Matches the previous hardcoded gauge scale.
+
 constexpr float kMinBaroBaselinePsi = 12.0F;
 constexpr float kMaxBaroBaselinePsi = 15.5F;
 constexpr float kBaroBaselineStepPsi = 0.1F;

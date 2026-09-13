@@ -12,6 +12,8 @@
 struct AppSettings {
     uint16_t shiftLightRpm = config::kDefaultShiftLightRpm;
     uint16_t redlineRpm = config::kDefaultRedlineRpm;
+    uint16_t maxRpm = config::kDefaultMaxRpm;
+    uint16_t maxSpeedMph = config::kDefaultMaxSpeedMph;
     uint32_t logIntervalMs = config::kDefaultLogRowIntervalMs;
     float baroBaselinePsi = config::kDefaultBaroBaselinePsi;
     // Theme selection is persisted for forward compatibility, but only
@@ -32,11 +34,19 @@ public:
 
     void setShiftLightRpm(uint16_t rpm);
     void setRedlineRpm(uint16_t rpm);
+    void setMaxRpm(uint16_t rpm);
+    void setMaxSpeedMph(uint16_t mph);
     void setLogIntervalMs(uint32_t intervalMs);
     void setBaroBaselinePsi(float psi);
 
+    // True whenever the current settings differ from the last saved/loaded
+    // snapshot (a live comparison, not a sticky flag - reverting a value back
+    // to what's on SD clears this again). Drives the shared config-page Save
+    // button's color.
+    bool isDirty() const;
+
     // Persists the current settings to /config.txt. Returns false if the SD
-    // card is unavailable or the write fails.
+    // card is unavailable or the write fails; clears isDirty() on success.
     bool save();
 
 private:
@@ -44,4 +54,5 @@ private:
 
     SdManager& sdManager_;
     AppSettings settings_;
+    AppSettings savedSettings_; // Snapshot of what's currently on SD, for isDirty().
 };

@@ -12,15 +12,28 @@
 #include "system/dtc_decoder.h"
 #include "logging/csv_logger.h"
 
+// Dashboard and config-menu pages are kept as contiguous enum ranges (rather
+// than in on-screen page-number order) so group membership and group-cycling
+// (see ClusterTouchHandler::handleHeaderTap) reduce to a simple index range
+// check instead of a per-page lookup table.
 enum class ClusterPage : uint8_t {
-    PrimaryCluster = 0,   // Page 1
-    EngineLoadAirflow,    // Page 2
-    CarSpecificSensors,   // Page 3
-    PerformanceTelemetry, // Page 4
-    ConfigMenu,           // Page 5
-    Diagnostics,          // Page 6
+    PrimaryCluster = 0,   // Page 1 - dashboard
+    EngineLoadAirflow,    // Page 2 - dashboard
+    CarSpecificSensors,   // Page 3 - dashboard
+    PerformanceTelemetry, // Page 4 - dashboard
+    Diagnostics,          // Page 6 - dashboard (last in group)
+    ConfigUi,             // Page 5 - first config-group page ("UI")
+    ConfigGauges,         // config-group page ("GAUGES")
+    ConfigUserVars,       // config-group page ("USER VARS")
+    ConfigLogs,           // config-group page ("LOGS")
     Count
 };
+
+constexpr ClusterPage kFirstConfigPage = ClusterPage::ConfigUi;
+
+constexpr bool isConfigPage(ClusterPage page) {
+    return page >= kFirstConfigPage;
+}
 
 // Transient UI state that isn't a persisted setting and isn't part of the
 // telemetry snapshot: timers, rolling history, and short-lived confirmation
@@ -57,28 +70,36 @@ struct ClusterPageRuntimeState {
     DtcList dtcListDrawn;
     int8_t dtcClearConfirmDrawn = -1;
 
-    // Page 5 - delete-all-logs confirmation and save feedback.
+    // Logs page - delete-all-logs confirmation.
     bool deleteLogsConfirmArmed = false;
     uint32_t deleteLogsConfirmArmedAtMs = 0;
+
+    // Shared config footer (Save button) - feedback message/timeout, shown on
+    // whichever config page is active when Save is tapped.
     char configStatusMessage[32] = {0};
     uint32_t configStatusMessageSetAtMs = 0;
 
-    // Page 5 - last-drawn field text/button state, so drawPage5Dynamic() only
-    // repaints a field when its value actually changed instead of every UI
-    // refresh tick. Empty string / -1 means "not drawn yet" and forces a
-    // redraw the first time; reset whenever drawPage5Static() reopens the
-    // page.
-    char cfgShiftLightRpmDrawn[24] = {0};
-    char cfgRedlineRpmDrawn[24] = {0};
-    char cfgLogIntervalDrawn[24] = {0};
-    char cfgBaroBaselineDrawn[24] = {0};
-    int8_t cfgSaveButtonDrawn = -1;
-    int8_t cfgDeleteConfirmDrawn = -1;
+    // UI/Logs pages - last-drawn field text/button state, so
+    // drawConfigUiDynamic()/drawConfigLogsDynamic() only repaint a field when
+    // its value actually changed instead of every UI refresh tick. Empty
+    // string / -1 means "not drawn yet" and forces a redraw the first time;
+    // reset whenever the owning page's Static function reopens the page.
+    char cfgShiftLightRpmDrawn[24] = {0};  // Gauges page
+    char cfgRedlineRpmDrawn[24] = {0};     // Gauges page
+    char cfgMaxRpmDrawn[24] = {0};         // Gauges page
+    char cfgMaxSpeedDrawn[24] = {0};       // Gauges page
+    char cfgBaroBaselineDrawn[24] = {0};   // User Vars page
+    char cfgLogIntervalDrawn[24] = {0};    // Logs page
+    int8_t cfgDeleteConfirmDrawn = -1;     // Logs page
 
-    // Page 5 - log summary (file count/size) is expensive to compute (it
+    // Shared config footer (Save button) - same "not drawn yet" convention as
+    // above, reset whenever any config page's Static function reopens.
+    int8_t cfgSaveButtonDrawn = -1;
+
+    // Logs page - log summary (file count/size) is expensive to compute (it
     // scans the SD card directory), so it's only rescanned periodically
     // rather than on every UI refresh tick. Setting cfgLogSummaryNextScanMs
-    // to 0 forces an immediate rescan on the next drawPage5Dynamic() call.
+    // to 0 forces an immediate rescan on the next drawConfigLogsDynamic() call.
     char cfgLogSummaryDrawn[32] = {0};
     uint32_t cfgLogSummaryNextScanMs = 0;
 };
@@ -115,8 +136,16 @@ private:
     void drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs);
     void drawPage4Static();
     void drawPage4Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs);
-    void drawPage5Static();
-    void drawPage5Dynamic(uint32_t nowMs);
+    void drawConfigUiStatic();
+    void drawConfigUiDynamic(uint32_t nowMs);
+    void drawConfigGaugesStatic();
+    void drawConfigGaugesDynamic(uint32_t nowMs);
+    void drawConfigUserVarsStatic();
+    void drawConfigUserVarsDynamic(uint32_t nowMs);
+    void drawConfigLogsStatic();
+    void drawConfigLogsDynamic(uint32_t nowMs);
+    void drawConfigFooterStatic();
+    void drawConfigFooterDynamic(uint32_t nowMs);
     void drawPage6Static();
     void drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs);
 

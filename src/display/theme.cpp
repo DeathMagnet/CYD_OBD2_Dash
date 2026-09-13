@@ -19,6 +19,8 @@ constexpr ThemeColors kModernFlatTheme = {
     0xC618, // textSecondary: silver
     0xD800, // warningActive: crimson
     0x5D1F, // touchHighlight: light blue
+    0x262B, // unsavedActive: green (Save button, unsaved config changes)
+    0x262B, // liveActive: green (OBDII badge, connection live)
     "Modern Flat",
 };
 

@@ -101,4 +101,9 @@ void drawStatusBadge(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width, int32_t
 // MIL (check engine light) indicator; also the Page 6 touch zone glyph.
 void drawMilIndicator(TFT_eSPI& tft, int32_t centerX, int32_t centerY, bool milOn, const ThemeColors& theme);
 
+// Dashboard/config-group mode toggle glyph: a gear while `showGear` is true
+// (on a dashboard page - tap to go to config), a steering wheel otherwise (on
+// a config page - tap to return to the dashboard).
+void drawModeToggleButton(TFT_eSPI& tft, int32_t centerX, int32_t centerY, bool showGear, const ThemeColors& theme);
+
 } // namespace gaugewidgets

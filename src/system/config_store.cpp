@@ -51,6 +51,10 @@ bool ConfigStore::parseLine(const char* line) {
         settings_.shiftLightRpm = clampU16(atol(valueStr), config::kMinShiftLightRpm, config::kMaxShiftLightRpm);
     } else if (strcmp(key, "redline_rpm") == 0) {
         settings_.redlineRpm = clampU16(atol(valueStr), config::kMinRedlineRpm, config::kMaxRedlineRpm);
+    } else if (strcmp(key, "max_rpm") == 0) {
+        settings_.maxRpm = clampU16(atol(valueStr), config::kMinMaxRpm, config::kMaxMaxRpm);
+    } else if (strcmp(key, "max_speed_mph") == 0) {
+        settings_.maxSpeedMph = clampU16(atol(valueStr), config::kMinMaxSpeedMph, config::kMaxMaxSpeedMph);
     } else if (strcmp(key, "log_interval_ms") == 0) {
         uint32_t interval = static_cast<uint32_t>(atol(valueStr));
         settings_.logIntervalMs = isValidLogIntervalMs(interval) ? interval : config::kDefaultLogRowIntervalMs;
@@ -89,18 +93,43 @@ void ConfigStore::begin() {
     }
     file.close();
 
-    Serial.printf("[Config] Loaded: shiftLight=%u redline=%u logIntervalMs=%lu baroBaselinePsi=%.2f theme=%u\n",
-                  settings_.shiftLightRpm, settings_.redlineRpm,
-                  static_cast<unsigned long>(settings_.logIntervalMs),
-                  settings_.baroBaselinePsi, settings_.themeId);
+    // parseLine() only clamps each field to its own independent bounds, so a
+    // stale or hand-edited file can leave the shiftLight <= redline <= maxRpm
+    // ordering broken regardless of key order; fix it up top-down once here.
+    if (settings_.redlineRpm > settings_.maxRpm) {
+        settings_.redlineRpm = settings_.maxRpm;
+    }
+    if (settings_.shiftLightRpm > settings_.redlineRpm) {
+        settings_.shiftLightRpm = settings_.redlineRpm;
+    }
+
+    Serial.printf("[Config] Loaded: shiftLight=%u redline=%u maxRpm=%u maxSpeed=%u logIntervalMs=%lu baroBaselinePsi=%.2f theme=%u\n",
+                  settings_.shiftLightRpm, settings_.redlineRpm, settings_.maxRpm, settings_.maxSpeedMph,
+                  static_cast<unsigned long>(settings_.logIntervalMs), settings_.baroBaselinePsi, settings_.themeId);
+
+    savedSettings_ = settings_;
 }
 
 void ConfigStore::setShiftLightRpm(uint16_t rpm) {
-    settings_.shiftLightRpm = clampU16(rpm, config::kMinShiftLightRpm, config::kMaxShiftLightRpm);
+    // Clamped below redline so shiftLight <= redline always holds; each
+    // setter only ever tightens its own field, never a sibling's.
+    uint16_t hi = config::kMaxShiftLightRpm < settings_.redlineRpm ? config::kMaxShiftLightRpm : settings_.redlineRpm;
+    settings_.shiftLightRpm = clampU16(rpm, config::kMinShiftLightRpm, hi);
 }
 
 void ConfigStore::setRedlineRpm(uint16_t rpm) {
-    settings_.redlineRpm = clampU16(rpm, config::kMinRedlineRpm, config::kMaxRedlineRpm);
+    uint16_t lo = config::kMinRedlineRpm > settings_.shiftLightRpm ? config::kMinRedlineRpm : settings_.shiftLightRpm;
+    uint16_t hi = config::kMaxRedlineRpm < settings_.maxRpm ? config::kMaxRedlineRpm : settings_.maxRpm;
+    settings_.redlineRpm = clampU16(rpm, lo, hi);
+}
+
+void ConfigStore::setMaxRpm(uint16_t rpm) {
+    uint16_t lo = config::kMinMaxRpm > settings_.redlineRpm ? config::kMinMaxRpm : settings_.redlineRpm;
+    settings_.maxRpm = clampU16(rpm, lo, config::kMaxMaxRpm);
+}
+
+void ConfigStore::setMaxSpeedMph(uint16_t mph) {
+    settings_.maxSpeedMph = clampU16(mph, config::kMinMaxSpeedMph, config::kMaxMaxSpeedMph);
 }
 
 void ConfigStore::setLogIntervalMs(uint32_t intervalMs) {
@@ -109,6 +138,16 @@ void ConfigStore::setLogIntervalMs(uint32_t intervalMs) {
 
 void ConfigStore::setBaroBaselinePsi(float psi) {
     settings_.baroBaselinePsi = clampF(psi, config::kMinBaroBaselinePsi, config::kMaxBaroBaselinePsi);
+}
+
+bool ConfigStore::isDirty() const {
+    return settings_.shiftLightRpm != savedSettings_.shiftLightRpm ||
+           settings_.redlineRpm != savedSettings_.redlineRpm ||
+           settings_.maxRpm != savedSettings_.maxRpm ||
+           settings_.maxSpeedMph != savedSettings_.maxSpeedMph ||
+           settings_.logIntervalMs != savedSettings_.logIntervalMs ||
+           settings_.baroBaselinePsi != savedSettings_.baroBaselinePsi ||
+           settings_.themeId != savedSettings_.themeId;
 }
 
 bool ConfigStore::save() {
@@ -132,11 +171,14 @@ bool ConfigStore::save() {
     file.printf("theme=%u\n", settings_.themeId);
     file.printf("shift_light_rpm=%u\n", settings_.shiftLightRpm);
     file.printf("redline_rpm=%u\n", settings_.redlineRpm);
+    file.printf("max_rpm=%u\n", settings_.maxRpm);
+    file.printf("max_speed_mph=%u\n", settings_.maxSpeedMph);
     file.printf("log_interval_ms=%lu\n", static_cast<unsigned long>(settings_.logIntervalMs));
     file.printf("baro_baseline_psi=%.2f\n", settings_.baroBaselinePsi);
     file.flush();
     file.close();
 
     Serial.println("[Config] Settings saved to /config.txt.");
+    savedSettings_ = settings_;
     return true;
 }

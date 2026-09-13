@@ -286,7 +286,7 @@ uint32_t CsvLogger::deleteAllLogs() {
     }
 
     // Only resume logging afterward if it was actually active before this
-    // call. Otherwise a Page 5 "delete all logs" tap while SD_LOGGING_ENABLED
+    // call. Otherwise a Logs page "delete all logs" tap while SD_LOGGING_ENABLED
     // is unset (or begin() never mounted) would silently start a session.
     bool wasActive = loggingActive_;
 

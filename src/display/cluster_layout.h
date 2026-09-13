@@ -13,22 +13,48 @@ constexpr int32_t kScreenWidth = config::kScreenWidth;   // 480
 constexpr int32_t kScreenHeight = config::kScreenHeight; // 320
 
 // Header touch zones (docs/cyd-obd2-ui-cluster-guide.md: Touch Navigation).
+// Left to right: prev arrow, SD recording light (display-only), page title
+// (display-only), OBDII status badge (display-only), MIL/CEL zone, mode
+// toggle (dashboard/config groups), next arrow.
 constexpr int32_t kNavPrevX0 = 0, kNavPrevX1 = 60;
 constexpr int32_t kNavNextX0 = 420, kNavNextX1 = 480;
-constexpr int32_t kNavTitleX0 = 61, kNavTitleX1 = 350;
-constexpr int32_t kMilZoneX0 = 351, kMilZoneX1 = 419;
+
+// Both edge icons (SD light, mode toggle) sit the same distance from their
+// adjacent nav arrow so the header reads as symmetric.
+constexpr int32_t kHeaderIconGap = 8;
+
+constexpr int32_t kSdLightCenterX = kNavPrevX1 + kHeaderIconGap;
+constexpr int32_t kSdLightCenterY = kHeaderHeight / 2;
+constexpr int32_t kSdLightRadius = 5;
+
+// Page title: centered between the SD light and the OBDII badge (display only).
+constexpr int32_t kNavTitleX0 = kSdLightCenterX + kSdLightRadius + 4;
+constexpr int32_t kBadgeX = 216, kBadgeY = 9, kBadgeW = 90, kBadgeH = 22;
+constexpr int32_t kNavTitleX1 = kBadgeX - 4;
+constexpr int32_t kNavTitleCenterX = (kNavTitleX0 + kNavTitleX1) / 2;
+
+constexpr int32_t kMilZoneX0 = 310, kMilZoneX1 = 365;
 constexpr int32_t kMilCenterX = (kMilZoneX0 + kMilZoneX1) / 2;
 constexpr int32_t kMilCenterY = kHeaderHeight / 2;
 
-// Page 5 (Config Menu): 7 rows of 40px exactly filling the 280px body.
+// Mode toggle touch zone stays between the MIL zone and the next arrow, but
+// the icon itself is drawn kHeaderIconGap from the next arrow (mirroring the
+// SD light's offset from the prev arrow) rather than at the zone's midpoint.
+constexpr int32_t kModeToggleX0 = 365, kModeToggleX1 = 420;
+constexpr int32_t kModeToggleCenterX = kNavNextX0 - kHeaderIconGap;
+constexpr int32_t kModeToggleCenterY = kHeaderHeight / 2;
+
+// Config pages (UI, Logs, ...): each page owns rows 0..3 of its own 40px-tall
+// body independently (same convention as every other page), plus a Save
+// button footer shared by every config page, fixed to the bottom of the
+// screen regardless of which config page is active or how many rows it uses.
 constexpr int32_t kConfigRowHeight = 40;
-constexpr int32_t kConfigRow0Y = kHeaderHeight;                   // Theme (display only)
-constexpr int32_t kConfigRow1Y = kConfigRow0Y + kConfigRowHeight; // Shift light RPM
-constexpr int32_t kConfigRow2Y = kConfigRow1Y + kConfigRowHeight; // Redline RPM
-constexpr int32_t kConfigRow3Y = kConfigRow2Y + kConfigRowHeight; // Log interval
-constexpr int32_t kConfigRow4Y = kConfigRow3Y + kConfigRowHeight; // Boost baro baseline
-constexpr int32_t kConfigRow5Y = kConfigRow4Y + kConfigRowHeight; // Save button
-constexpr int32_t kConfigRow6Y = kConfigRow5Y + kConfigRowHeight; // Log summary + delete
+constexpr int32_t kConfigRow0Y = kHeaderHeight;
+constexpr int32_t kConfigRow1Y = kConfigRow0Y + kConfigRowHeight;
+constexpr int32_t kConfigRow2Y = kConfigRow1Y + kConfigRowHeight;
+constexpr int32_t kConfigRow3Y = kConfigRow2Y + kConfigRowHeight;
+
+constexpr int32_t kConfigFooterY = kScreenHeight - kConfigRowHeight; // Shared save button
 
 constexpr int32_t kConfigMinusX = 240, kConfigMinusW = 50;
 constexpr int32_t kConfigValueX = 300, kConfigValueW = 90;
@@ -36,9 +62,9 @@ constexpr int32_t kConfigPlusX = 400, kConfigPlusW = 50;
 constexpr int32_t kConfigButtonInsetY = 4;
 constexpr int32_t kConfigButtonH = kConfigRowHeight - 2 * kConfigButtonInsetY;
 
-constexpr int32_t kConfigCycleX = 240, kConfigCycleW = 210;   // Row 3: tap-to-cycle log interval
-constexpr int32_t kConfigSaveX = 20, kConfigSaveW = 440;      // Row 5: full-width save button
-constexpr int32_t kConfigDeleteX = 300, kConfigDeleteW = 160; // Row 6: delete-all-logs button
+constexpr int32_t kConfigCycleX = 240, kConfigCycleW = 210;   // Logs row 0: tap-to-cycle log interval
+constexpr int32_t kConfigSaveX = 20, kConfigSaveW = 440;      // Footer: full-width save button
+constexpr int32_t kConfigDeleteX = 300, kConfigDeleteW = 160; // Logs row 1: delete-all-logs button
 
 // Page 4 (Performance & Telemetry): 0-60 MPH timer tap-to-reset box.
 constexpr int32_t kPerfTimerX0 = 140, kPerfTimerY0 = 125, kPerfTimerX1 = 340, kPerfTimerY1 = 180;

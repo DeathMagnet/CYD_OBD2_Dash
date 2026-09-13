@@ -142,8 +142,8 @@ src/
     theme.h/.cpp             # ThemeColors + getTheme() - Modern Flat only today
     gauge_widgets.h/.cpp     # Arc gauge, bar gauge, value box, status badge, MIL indicator, NeedlePhysics
     cluster_layout.h         # Shared pixel geometry (header only) used by both drawing and touch hit-testing
-    cluster_pages.h/.cpp     # Pages 1-6 drawStatic()/drawDynamic()
-    touch_handler.h/.cpp     # ClusterTouchHandler: nav zones, Page 5/6 button taps
+    cluster_pages.h/.cpp     # Dashboard pages and config pages drawStatic()/drawDynamic()
+    touch_handler.h/.cpp     # ClusterTouchHandler: nav zones, config page taps, group cycling
   input/
     touch_manager.h/.cpp     # Raw touch + calibration (pre-existing)
   obd/
@@ -158,7 +158,7 @@ src/
   system/
     connection_state.h       # ConnectionState enum (header only)
     dtc_decoder.h/.cpp       # Mode 03/07 DTC byte-pair decoding
-    config_store.h/.cpp      # Page 5 settings, persisted to /config.txt
+    config_store.h/.cpp      # Config page settings (theme, gauge calibration, user vars, logging), persisted to /config.txt
 ```
 
 Notable deviations from the original proposal, and why:
@@ -166,7 +166,7 @@ Notable deviations from the original proposal, and why:
 - **No `dashboard_renderer`/`boot_player` split yet.** Boot image drawing still lives in the pre-existing `display_manager.cpp`; the new gauge/page rendering went into `cluster_pages.cpp` + `gauge_widgets.cpp` instead of a single `dashboard_renderer`, since the UI cluster guide's six-page spec didn't map cleanly onto one renderer file.
 - **`obd_client` runs on its own FreeRTOS task**, not a non-blocking state machine driven from `loop()`. `BluetoothSerial::connect()` and every ELM327 command round-trip are blocking calls with multi-second worst cases; rather than build a hand-rolled AT-command scheduler that still bottoms out on a blocking `connect()`, `ObdClient::begin()` starts a task pinned to `config::kObdTaskCore` (core 0, away from the Arduino loop task). The render loop reads a mutex-guarded `TelemetrySnapshot` copy every iteration and never touches Bluetooth directly, which satisfies "never block the display loop on Bluetooth I/O" more directly than a cooperative scheduler could on this library.
 - **No `scheduler.h`.** `loop()` uses plain `millis()`-delta checks per subsystem (touch poll, UI refresh, CSV row/flush), matching the coding standards' preference for plain direct code over a scheduling abstraction at this project's size.
-- **`config_store` and `dtc_decoder`** were not in the original proposal; they exist to back Page 5's persisted settings and Page 6's DTC list, respectively.
+- **`config_store` and `dtc_decoder`** were not in the original proposal; they exist to back the config pages' persisted settings and Page 6's DTC list, respectively.
 - **`obd_simulator`** is bench-only. Building the `cyd_4inch_sim` environment defines `OBD_SIMULATION_ENABLED`, which compiles `BluetoothSerial` and the whole AT/PID path out of `obd_client.*` and runs `ObdClient::simulationLoop()` on the same task instead. Because the swap happens behind `ObdClient`'s existing public interface, `main.cpp`, `cluster_pages`, `touch_handler`, and `csv_logger` are untouched and the mutex/task timing under test matches production.
 
 ## Simulated Telemetry Build
