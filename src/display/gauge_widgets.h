@@ -101,9 +101,11 @@ void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int
 // when !valid rather than a fabricated zero (see coding standards).
 // labelTextSize/valueTextSize default to every existing caller's current
 // sizes (1 and 2); pass larger values to bump just this call site.
+// labelToValueGap defaults to every existing caller's current spacing (14px
+// below the label's y); pass a larger value to widen just this call site.
 void drawValueBox(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width,
                    const char* label, const char* formattedValue, bool valid, const ThemeColors& theme,
-                   uint8_t labelTextSize = 1, uint8_t valueTextSize = 2);
+                   uint8_t labelTextSize = 1, uint8_t valueTextSize = 2, int32_t labelToValueGap = 14);
 
 // drawString() repaints only the glyph box of the new string, so a readout that
 // loses a character leaves the previous, wider one's outer columns on screen. Use
