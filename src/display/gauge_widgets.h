@@ -102,15 +102,87 @@ struct BarGaugeState {
 void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int32_t width, int32_t height,
                    float percent, uint16_t fillColor, const ThemeColors& theme);
 
+// Draws a unit/suffix caption once, in the default font (Font 1) at
+// `textSize`, colored theme.textSecondary against `background`, aligned per
+// `datum` (must be a right-aligned datum: TR_DATUM/MR_DATUM/BR_DATUM) so its
+// right edge sits at a fixed `rightX` regardless of any paired value's
+// width. Call ONLY from a page's drawStatic()/drawConfigXStatic() — never
+// from drawDynamic() — so the unit's position and pixels are never touched
+// by per-tick refreshes. Pair with fixedUnitWidth() from the matching
+// drawDynamic() to size the value field that butts up against it (see
+// drawFieldText()'s doc comment).
+void drawFixedUnit(TFT_eSPI& tft, const char* unit, int32_t rightX, int32_t y, uint8_t datum,
+                    uint8_t textSize, const ThemeColors& theme, uint16_t background);
+
+// Returns the pixel width `unit` occupies when drawn by drawFixedUnit() with
+// the same string/textSize, so a paired drawDynamic() can right-align its
+// value to end exactly at the unit's fixed left edge (minus a small gap)
+// without overlapping it. Recomputed each call rather than cached: cheap,
+// and keeps drawDynamic() free of any new per-field state.
+int32_t fixedUnitWidth(TFT_eSPI& tft, const char* unit, uint8_t textSize);
+
+// Returns the pixel width `representative` occupies when rendered in the
+// theme's "large value" font at `sizeTier` (see applyValueFont) — i.e. how
+// much horizontal room a value field should reserve so a value+unit group's
+// layout can be computed from constants alone rather than the live value
+// (see centerValueUnitGroup()). Pass a string representing the widest value
+// the field realistically shows (e.g. "199" for a 3-digit reading). Leaves
+// the active font as Font 1 afterward (matches resetValueFont()). For fields
+// that just use Font 1 directly (no applyValueFont call), reuse
+// fixedUnitWidth() instead — same idea, same font.
+int32_t reservedValueWidth(TFT_eSPI& tft, const ThemeColors& theme, uint8_t sizeTier, const char* representative);
+
+// Centers a `valueWidth`-wide value slot + `gapPx` + a unit of `unitWidth` as
+// one block on `centerX`, returning the right edge of each half (for right-
+// aligned draws ending there). Neither returned edge depends on the value
+// actually drawn this frame — only on the two widths passed in — so calling
+// this identically from drawStatic() (to place the unit via drawFixedUnit())
+// and drawDynamic() (to place the value via drawFieldText()) keeps the
+// unit's position exactly fixed while the pair still reads as centered in
+// its container, instead of hugging one edge.
+struct ValueUnitGroup {
+    int32_t valueRightX;
+    int32_t unitRightX;
+};
+ValueUnitGroup centerValueUnitGroup(int32_t centerX, int32_t valueWidth, int32_t unitWidth, int32_t gapPx);
+
 // A caption above a large numeric readout. Renders "--" in textSecondary
 // when !valid rather than a fabricated zero (see coding standards).
 // labelTextSize/valueTextSize default to every existing caller's current
 // sizes (1 and 2); pass larger values to bump just this call site.
 // labelToValueGap defaults to every existing caller's current spacing (14px
 // below the label's y); pass a larger value to widen just this call site.
+//
+// When `unit` is non-empty, split the call across the owning page's Static
+// and Dynamic passes instead: drawValueBoxStatic() draws the label and the
+// fixed unit caption once, and drawValueBoxValue() (called every refresh
+// tick) draws only the number, right-aligned against the unit's fixed left
+// edge. Use plain drawValueBox() only for fields with no unit at all.
 void drawValueBox(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width,
                    const char* label, const char* formattedValue, bool valid, const ThemeColors& theme,
                    uint8_t labelTextSize = 1, uint8_t valueTextSize = 2, int32_t labelToValueGap = 14);
+
+// Static half of a unit-bearing value box: draws the label (same position as
+// drawValueBox()) plus, when `unit` is non-empty, a fixed unit caption
+// positioned via centerValueUnitGroup() so the [value][unit] pair centers on
+// `x + width / 2` instead of hugging the box's edge — `representativeValue`
+// must be the same "widest expected value" string passed to the paired
+// drawValueBoxValue() call (see reservedValueWidth()'s doc). Call once from
+// drawStatic()/drawConfigXStatic(); pair with drawValueBoxValue() from the
+// matching drawDynamic() using the same x/y/width/unit/representativeValue/
+// valueTextSize/labelToValueGap.
+void drawValueBoxStatic(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width, const char* label,
+                         const char* unit, const char* representativeValue, const ThemeColors& theme,
+                         uint8_t labelTextSize = 1, uint8_t valueTextSize = 2, int32_t labelToValueGap = 14);
+
+// Dynamic half of a unit-bearing value box: draws only the number, right-
+// aligned within the reserved value slot computed from
+// `representativeValue` (must match the string passed to the paired
+// drawValueBoxStatic() call) so it lines up against the unit drawn there.
+// Never touches the label or the unit.
+void drawValueBoxValue(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width, const char* formattedValue,
+                        const char* unit, const char* representativeValue, bool valid, const ThemeColors& theme,
+                        uint8_t valueTextSize = 2, int32_t labelToValueGap = 14);
 
 // drawString() repaints only the glyph box of the new string, so a readout that
 // loses a character leaves the previous, wider one's outer columns on screen. Use
