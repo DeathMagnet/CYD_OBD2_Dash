@@ -59,6 +59,7 @@ void setup() {
     // 5. Load persisted settings (Page 5), falling back to defaults if the
     // SD card or /config.txt is unavailable.
     configStore.begin();
+    clusterPages.applyTheme(static_cast<ThemeId>(configStore.settings().themeId));
 
     // 6. Start SD CSV logging (pruning old sessions first if needed). No-ops
     // safely when SD_LOGGING_ENABLED is unset or the card is missing.

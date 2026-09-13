@@ -144,6 +144,10 @@ void ConfigStore::setBaroBaselinePsi(float psi) {
     settings_.baroBaselinePsi = clampF(psi, config::kMinBaroBaselinePsi, config::kMaxBaroBaselinePsi);
 }
 
+void ConfigStore::setThemeId(uint8_t id) {
+    settings_.themeId = (id <= 2) ? id : 2;
+}
+
 void ConfigStore::setUseMetricUnits(bool metric) {
     settings_.useMetricUnits = metric;
 }

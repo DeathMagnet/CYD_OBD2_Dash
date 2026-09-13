@@ -40,6 +40,7 @@ public:
     void setMaxSpeedMph(uint16_t mph);
     void setLogIntervalMs(uint32_t intervalMs);
     void setBaroBaselinePsi(float psi);
+    void setThemeId(uint8_t id);
     void setUseMetricUnits(bool metric);
     void setUseMetricLogs(bool metric);
 
