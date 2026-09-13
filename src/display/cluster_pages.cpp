@@ -63,6 +63,7 @@ void ClusterPages::drawStatusStrip(ConnectionState connectionState, bool sdLoggi
 void ClusterPages::drawStatic(ClusterPage page, const TelemetrySnapshot& snapshot) {
     bool milOn = snapshot.milOn.valid && snapshot.milOn.value != 0.0F;
     drawHeader(page, milOn);
+    runtimeState_.headerMilOnDrawn = static_cast<int8_t>(milOn);
 
     switch (page) {
         case ClusterPage::PrimaryCluster: drawPage1Static(); break;
@@ -85,7 +86,10 @@ void ClusterPages::drawStatic(ClusterPage page, const TelemetrySnapshot& snapsho
 void ClusterPages::drawDynamic(ClusterPage page, const TelemetrySnapshot& snapshot,
                                 ConnectionState connectionState, bool sdLoggingActive, uint32_t nowMs) {
     bool milOn = snapshot.milOn.valid && snapshot.milOn.value != 0.0F;
-    gaugewidgets::drawMilIndicator(tft_, layout::kMilCenterX, layout::kMilCenterY, milOn, theme_);
+    if (runtimeState_.headerMilOnDrawn != static_cast<int8_t>(milOn)) {
+        gaugewidgets::drawMilIndicator(tft_, layout::kMilCenterX, layout::kMilCenterY, milOn, theme_);
+        runtimeState_.headerMilOnDrawn = static_cast<int8_t>(milOn);
+    }
     drawStatusStrip(connectionState, sdLoggingActive);
 
     switch (page) {

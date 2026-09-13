@@ -71,6 +71,11 @@ struct ClusterPageRuntimeState {
     DtcList dtcListDrawn;
     int8_t dtcClearConfirmDrawn = -1;
 
+    // Header MIL icon - last-drawn state, so drawDynamic() only repaints the
+    // icon when milOn actually changes instead of every UI refresh tick.
+    // -1 means "not drawn yet" and forces a redraw the first time.
+    int8_t headerMilOnDrawn = -1;
+
     // Logs page - delete-all-logs confirmation.
     bool deleteLogsConfirmArmed = false;
     uint32_t deleteLogsConfirmArmedAtMs = 0;
