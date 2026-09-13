@@ -60,6 +60,19 @@ void ClusterPages::drawStatusStrip(ConnectionState connectionState, bool sdLoggi
     tft_.fillCircle(layout::kSdLightCenterX, layout::kSdLightCenterY, layout::kSdLightRadius, sdColor);
 }
 
+void ClusterPages::beginLargeText(uint8_t size) {
+    if (theme_.useSevenSegmentFont) {
+        tft_.setTextFont(7);
+        tft_.setTextSize(1);
+    } else {
+        tft_.setTextSize(size);
+    }
+}
+
+void ClusterPages::endLargeText() {
+    tft_.setTextFont(1); // No-op when Font 7 was never selected.
+}
+
 // ---------------------------------------------------------------- Dispatch --
 
 void ClusterPages::drawStatic(ClusterPage page, const TelemetrySnapshot& snapshot) {
@@ -218,6 +231,16 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     int32_t rpmLabelY = kGaugeCy + 25 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
     tft_.drawString(labels::kUnitRpm, kRpmGaugeCx, rpmLabelY);
+    beginLargeText(4);
+    // Font 7 digits are 32px wide each at size 1, so 4 digits (up to maxRpm=9000) need
+    // 128px - wider than the 120px field sized for the default font. A field narrower
+    // than the actual text leaves part of a shrinking digit uncleared on the next frame.
+    int32_t rpmFieldWidth = theme_.useSevenSegmentFont ? 132 : 120;
+    gaugewidgets::drawFieldText(tft_, rpmBuf, kRpmGaugeCx, kGaugeCy - 5, rpmFieldWidth, theme_.background);
+    endLargeText();
+    tft_.setTextSize(2);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    tft_.drawString(labels::kUnitRpm, kRpmGaugeCx, kGaugeCy + 30);
 
     char speedBuf[8];
     if (snapshot.speedMph.valid) {
@@ -234,6 +257,12 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     int32_t speedLabelY = kGaugeCy + 25 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
     tft_.drawString(units::speedUnitLabel(metric), kSpeedGaugeCx, speedLabelY);
+    beginLargeText(4);
+    gaugewidgets::drawFieldText(tft_, speedBuf, kSpeedGaugeCx, kGaugeCy - 5, 120, theme_.background);
+    endLargeText();
+    tft_.setTextSize(2);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    tft_.drawString(units::speedUnitLabel(metric), kSpeedGaugeCx, kGaugeCy + 30);
 
     constexpr int32_t kRowY = 250, kColW = 154, kColGap = 5;
     char valueBuf[16];
@@ -281,7 +310,7 @@ void ClusterPages::drawPage2Static() {
     constexpr int32_t kGaugeCx = 130, kGaugeCy = 130, kGaugeRadius = 78;
     gaugewidgets::drawGaugeBezel(tft_, kGaugeCx, kGaugeCy, kGaugeRadius, theme_);
 
-    tft_.fillRoundRect(250, 50, 220, 110, 6, theme_.panel);
+    tft_.fillRoundRect(250, 50, 220, 160, 6, theme_.panel); // MAF + TIMING ADVANCE box, 20px taller
     tft_.fillRoundRect(20, 220, 210, 80, 6, theme_.panel);
     tft_.fillRoundRect(250, 220, 210, 80, 6, theme_.panel);
 }
@@ -306,21 +335,34 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     int32_t engineLoadLabelY = kGaugeCy + 22 + (theme_.numberedFonts[1] != 0 ? 8 : 0);
     tft_.drawString(labels::kLabelEngineLoad, kGaugeCx, engineLoadLabelY);
+    if (theme_.useSevenSegmentFont) {
+        snprintf(buf, sizeof(buf), "%d", static_cast<int>(targetLoad)); // Font 7 has no '%' glyph.
+    } else {
+        snprintf(buf, sizeof(buf), "%d%%", static_cast<int>(targetLoad));
+    }
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    beginLargeText(3);
+    gaugewidgets::drawFieldText(tft_, snapshot.engineLoadPct.valid ? buf : "--", kGaugeCx, kGaugeCy, 100,
+                                 theme_.background);
+    endLargeText();
+    tft_.setTextSize(1);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    tft_.drawString(labels::kLabelEngineLoad, kGaugeCx, kGaugeCy + 34);
 
     if (snapshot.mafGps.valid && snapshot.mafGps.value > runtimeState_.mafPeakGps) {
         runtimeState_.mafPeakGps = snapshot.mafGps.value;
     }
     snprintf(buf, sizeof(buf), "%.1f g/s", snapshot.mafGps.value);
-    gaugewidgets::drawValueBox(tft_, 260, 58, 200, labels::kLabelMaf, buf, snapshot.mafGps.valid, theme_);
+    gaugewidgets::drawValueBox(tft_, 260, 58, 200, labels::kLabelMaf, buf, snapshot.mafGps.valid, theme_, 2, 2);
     char peakBuf[24];
     snprintf(peakBuf, sizeof(peakBuf), "PEAK %.1f g/s", runtimeState_.mafPeakGps);
     tft_.setTextDatum(TC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
     tft_.setTextSize(1);
-    gaugewidgets::drawFieldText(tft_, peakBuf, 360, 96, 200, theme_.panel);
+    gaugewidgets::drawFieldText(tft_, peakBuf, 360, 105, 200, theme_.panel);
 
     snprintf(buf, sizeof(buf), "%.1f deg", snapshot.timingAdvanceDeg.value);
-    gaugewidgets::drawValueBox(tft_, 260, 118, 200, labels::kLabelTimingAdvance, buf, snapshot.timingAdvanceDeg.valid, theme_);
+    gaugewidgets::drawValueBox(tft_, 260, 132, 200, labels::kLabelTimingAdvance, buf, snapshot.timingAdvanceDeg.valid, theme_, 2, 2);
 
     tft_.setTextDatum(TC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
@@ -350,7 +392,7 @@ void ClusterPages::drawPage3Static() {
     vacuumArc_.invalidate();
 
     // Must match the Vacuum/Boost gauge geometry in drawPage3Dynamic().
-    constexpr int32_t kVacCx = 240, kVacCy = 194, kVacR = 70;
+    constexpr int32_t kVacCx = 240, kVacCy = 211, kVacR = 82;
     gaugewidgets::drawGaugeBezel(tft_, kVacCx, kVacCy, kVacR, theme_);
 
     tft_.fillRoundRect(10, 50, 225, 70, 6, theme_.panel);
@@ -414,7 +456,7 @@ void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     }
     // Sits in the gap between the two bottom panels (x 150..330), so it can run
     // lower and wider than the top-row gauges.
-    constexpr int32_t kVacCx = 240, kVacCy = 194, kVacR = 70;
+    constexpr int32_t kVacCx = 240, kVacCy = 211, kVacR = 82;
     gaugewidgets::drawArcGauge(tft_, vacuumArc_, kVacCx, kVacCy, kVacR, gaugeValue, gaugeMax, gaugeMax, gaugeMax,
                                 theme_.background, theme_);
     tft_.setTextDatum(MC_DATUM);
@@ -430,6 +472,16 @@ void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     gaugewidgets::drawFieldText(tft_, gaugeLabel, kVacCx, vacLabelY, 90, theme_.background);
     gaugewidgets::drawFieldText(tft_, gaugeUnit, kVacCx, kVacCy + 26, 90, theme_.background);
+    beginLargeText(3);
+    // A 2-digit reading plus the decimal point needs more room under Font 7 (32px/digit)
+    // than the default font, same reasoning as the RPM field fix.
+    int32_t vacFieldWidth = theme_.useSevenSegmentFont ? 112 : 96;
+    gaugewidgets::drawFieldText(tft_, haveMap ? buf : "--", kVacCx, kVacCy - 14, vacFieldWidth, theme_.background);
+    endLargeText();
+    tft_.setTextSize(1);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    gaugewidgets::drawFieldText(tft_, gaugeLabel, kVacCx, kVacCy + 24, 90, theme_.background);
+    gaugewidgets::drawFieldText(tft_, gaugeUnit, kVacCx, kVacCy + 36, 90, theme_.background);
 
     snprintf(buf, sizeof(buf), "%.2f V", snapshot.o2B1S1V.value);
     gaugewidgets::drawValueBox(tft_, 10, 253, 140, labels::kLabelO2B1S1, buf, snapshot.o2B1S1V.valid, theme_);
@@ -1015,22 +1067,37 @@ void ClusterPages::drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     bool dtcListChanged = runtimeState_.dtcHaveResultDrawn != static_cast<int8_t>(haveResult) ||
                            (haveResult && !dtcListsEqual(dtcList, runtimeState_.dtcListDrawn));
     if (dtcListChanged) {
-        tft_.setTextSize(1);
+        tft_.setTextSize(2);
+        // Clear the whole box every time regardless of how many lines will actually be
+        // shown, so a shrinking list (fewer codes, or a fresh read) never leaves a stale
+        // line from a taller previous draw.
         for (uint8_t line = 0; line < layout::kDtcListVisibleLines; ++line) {
             int32_t y = layout::kDtcListY + line * layout::kDtcListLineHeight;
             tft_.fillRect(30, y, 420, layout::kDtcListLineHeight - 2, theme_.background);
-            tft_.setTextDatum(TL_DATUM);
-            if (!haveResult) {
-                if (line == 0) {
-                    tft_.setTextColor(theme_.textSecondary, theme_.background);
-                    tft_.drawString(labels::kStatusReadingCodes, 34, y);
-                }
-            } else if (line < dtcList.count) {
-                tft_.setTextColor(theme_.textPrimary, theme_.background);
-                tft_.drawString(dtcList.codes[line], 34, y);
-            } else if (line == 0 && dtcList.count == 0) {
-                tft_.setTextColor(theme_.textSecondary, theme_.background);
-                tft_.drawString(labels::kStatusNoCodes, 34, y);
+        }
+
+        // Center the actual content block vertically within the box's 7-line span, and
+        // each line horizontally on the box's x-center (matches the drawRoundRect box in
+        // drawPage6Static: x 20..460).
+        uint8_t contentLines = 1;
+        if (haveResult && dtcList.count > 0) {
+            contentLines = dtcList.count < layout::kDtcListVisibleLines ? dtcList.count : layout::kDtcListVisibleLines;
+        }
+        int32_t startY = layout::kDtcListY + (layout::kDtcListVisibleLines - contentLines) * layout::kDtcListLineHeight / 2;
+        constexpr int32_t kDtcCenterX = 20 + 440 / 2;
+
+        tft_.setTextDatum(MC_DATUM);
+        if (!haveResult) {
+            tft_.setTextColor(theme_.textSecondary, theme_.background);
+            tft_.drawString(labels::kStatusReadingCodes, kDtcCenterX, startY + layout::kDtcListLineHeight / 2);
+        } else if (dtcList.count == 0) {
+            tft_.setTextColor(theme_.textSecondary, theme_.background);
+            tft_.drawString(labels::kStatusNoCodes, kDtcCenterX, startY + layout::kDtcListLineHeight / 2);
+        } else {
+            tft_.setTextColor(theme_.textPrimary, theme_.background);
+            for (uint8_t line = 0; line < contentLines; ++line) {
+                int32_t y = startY + line * layout::kDtcListLineHeight + layout::kDtcListLineHeight / 2;
+                tft_.drawString(dtcList.codes[line], kDtcCenterX, y);
             }
         }
         runtimeState_.dtcHaveResultDrawn = static_cast<int8_t>(haveResult);

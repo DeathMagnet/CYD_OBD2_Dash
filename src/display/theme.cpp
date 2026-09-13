@@ -31,6 +31,7 @@ ThemeColors kModernFlatTheme = {
     0x262B, // liveActive: green (OBDII badge, connection live)
     false,  // showGaugeBezel
     true,   // showOuterTicks
+    false,  // useSevenSegmentFont
     labels::kThemeNameModernFlat,
     {},     // valueFonts: initialized via initializeThemeFonts()
     {},     // numberedFonts: not used
@@ -58,6 +59,7 @@ ThemeColors kTorqueNeonTheme = {
     0x07E0, // liveActive: neon green (OBDII badge, connection live)
     false,  // showGaugeBezel
     true,   // showOuterTicks
+    false,  // useSevenSegmentFont
     labels::kThemeNameTorqueNeon,
     {},     // valueFonts: initialized via initializeThemeFonts()
     {},     // numberedFonts: not used
@@ -69,9 +71,9 @@ ThemeColors kTorqueNeonTheme = {
 constexpr ThemeColors kMustangS197Theme = {
     0x0821, // background: deep midnight navy
     0x10A5, // panel: slightly lighter navy card surface
-    0x07E0, // primaryGaugeArc: LED green
+    0x001F, // primaryGaugeArc: LED blue
     0x0000, // secondaryGaugeArc: black
-    0xC618, // tickInactiveColor: silver (lights up LED green once the needle passes)
+    0xC618, // tickInactiveColor: silver (lights up LED blue once the needle passes)
     0xF800, // needle: vibrant red
     0xC618, // needleCap: chrome hub
     0xFD20, // cautionArc: amber (Shift Light RPM -> Redline RPM zone)
@@ -85,6 +87,7 @@ constexpr ThemeColors kMustangS197Theme = {
     0x062B, // liveActive: green (OBDII badge, connection live)
     true,   // showGaugeBezel: OEM chrome ring around round gauges
     false,  // showOuterTicks: only the inner tick segment is shown
+    true,   // useSevenSegmentFont: TFT_eSPI Font 7 for large readouts
     labels::kThemeNameMustangS197,
     {},     // valueFonts: nullptr array (use default GLCD font)
     {0, 7, 7}, // numberedFonts: Font 7 (7-segment LCD) for tiers 3/4 (boost/vacuum and RPM/Speed); tier 2 (drawValueBox) stays on default
