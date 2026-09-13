@@ -55,8 +55,14 @@ bool ClusterTouchHandler::handleHeaderTap(uint16_t x, uint16_t y) {
         return true;
     }
     if (within(x, y, layout::kMilZoneX0, 0, layout::kMilZoneX1, layout::kHeaderHeight)) {
-        currentPage_ = ClusterPage::Diagnostics;
-        return true;
+        // MIL icon is only tappable when MIL is active
+        TelemetrySnapshot snapshot;
+        obdClient_.getSnapshot(snapshot);
+        bool milOn = snapshot.milOn.valid && snapshot.milOn.value != 0.0F;
+        if (milOn) {
+            currentPage_ = ClusterPage::Diagnostics;
+            return true;
+        }
     }
     if (within(x, y, layout::kModeToggleX0, 0, layout::kModeToggleX1, layout::kHeaderHeight)) {
         if (isConfigPage(currentPage_)) {
