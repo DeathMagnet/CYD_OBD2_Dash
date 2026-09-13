@@ -34,9 +34,19 @@ constexpr uint16_t kTouchPressureThreshold = 200;
 
 // ---- OBD-II / ELM327 Bluetooth Configuration ----
 // Adapter identity defaults; override per-device via src/secrets/local_config.h
-// (see src/secrets/local_config.example.h) rather than editing these.
+// (see src/secrets/local_config.example.h) rather than editing these. On-device,
+// the Config: OBD Adapter page lets a user pick from the preset lists below
+// instead, persisted via ConfigStore; local_config.h still always wins if present.
 constexpr const char* kObdDefaultAdapterName = "OBDII";
 constexpr const char* kObdDefaultAdapterPin = "1234";
+
+// Adapter name/PIN presets offered by the Config: OBD Adapter page's
+// tap-to-cycle rows (same interaction as the Logs page's log interval field).
+// kObdDefaultAdapterName/kObdDefaultAdapterPin above must equal options[0].
+constexpr const char* kObdAdapterNameOptions[] = {"OBDII", "OBDLink", "Vgate", "VEEPEAK", "OBD2"};
+constexpr size_t kObdAdapterNameOptionCount = 5;
+constexpr const char* kObdAdapterPinOptions[] = {"1234", "0000", "1111", "6789"};
+constexpr size_t kObdAdapterPinOptionCount = 4;
 
 constexpr uint32_t kObdResetCommandTimeoutMs = 3000;   // ATZ reset needs extra settle time
 constexpr uint32_t kObdCommandTimeoutMs = 1000;        // Normal AT/PID command timeout

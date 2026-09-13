@@ -22,6 +22,15 @@ struct AppSettings {
     uint8_t themeId = 2;
     bool useMetricUnits = false; // Display units (dashboard pages, config fields)
     bool useMetricLogs = false;  // CSV logging units
+
+    // ELM327 Bluetooth identity, picked from config::kObdAdapterNameOptions/
+    // kObdAdapterPinOptions on the Config: OBD Adapter page. Char arrays can't
+    // use the "= config::kDefaultX" style the fields above use, so they're
+    // defaulted in the constructor instead.
+    char obdAdapterName[24];
+    char obdAdapterPin[9];
+
+    AppSettings();
 };
 
 class ConfigStore {
@@ -43,6 +52,8 @@ public:
     void setThemeId(uint8_t id);
     void setUseMetricUnits(bool metric);
     void setUseMetricLogs(bool metric);
+    void setObdAdapterName(const char* name);
+    void setObdAdapterPin(const char* pin);
 
     // True whenever the current settings differ from the last saved/loaded
     // snapshot (a live comparison, not a sticky flag - reverting a value back
@@ -54,6 +65,11 @@ public:
     // whether log files get wiped when Save is tapped (wipe only once, only if
     // it actually changed relative to what's on SD).
     bool isLogUnitsDirty() const;
+
+    // True if the OBD adapter name or PIN has changed since the last save;
+    // used to gate the live Bluetooth reconnect when Save is tapped (only
+    // reconnect if the credentials actually changed relative to what's on SD).
+    bool isObdCredentialsDirty() const;
 
     // Persists the current settings to /config.txt. Returns false if the SD
     // card is unavailable or the write fails; clears isDirty() on success.

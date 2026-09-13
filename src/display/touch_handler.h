@@ -29,6 +29,7 @@ private:
     bool handleConfigGaugesTap(uint16_t x, uint16_t y, uint32_t nowMs);
     bool handleConfigUserVarsTap(uint16_t x, uint16_t y, uint32_t nowMs);
     bool handleConfigLogsTap(uint16_t x, uint16_t y, uint32_t nowMs);
+    bool handleConfigObdTap(uint16_t x, uint16_t y, uint32_t nowMs);
     bool handleConfigFooterTap(uint16_t x, uint16_t y, uint32_t nowMs);
     bool handleDiagnosticsTap(uint16_t x, uint16_t y, uint32_t nowMs);
     bool handlePerformanceTap(uint16_t x, uint16_t y);

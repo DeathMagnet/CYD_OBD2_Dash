@@ -72,7 +72,7 @@ void setup() {
 
     // 7. Start the ELM327 Bluetooth client on its own task so connecting/
     // polling never blocks the render loop below.
-    obdClient.begin();
+    obdClient.begin(configStore.settings().obdAdapterName, configStore.settings().obdAdapterPin);
 
     // 8. Draw Page 1 chrome; drawDynamic() in loop() fills in live values.
     displayManager.clear(TFT_BLACK);

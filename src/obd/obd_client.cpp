@@ -39,12 +39,25 @@ void decodeAllLinesForDtc(char* mutableBuffer, uint8_t modeAckByte, DtcList& out
 
 #endif // !OBD_SIMULATION_ENABLED
 
-bool ObdClient::begin() {
+bool ObdClient::begin(const char* adapterName, const char* adapterPin) {
     mutex_ = xSemaphoreCreateMutex();
     if (mutex_ == nullptr) {
         Serial.println("[OBD] Failed to create mutex; OBD disabled.");
         return false;
     }
+
+#if !OBD_SIMULATION_ENABLED
+    // Safe without locking: the task hasn't been created yet, so there's no
+    // concurrent reader of adapterName_/adapterPin_ until xTaskCreatePinnedToCore
+    // below returns.
+    strncpy(adapterName_, adapterName, sizeof(adapterName_) - 1);
+    adapterName_[sizeof(adapterName_) - 1] = '\0';
+    strncpy(adapterPin_, adapterPin, sizeof(adapterPin_) - 1);
+    adapterPin_[sizeof(adapterPin_) - 1] = '\0';
+#else
+    (void)adapterName;
+    (void)adapterPin;
+#endif
 
     BaseType_t created = xTaskCreatePinnedToCore(
         &ObdClient::taskEntry, "obd_task", config::kObdTaskStackWords, this,
@@ -270,6 +283,24 @@ void ObdClient::performClearCodes() {
     dtcResultReady_.store(false); // Force a fresh read next time Page 6 asks.
 }
 
+void ObdClient::updateAdapterCredentials(const char* adapterName, const char* adapterPin) {
+#if OBD_LOCAL_CONFIG_AVAILABLE
+    // secrets/local_config.h always wins; a live UI change has nothing to apply.
+    (void)adapterName;
+    (void)adapterPin;
+    return;
+#else
+    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
+        strncpy(pendingAdapterName_, adapterName, sizeof(pendingAdapterName_) - 1);
+        pendingAdapterName_[sizeof(pendingAdapterName_) - 1] = '\0';
+        strncpy(pendingAdapterPin_, adapterPin, sizeof(pendingAdapterPin_) - 1);
+        pendingAdapterPin_[sizeof(pendingAdapterPin_) - 1] = '\0';
+        xSemaphoreGive(mutex_);
+    }
+    credentialsChanged_.store(true);
+#endif
+}
+
 #endif // !OBD_SIMULATION_ENABLED
 
 void ObdClient::getSnapshot(TelemetrySnapshot& out) const {
@@ -287,6 +318,12 @@ void ObdClient::getDtcList(DtcList& out) const {
 }
 
 #if OBD_SIMULATION_ENABLED
+
+void ObdClient::updateAdapterCredentials(const char* adapterName, const char* adapterPin) {
+    // The simulator doesn't pair over real Bluetooth; nothing to apply.
+    (void)adapterName;
+    (void)adapterPin;
+}
 
 void ObdClient::runSimulationBlip() {
     // Holds the last snapshot untouched long enough for main.cpp to derive STALE,
@@ -370,26 +407,50 @@ void ObdClient::simulationLoop() {
 
 void ObdClient::taskLoop() {
 #if OBD_LOCAL_CONFIG_AVAILABLE
-    const char* adapterName = localconfig::kObdAdapterName;
-    const char* adapterPin = localconfig::kObdAdapterPin;
-#else
-    const char* adapterName = config::kObdDefaultAdapterName;
-    const char* adapterPin = config::kObdDefaultAdapterPin;
+    // secrets/local_config.h always wins over whatever ConfigStore passed to
+    // begin(), so adapterName_/adapterPin_ (and any later updateAdapterCredentials()
+    // call, which no-ops in this build) are irrelevant here.
+    strncpy(adapterName_, localconfig::kObdAdapterName, sizeof(adapterName_) - 1);
+    adapterName_[sizeof(adapterName_) - 1] = '\0';
+    strncpy(adapterPin_, localconfig::kObdAdapterPin, sizeof(adapterPin_) - 1);
+    adapterPin_[sizeof(adapterPin_) - 1] = '\0';
 #endif
+    // Without a local_config.h override, adapterName_/adapterPin_ already hold
+    // what begin() was given (the persisted ConfigStore values).
 
     btSerial_.begin("CYD_OBD_Dash", true); // Local device name; master role.
-    btSerial_.setPin(adapterPin);
+    btSerial_.setPin(adapterPin_);
 
     bool initialized = false;
 
     for (;;) {
+#if !OBD_LOCAL_CONFIG_AVAILABLE
+        if (credentialsChanged_.exchange(false)) {
+            if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
+                strncpy(adapterName_, pendingAdapterName_, sizeof(adapterName_) - 1);
+                adapterName_[sizeof(adapterName_) - 1] = '\0';
+                strncpy(adapterPin_, pendingAdapterPin_, sizeof(adapterPin_) - 1);
+                adapterPin_[sizeof(adapterPin_) - 1] = '\0';
+                xSemaphoreGive(mutex_);
+            }
+            Serial.printf("[OBD] Adapter credentials updated to '%s'; reconnecting.\n", adapterName_);
+            if (btSerial_.connected()) {
+                btSerial_.disconnect();
+            }
+            btSerial_.setPin(adapterPin_);
+            initialized = false;
+            reconnectBackoffMs_ = 0;
+            connectionState_.store(ConnectionState::ObdConnecting);
+        }
+#endif
+
         if (!btSerial_.connected()) {
             initialized = false;
             connectionState_.store(ConnectionState::ObdConnecting);
             setSnapshotConnected(false);
 
-            Serial.printf("[OBD] Connecting to '%s'...\n", adapterName);
-            if (!btSerial_.connect(String(adapterName))) {
+            Serial.printf("[OBD] Connecting to '%s'...\n", adapterName_);
+            if (!btSerial_.connect(String(adapterName_))) {
                 Serial.println("[OBD] Connect failed; backing off.");
                 connectionState_.store(ConnectionState::Reconnecting);
                 reconnectBackoffMs_ = (reconnectBackoffMs_ == 0)

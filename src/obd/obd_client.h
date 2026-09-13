@@ -43,8 +43,17 @@ public:
     ObdClient(const ObdClient&) = delete;
     ObdClient& operator=(const ObdClient&) = delete;
 
-    // Starts the background task. Call once from setup().
-    bool begin();
+    // Starts the background task. Call once from setup(), after ConfigStore
+    // has loaded, with the persisted adapter identity (ignored in simulation
+    // builds; also ignored on real hardware if secrets/local_config.h is
+    // present, since that always takes priority).
+    bool begin(const char* adapterName, const char* adapterPin);
+
+    // Thread-safe: updates the adapter identity used for the next (and all
+    // subsequent) connection attempts and forces an immediate reconnect
+    // instead of waiting for the current backoff/poll cycle. No-op in
+    // simulation builds and when secrets/local_config.h is present.
+    void updateAdapterCredentials(const char* adapterName, const char* adapterPin);
 
     // Thread-safe copy of the latest telemetry snapshot.
     void getSnapshot(TelemetrySnapshot& out) const;
@@ -85,6 +94,16 @@ private:
     void performClearCodes();
 
     BluetoothSerial btSerial_;
+
+    // Adapter identity currently in use by taskLoop(); adapterName_/adapterPin_
+    // are only ever touched from within taskLoop() itself. updateAdapterCredentials()
+    // writes the pending fields under mutex_ and sets credentialsChanged_;
+    // taskLoop() picks them up at the top of its next loop iteration.
+    char adapterName_[24] = {0};
+    char adapterPin_[9] = {0};
+    char pendingAdapterName_[24] = {0}; // Guarded by mutex_
+    char pendingAdapterPin_[9] = {0};   // Guarded by mutex_
+    std::atomic<bool> credentialsChanged_{false};
 #endif
 
     SemaphoreHandle_t mutex_ = nullptr;
