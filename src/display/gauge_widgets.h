@@ -46,6 +46,7 @@ namespace gaugewidgets {
 struct ArcGaugeState {
     float lastValueAngle = 0.0F;
     float lastMaxValue = 0.0F;
+    int32_t lastLitSegments = -1; // Segmented-style theme only; unused otherwise.
     bool needsFullRedraw = true;
 
     void invalidate() { needsFullRedraw = true; }
@@ -90,6 +91,7 @@ void drawGaugeBezel(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t rad
 // whenever the area behind the gauge is cleared (page redraw).
 struct BarGaugeState {
     int32_t lastFillWidth = -1;
+    int32_t lastLitSegments = -1; // Segmented-style theme only; unused otherwise.
     bool needsFullRedraw = true;
 
     void invalidate() { needsFullRedraw = true; }

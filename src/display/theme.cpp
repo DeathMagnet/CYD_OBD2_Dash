@@ -32,6 +32,8 @@ ThemeColors kModernFlatTheme = {
     false,  // showGaugeBezel
     true,   // showOuterTicks
     false,  // useSevenSegmentFont
+    false,  // useSegmentedBars
+    false,  // useSegmentedArcs
     labels::kThemeNameModernFlat,
     {},     // valueFonts: initialized via initializeThemeFonts()
     {},     // numberedFonts: not used
@@ -60,6 +62,8 @@ ThemeColors kTorqueNeonTheme = {
     false,  // showGaugeBezel
     true,   // showOuterTicks
     false,  // useSevenSegmentFont
+    false,  // useSegmentedBars
+    false,  // useSegmentedArcs
     labels::kThemeNameTorqueNeon,
     {},     // valueFonts: initialized via initializeThemeFonts()
     {},     // numberedFonts: not used
@@ -88,6 +92,8 @@ constexpr ThemeColors kMustangS197Theme = {
     true,   // showGaugeBezel: OEM chrome ring around round gauges
     false,  // showOuterTicks: only the inner tick segment is shown
     true,   // useSevenSegmentFont: TFT_eSPI Font 7 for large readouts
+    true,   // useSegmentedBars: OEM-style segmented LED bar look
+    true,   // useSegmentedArcs: OEM-style segmented LED ring look
     labels::kThemeNameMustangS197,
     {},     // valueFonts: nullptr array (use default GLCD font)
     {0, 7, 7}, // numberedFonts: Font 7 (7-segment LCD) for tiers 3/4 (boost/vacuum and RPM/Speed); tier 2 (drawValueBox) stays on default

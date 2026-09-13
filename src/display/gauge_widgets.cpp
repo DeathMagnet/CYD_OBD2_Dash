@@ -7,6 +7,16 @@ namespace {
 constexpr float kGaugeStartAngle = 30.0F;
 constexpr float kGaugeEndAngle = 330.0F;
 constexpr int32_t kArcThicknessPx = 12;
+
+// Segmented-arc LED color for one wedge: danger/caution zones always win (they're a
+// fixed-position overlay, not "unlocked" by the value reaching them), otherwise lit
+// vs. unlit by whether this segment's index falls under the current value fill.
+uint16_t segmentedArcColor(int32_t index, int32_t litSegments, bool hasCaution, int32_t cautionSegmentIndex,
+                            bool hasDanger, int32_t dangerSegmentIndex, const ThemeColors& theme) {
+    if (hasDanger && index >= dangerSegmentIndex) return theme.dangerArc;
+    if (hasCaution && index >= cautionSegmentIndex) return theme.cautionArc;
+    return (index < litSegments) ? theme.primaryGaugeArc : theme.secondaryGaugeArc;
+}
 } // namespace
 
 void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t centerY, int32_t radius,
@@ -25,6 +35,52 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
     float clampedCautionStart = cautionStart > clampedDangerStart ? clampedDangerStart : cautionStart;
     bool hasCaution = clampedCautionStart < clampedDangerStart;
     bool hasDanger = clampedDangerStart < maxValue;
+
+    if (theme.useSegmentedArcs) {
+        constexpr float kSegmentAngleWidthDeg = 6.0F; // LED segment angular width, degrees -- tune here.
+        constexpr float kSegmentGapDeg = 2.0F;        // gap between segments, degrees -- tune here.
+        constexpr float kSegmentPitchDeg = kSegmentAngleWidthDeg + kSegmentGapDeg;
+        constexpr float kSweepDeg = kGaugeEndAngle - kGaugeStartAngle;
+
+        int32_t numSegments = static_cast<int32_t>((kSweepDeg + kSegmentGapDeg) / kSegmentPitchDeg);
+        if (numSegments < 1) numSegments = 1;
+        int32_t litSegments = static_cast<int32_t>(valueFraction * static_cast<float>(numSegments) + 0.5F);
+        if (litSegments > numSegments) litSegments = numSegments;
+
+        int32_t cautionSegmentIndex = hasCaution
+            ? static_cast<int32_t>((clampedCautionStart / maxValue) * static_cast<float>(numSegments) + 0.5F)
+            : numSegments;
+        int32_t dangerSegmentIndex = hasDanger
+            ? static_cast<int32_t>((clampedDangerStart / maxValue) * static_cast<float>(numSegments) + 0.5F)
+            : numSegments;
+
+        int32_t from = 0;
+        int32_t to = numSegments;
+        bool doDelta = !state.needsFullRedraw && maxValue == state.lastMaxValue;
+        if (doDelta) {
+            if (litSegments == state.lastLitSegments) {
+                return;
+            }
+            from = litSegments < state.lastLitSegments ? litSegments : state.lastLitSegments;
+            to = litSegments > state.lastLitSegments ? litSegments : state.lastLitSegments;
+        }
+
+        for (int32_t i = from; i < to; ++i) {
+            float segStart = kGaugeStartAngle + static_cast<float>(i) * kSegmentPitchDeg;
+            float segEnd = segStart + kSegmentAngleWidthDeg;
+            tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
+                               static_cast<uint32_t>(segStart), static_cast<uint32_t>(segEnd),
+                               segmentedArcColor(i, litSegments, hasCaution, cautionSegmentIndex,
+                                                  hasDanger, dangerSegmentIndex, theme),
+                               bgColor, false);
+        }
+
+        state.lastLitSegments = litSegments;
+        state.lastValueAngle = valueAngle;
+        state.lastMaxValue = maxValue;
+        state.needsFullRedraw = false;
+        return;
+    }
 
     // The caution/danger zones paint over the value arc, so inside them the fill
     // state is invisible and only the sweep below zoneStartAngle ever needs repainting.
@@ -172,8 +228,48 @@ void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int
                    float percent, uint16_t fillColor, const ThemeColors& theme) {
     float clamped = percent < 0.0F ? 0.0F : (percent > 100.0F ? 100.0F : percent);
     int32_t innerWidth = width - 4;
+    int32_t innerX = x + 2, innerY = y + 2, innerH = height - 4;
+
+    if (theme.useSegmentedBars) {
+        constexpr int32_t kSegmentWidthPx = 8; // LED segment width, px -- tune here.
+        constexpr int32_t kSegmentGapPx = 3;   // gap between segments, px -- tune here.
+        constexpr int32_t kSegmentPitchPx = kSegmentWidthPx + kSegmentGapPx;
+
+        int32_t numSegments = (innerWidth + kSegmentGapPx) / kSegmentPitchPx;
+        if (numSegments < 1) numSegments = 1;
+        int32_t litSegments = static_cast<int32_t>(clamped / 100.0F * static_cast<float>(numSegments) + 0.5F);
+        if (litSegments > numSegments) litSegments = numSegments;
+
+        if (!state.needsFullRedraw) {
+            if (litSegments == state.lastLitSegments) {
+                return;
+            }
+            if (litSegments > state.lastLitSegments) {
+                // Grew: light the newly lit segments.
+                for (int32_t i = state.lastLitSegments; i < litSegments; ++i) {
+                    tft.fillRect(innerX + i * kSegmentPitchPx, innerY, kSegmentWidthPx, innerH, fillColor);
+                }
+            } else {
+                // Shrank: darken the newly unlit segments.
+                for (int32_t i = litSegments; i < state.lastLitSegments; ++i) {
+                    tft.fillRect(innerX + i * kSegmentPitchPx, innerY, kSegmentWidthPx, innerH, theme.panel);
+                }
+            }
+            state.lastLitSegments = litSegments;
+            return;
+        }
+
+        tft.drawRect(x, y, width, height, theme.bezel);
+        tft.fillRect(innerX, innerY, innerWidth, innerH, theme.panel); // clears unlit segments + gaps in one call
+        for (int32_t i = 0; i < litSegments; ++i) {
+            tft.fillRect(innerX + i * kSegmentPitchPx, innerY, kSegmentWidthPx, innerH, fillColor);
+        }
+        state.lastLitSegments = litSegments;
+        state.needsFullRedraw = false;
+        return;
+    }
+
     int32_t fillWidth = static_cast<int32_t>((clamped / 100.0F) * innerWidth);
-    int32_t innerY = y + 2, innerH = height - 4;
 
     if (!state.needsFullRedraw) {
         if (fillWidth == state.lastFillWidth) {
