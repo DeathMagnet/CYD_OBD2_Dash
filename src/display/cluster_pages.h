@@ -144,6 +144,15 @@ private:
     void drawHeader(ClusterPage page, bool milOn);
     void drawStatusStrip(ConnectionState connectionState, bool sdLoggingActive);
 
+    // Applies the given "large text" size for a readout that would otherwise use
+    // setTextSize(3+) on the default font. Under a theme with useSevenSegmentFont,
+    // swaps to TFT_eSPI's built-in Font 7 (7-segment LED look; digits + ':' '.' '-'
+    // only) at its native size instead of scaling the default font. Always pair
+    // with endLargeText() before drawing any other text, since font selection is
+    // sticky in TFT_eSPI.
+    void beginLargeText(uint8_t size);
+    void endLargeText();
+
     void drawPage1Static();
     void drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs);
     void drawPage2Static();

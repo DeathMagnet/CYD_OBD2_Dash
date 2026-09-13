@@ -99,8 +99,11 @@ void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int
 
 // A caption above a large numeric readout. Renders "--" in textSecondary
 // when !valid rather than a fabricated zero (see coding standards).
+// labelTextSize/valueTextSize default to every existing caller's current
+// sizes (1 and 2); pass larger values to bump just this call site.
 void drawValueBox(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width,
-                   const char* label, const char* formattedValue, bool valid, const ThemeColors& theme);
+                   const char* label, const char* formattedValue, bool valid, const ThemeColors& theme,
+                   uint8_t labelTextSize = 1, uint8_t valueTextSize = 2);
 
 // drawString() repaints only the glyph box of the new string, so a readout that
 // loses a character leaves the previous, wider one's outer columns on screen. Use
