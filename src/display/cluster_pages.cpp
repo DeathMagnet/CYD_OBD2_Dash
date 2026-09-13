@@ -247,7 +247,7 @@ void ClusterPages::drawPage2Static() {
     loadArc_.invalidate();
     stftBar_.invalidate();
     ltftBar_.invalidate();
-    tft_.fillRoundRect(250, 50, 220, 100, 6, theme_.panel);
+    tft_.fillRoundRect(250, 50, 220, 110, 6, theme_.panel);
     tft_.fillRoundRect(20, 220, 210, 80, 6, theme_.panel);
     tft_.fillRoundRect(250, 220, 210, 80, 6, theme_.panel);
 }
@@ -284,7 +284,7 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     gaugewidgets::drawFieldText(tft_, peakBuf, 360, 96, 200, theme_.panel);
 
     snprintf(buf, sizeof(buf), "%.1f deg", snapshot.timingAdvanceDeg.value);
-    gaugewidgets::drawValueBox(tft_, 260, 108, 200, "TIMING ADVANCE", buf, snapshot.timingAdvanceDeg.valid, theme_);
+    gaugewidgets::drawValueBox(tft_, 260, 118, 200, "TIMING ADVANCE", buf, snapshot.timingAdvanceDeg.valid, theme_);
 
     tft_.setTextDatum(TC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
