@@ -75,6 +75,13 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
 void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, float value, float maxValue,
                      float minorInterval, float majorInterval, float excludeFromValue, const ThemeColors& theme);
 
+// Decorative ring drawn just outside a round arc gauge's outer edge (OEM
+// chrome bezel look). No-op unless theme.showGaugeBezel is set, so callers
+// can invoke it unconditionally. Static chrome — call once from the owning
+// page's drawStatic(), with centerX/centerY/radius matching the paired
+// drawArcGauge() call exactly.
+void drawGaugeBezel(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, const ThemeColors& theme);
+
 // Lets a bar gauge repaint only the sliver of fill that changed between
 // frames instead of clearing and redrawing the whole bar. Call invalidate()
 // whenever the area behind the gauge is cleared (page redraw).

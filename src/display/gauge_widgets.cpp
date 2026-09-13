@@ -143,9 +143,22 @@ void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t rad
         int32_t xInner1 = centerX + static_cast<int32_t>(dirX * innerRadius);
         int32_t yInner1 = centerY + static_cast<int32_t>(dirY * innerRadius);
 
-        uint16_t tickColor = (value >= tickValue) ? theme.primaryGaugeArc : theme.secondaryGaugeArc;
-        tft.drawLine(xOuter0, yOuter0, xOuter1, yOuter1, tickColor);  // outside: radius to radius+tickLen
+        uint16_t tickColor = (value >= tickValue) ? theme.primaryGaugeArc : theme.tickInactiveColor;
+        if (theme.showOuterTicks) {
+            tft.drawLine(xOuter0, yOuter0, xOuter1, yOuter1, tickColor);  // outside: radius to radius+tickLen
+        }
         tft.drawLine(xInner0, yInner0, xInner1, yInner1, tickColor);   // inside: innerRadius-tickLen to innerRadius
+    }
+}
+
+void drawGaugeBezel(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, const ThemeColors& theme) {
+    if (!theme.showGaugeBezel) {
+        return;
+    }
+    constexpr int32_t kBezelGap = 2;       // px between the arc's outer edge and the ring
+    constexpr int32_t kBezelThickness = 4; // ring width in px
+    for (int32_t i = 0; i < kBezelThickness; ++i) {
+        tft.drawCircle(centerX, centerY, radius + kBezelGap + i, theme.bezel);
     }
 }
 

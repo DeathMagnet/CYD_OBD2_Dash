@@ -11,13 +11,14 @@ This document provides complete, technical design and implementation instruction
 The dashboard displays all six dashboard pages (1–4 and 6) plus five dedicated config pages (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER), with these deliberate deviations from the design above:
 
 - **All on-screen text is centralized.** Every label, unit, button text, page title, and status string shown in this spec is sourced from `src/labels.h` (`namespace labels`) rather than hardcoded in drawing code. The source of truth for display text is the labels constants in that header file, not the literal strings you see documented below.
-- **Modern Flat and Torque Neon are implemented; Mustang S197 is reserved.** `getTheme()` (`src/display/theme.cpp`) returns the Torque Neon palette for `ThemeId::TorqueNeon` and the Modern Flat palette for `ThemeId::ModernFlat` (also the fallback for the unimplemented `ThemeId::MustangS197`). The UI config page's "Active Theme" row has a tap-to-cycle button (mirroring the Units row) that toggles between the two implemented themes, persists the choice, and immediately recolors the visible page.
+- **All three themes are implemented.** `getTheme()` (`src/display/theme.cpp`) returns the Mustang S197, Torque Neon, or Modern Flat palette for the corresponding `ThemeId`. The UI config page's "Active Theme" row has a tap-to-cycle button (mirroring the Units row) that rotates through all three themes (Modern Flat -> Torque Neon -> Mustang S197 -> Modern Flat), persists the choice, and immediately recolors the visible page.
 - **Page organization: Dashboard group vs. Config group.** Dashboard pages (1–4, 6) form one group; config pages (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER) form another. The header includes a mode toggle button: a steering wheel icon when viewing dashboard pages (tap to switch to the last-visited config page), and a cog icon when viewing config pages (tap to switch to the last-visited dashboard page). Prev/next navigation arrows cycle only within the active group, never across both groups.
 - **Direct-to-TFT rendering, not sprites.** This board's ESP32-32E has no PSRAM, and a full-frame RGB565 sprite (~300KB) does not fit in 320KB of SRAM alongside the Bluetooth stack and SD buffers. Each page has a `drawStatic()` pass (chrome/labels, called once per page change) and a `drawDynamic()` pass (values only, called on a throttled `config::kUiRefreshIntervalMs` cadence) that redraws its own bounded region using TFT_eSPI's background-color text redraw to avoid flicker. There is no slide/fade page-transition animation; page switches redraw immediately.
 - **OBDII connection status badge.** The badge in the header displays the connection state with context-sensitive colors: green for `Live` (connected), blue for `Reconnecting`/`ObdConnecting`/`DisplayReady` (in progress), and crimson for `Boot`/`SdInit`/`Stale`/`Degraded` (error/disconnected).
 - **RPM warning arc**: drawn as two solid zones, not a gradient, via `gaugewidgets::drawArcGauge`'s `cautionStart`/`dangerStart` parameters — orange (`theme.cautionArc`) from the GAUGES config page's "Shift Light RPM" setting (default 5800) up to its "Redline RPM" setting (default 6200), then red (`theme.dangerArc`) held from Redline RPM out to the end of the arc, so the sweep never drops back to unlit track.
 - **Onboard RGB status LED** (`StatusLed::update()` in `src/system/status_led.cpp`): Mirrors the shift/MIL indication with a three-state behavior — flashes the theme's `warningActive` color (same 200 ms cadence as the Page-1 shift-light RPM text flash) whenever RPM is at or above Shift Light RPM, taking priority over a steady-red Check Engine (MIL) indication so the flash is never visually masked; falls back to steady red for MIL alone (when RPM is below Shift Light RPM); off otherwise.
-- **Gauge tick marks** (Page 1 RPM/Speed gauges): radial tick marks drawn as two short segments flanking the arc ring — one just outside the outer edge, one just inside the inner edge — at fixed value intervals (RPM: every 500, major every 1000; Speed: every 10, major every 50). Each tick is colored `primaryGaugeArc` once the needle has passed that value and `secondaryGaugeArc` while still short of it, providing an at-a-glance "how far past this mark" reference. Ticks are not drawn inside the RPM redline zone (where the arc is already solid red). Toggleable on the Config: UI page via a "GAUGE TICKS" ON/OFF button (default: ON).
+- **Gauge tick marks** (Page 1 RPM/Speed gauges): radial tick marks drawn as two short segments flanking the arc ring — one just outside the outer edge, one just inside the inner edge — at fixed value intervals (RPM: every 500, major every 1000; Speed: every 10, major every 50). Each tick is colored `primaryGaugeArc` once the needle has passed that value and `theme.tickInactiveColor` while still short of it (a field independent of the arc's own `secondaryGaugeArc` track color, so a theme can give ticks a different "unlit" color than the track), providing an at-a-glance "how far past this mark" reference. Ticks are not drawn inside the RPM redline zone (where the arc is already solid red). The outer segment is itself gated by `theme.showOuterTicks` — Mustang S197 sets this false and shows only the inner segment, while the other two themes show both. Toggleable on the Config: UI page via a "GAUGE TICKS" ON/OFF button (default: ON).
+- **Round-gauge chrome bezel** (Page 1 RPM/Speed, Page 2 Engine Load, Page 3 Vacuum/Boost): `gaugewidgets::drawGaugeBezel()` draws a decorative ring just outside each round gauge's outer edge, gated by `theme.showGaugeBezel` — on (4px thick, chrome-colored) for Mustang S197, off for the other two themes.
 - **Page 6 DTC list shows codes only** (e.g. `P0133`), not human-readable descriptions — no DTC description database is included. A read is triggered automatically whenever Page 6 is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
 - **Config pages: UI / GAUGES / USER VARS / LOGS / OBD ADAPTER.** Settings are organized into five focused pages with a shared Save button at the bottom. Each config page displays the Save button (green when any value differs from what's saved on SD, default color when everything matches); tapping it persists all settings across all config pages to `/config.txt` on the SD card and displays "SAVED!" feedback. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space. Saving the OBD ADAPTER page also forces an immediate Bluetooth reconnect using the newly saved adapter name/PIN (no reboot needed), unless `secrets/local_config.h` is present, which always takes priority over the on-device selection.
 - **Actual source layout** differs from the "Proposed" structure at the bottom of this doc — see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#proposed-source-layout) for the as-built tree.
@@ -29,8 +30,10 @@ The dashboard displays all six dashboard pages (1–4 and 6) plus five dedicated
 The UI supports three distinct visual themes switchable at runtime or persisted via config.
 
 ### 1. Mustang OEM S197 Theme
-- **Inspiration**: 2005–2010 Ford Mustang S197 instrument cluster.
-- **Color Palette**: Ice Blue / MyColor cyan dials (`0x051D`), metallic chrome bezels (`0xC618`), vibrant red needle (`0xF800`), deep midnight background (`0x0821`).
+- **Inspiration**: 2005–2010 Ford Mustang S197 instrument cluster, restyled with an LED-backlit gauge face.
+- **Color Palette**: Deep midnight navy background (`0x0821`), metallic chrome bezels and needle cap (`0xC618`), vibrant red needle (`0xF800`), LED-green primary text and gauge arc fill (`0x07E0`), soft LED-green secondary text (`0x5D8D`), black unswept arc track (`0x0000`).
+- **Tick Marks**: Silver (`0xC618`) before the needle reaches them, switching to LED green once passed; only the inner segment is drawn (the outer segment other themes show is suppressed for this theme).
+- **Gauge Bezel**: A decorative 4px-thick chrome ring drawn just outside each round gauge (RPM, Speed, Engine Load, Vacuum/Boost) — not shown on the other two themes.
 - **Typography**: Retro-block / racing numerals, tick marks every 500 RPM / 10 MPH.
 
 ### 2. Torque Neon Theme
@@ -48,35 +51,7 @@ The UI supports three distinct visual themes switchable at runtime or persisted 
 
 ### Implementation Structure (`src/display/theme.h`)
 
-```cpp
-#pragma once
-#include <stdint.h>
-
-enum class ThemeId : uint8_t {
-    MustangS197 = 0,
-    TorqueNeon  = 1,
-    ModernFlat  = 2
-};
-
-struct ThemeColors {
-    uint16_t background;
-    uint16_t primaryGaugeArc;
-    uint16_t secondaryGaugeArc;
-    uint16_t needle;
-    uint16_t needleCap;
-    uint16_t cautionArc;
-    uint16_t dangerArc;
-    uint16_t bezel;
-    uint16_t textPrimary;
-    uint16_t textSecondary;
-    uint16_t warningActive;
-    uint16_t touchHighlight;
-    uint16_t unsavedActive;  // Save button fill while a config page has unsaved changes (green).
-    uint16_t liveActive;     // OBDII status badge while ConnectionState::Live (green).
-};
-
-const ThemeColors& getTheme(ThemeId id);
-```
+`ThemeId` (`MustangS197 = 0`, `TorqueNeon = 1`, `ModernFlat = 2`) selects a `const ThemeColors&` from `getTheme()`. `ThemeColors` holds every themeable color (background, panel, gauge arc/needle/bezel/text colors, tick colors, warning/highlight/save-button/connection-badge colors) plus a couple of per-theme booleans that toggle whole visual features on or off (`showGaugeBezel`, `showOuterTicks`) and the display name shown on the Config: UI page. Treat `src/display/theme.h` as the authoritative field list rather than a copy here — it has grown several times as themes gained features (most recently the Mustang S197 tick/bezel work), and a duplicated struct in this doc is exactly what goes stale.
 
 ---
 
@@ -156,7 +131,7 @@ Header layout:
 +-------------------------------------------------------------------+
 ```
 - `[<]` — Previous Page (within current group)
-- `●SD` — SD logging activity light (green when logging, red when inactive)
+- `●SD` — SD logging activity light (green when logging, dark green when inactive; same on every theme)
 - `PAGE TITLE` — Name of current page
 - `[OBDII]` — Connection status badge (green=Live, blue=Connecting, crimson=Error)
 - `⚙️` or `🧭` — Mode toggle button (cog when on dashboard → tap to go to config; steering wheel when on config → tap to go to dashboard)
@@ -244,7 +219,7 @@ Settings for display appearance and unit system.
 
 | Setting Field | Options / Range | Default | Description |
 | --- | --- | --- | --- |
-| **Active Theme** | Torque Neon, Modern Flat (Mustang S197 reserved, not yet switchable) | Modern Flat | UI visual style; tap-to-cycle button toggles between the implemented themes |
+| **Active Theme** | Modern Flat, Torque Neon, Mustang S197 | Modern Flat | UI visual style; tap-to-cycle button rotates through all three themes |
 | **Units** | Standard (MPH/°F/PSI), Metric (KM/H/°C/KPA) | Standard | Display units for speed, temperature, and pressure. Affects all dashboard pages and config field labels/steppers. Does not affect CSV logging (see LOGS page). |
 | **Gauge Ticks** | On, Off | On | Radial tick marks on the RPM/Speed gauge scales (every 500/1000 RPM, every 10/50 MPH or KM/H); tap-to-cycle toggle |
 
@@ -337,7 +312,7 @@ src/
 - [ ] All 6 dashboard pages (1–4, 6) render cleanly at 480×320 landscape resolution.
 - [ ] All 5 config pages (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER) render cleanly.
 - [ ] OBD ADAPTER page's Adapter Name/PIN tap-to-cycle buttons work, and tapping Save with a changed value forces an immediate Bluetooth reconnect without a reboot.
-- [ ] Theme switching (Modern Flat <-> Torque Neon, via the UI page's Active Theme cycle button) immediately recolors gauges, bezels, needles, and text, and the selection survives Save + reboot.
+- [ ] Theme switching (Modern Flat -> Torque Neon -> Mustang S197 -> Modern Flat, via the UI page's Active Theme cycle button) immediately recolors gauges, bezels, needles, and text, and the selection survives Save + reboot.
 - [ ] Page 1 RPM gauge correctly displays the orange Shift Light-to-Redline arc and the red Redline-to-max arc, holds the red zone to the end of the sweep, and triggers bezel shift light flash.
 - [ ] Shift Light RPM and Redline RPM on GAUGES page control the arc colors correctly.
 - [ ] Needles perform a smooth full-scale sweep on boot and update continuously without jitter.
