@@ -20,16 +20,17 @@ void ClusterPages::drawHeader(ClusterPage page, bool milOn) {
     tft_.drawString(">", (layout::kNavNextX0 + layout::kNavNextX1) / 2, layout::kHeaderHeight / 2);
 
     static const char* kTitles[] = {
-        "PAGE 1: PRIMARY CLUSTER",       "PAGE 2: ENGINE LOAD & AIRFLOW",
-        "PAGE 3: CAR-SPECIFIC SENSORS",  "PAGE 4: MY CAR PERFORMANCE",
-        "PAGE 5: CONFIG MENU",           "PAGE 6: DIAGNOSTICS",
+        "PRIMARY CLUSTER", "ENGINE LOAD", "CAR-SPECIFIC", "PERFORMANCE", "DIAGNOSTICS", "UI",
+        "GAUGES", "USER VARS", "LOGS",
     };
-    tft_.setTextDatum(ML_DATUM);
+    tft_.setTextDatum(MC_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.panel);
     tft_.setTextSize(1);
-    tft_.drawString(kTitles[static_cast<uint8_t>(page)], layout::kNavTitleX0 + 4, layout::kHeaderHeight / 2);
+    tft_.drawString(kTitles[static_cast<uint8_t>(page)], layout::kNavTitleCenterX, layout::kHeaderHeight / 2);
 
     gaugewidgets::drawMilIndicator(tft_, layout::kMilCenterX, layout::kMilCenterY, milOn, theme_);
+    gaugewidgets::drawModeToggleButton(tft_, layout::kModeToggleCenterX, layout::kModeToggleCenterY,
+                                        !isConfigPage(page), theme_);
 }
 
 void ClusterPages::drawStatusStrip(ConnectionState connectionState, bool sdLoggingActive) {
@@ -37,23 +38,26 @@ void ClusterPages::drawStatusStrip(ConnectionState connectionState, bool sdLoggi
     uint16_t color;
     switch (connectionState) {
         case ConnectionState::Live:
+            color = theme_.liveActive;
+            break;
+        case ConnectionState::Reconnecting:
+        case ConnectionState::ObdConnecting:
+        case ConnectionState::DisplayReady:
             color = theme_.primaryGaugeArc;
             break;
-        case ConnectionState::ObdConnecting:
         case ConnectionState::Boot:
         case ConnectionState::SdInit:
-            color = theme_.secondaryGaugeArc;
-            break;
-        default: // Stale, Reconnecting, Degraded
+        case ConnectionState::Stale:
+        case ConnectionState::Degraded:
             color = theme_.warningActive;
             break;
     }
 
-    constexpr int32_t kBadgeX = 264, kBadgeY = 9, kBadgeW = 82, kBadgeH = 22;
-    gaugewidgets::drawStatusBadge(tft_, kBadgeX, kBadgeY, kBadgeW, kBadgeH, label, color, theme_.background);
+    gaugewidgets::drawStatusBadge(tft_, layout::kBadgeX, layout::kBadgeY, layout::kBadgeW, layout::kBadgeH, label,
+                                   color, theme_.background);
 
     uint16_t sdColor = sdLoggingActive ? theme_.primaryGaugeArc : theme_.warningActive;
-    tft_.fillCircle(kBadgeX - 12, kBadgeY + kBadgeH / 2, 5, sdColor);
+    tft_.fillCircle(layout::kSdLightCenterX, layout::kSdLightCenterY, layout::kSdLightRadius, sdColor);
 }
 
 // ---------------------------------------------------------------- Dispatch --
@@ -67,9 +71,15 @@ void ClusterPages::drawStatic(ClusterPage page, const TelemetrySnapshot& snapsho
         case ClusterPage::EngineLoadAirflow: drawPage2Static(); break;
         case ClusterPage::CarSpecificSensors: drawPage3Static(); break;
         case ClusterPage::PerformanceTelemetry: drawPage4Static(); break;
-        case ClusterPage::ConfigMenu: drawPage5Static(); break;
+        case ClusterPage::ConfigUi: drawConfigUiStatic(); break;
+        case ClusterPage::ConfigGauges: drawConfigGaugesStatic(); break;
+        case ClusterPage::ConfigUserVars: drawConfigUserVarsStatic(); break;
+        case ClusterPage::ConfigLogs: drawConfigLogsStatic(); break;
         case ClusterPage::Diagnostics: drawPage6Static(); break;
         default: break;
+    }
+    if (isConfigPage(page)) {
+        drawConfigFooterStatic();
     }
 }
 
@@ -84,9 +94,15 @@ void ClusterPages::drawDynamic(ClusterPage page, const TelemetrySnapshot& snapsh
         case ClusterPage::EngineLoadAirflow: drawPage2Dynamic(snapshot, nowMs); break;
         case ClusterPage::CarSpecificSensors: drawPage3Dynamic(snapshot, nowMs); break;
         case ClusterPage::PerformanceTelemetry: drawPage4Dynamic(snapshot, nowMs); break;
-        case ClusterPage::ConfigMenu: drawPage5Dynamic(nowMs); break;
+        case ClusterPage::ConfigUi: drawConfigUiDynamic(nowMs); break;
+        case ClusterPage::ConfigGauges: drawConfigGaugesDynamic(nowMs); break;
+        case ClusterPage::ConfigUserVars: drawConfigUserVarsDynamic(nowMs); break;
+        case ClusterPage::ConfigLogs: drawConfigLogsDynamic(nowMs); break;
         case ClusterPage::Diagnostics: drawPage6Dynamic(snapshot, nowMs); break;
         default: break;
+    }
+    if (isConfigPage(page)) {
+        drawConfigFooterDynamic(nowMs);
     }
 }
 
@@ -433,13 +449,13 @@ void ClusterPages::drawPage4Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     }
 }
 
-// ---------------------------------------------------------------- Page 5: Config Menu --
+// ---------------------------------------------------------------- Config: UI --
 
-void ClusterPages::drawPage5Static() {
+void ClusterPages::drawConfigUiStatic() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
 
-    for (int i = 0; i <= 7; ++i) {
+    for (int i = 0; i <= 1; ++i) {
         int32_t y = layout::kHeaderHeight + i * layout::kConfigRowHeight;
         tft_.drawFastHLine(0, y, layout::kScreenWidth, theme_.bezel);
     }
@@ -448,10 +464,86 @@ void ClusterPages::drawPage5Static() {
     tft_.setTextColor(theme_.textPrimary, theme_.background);
     tft_.setTextSize(1);
     tft_.drawString("ACTIVE THEME", 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
-    tft_.drawString("SHIFT LIGHT RPM", 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
-    tft_.drawString("REDLINE RPM", 12, layout::kConfigRow2Y + layout::kConfigRowHeight / 2);
-    tft_.drawString("LOG INTERVAL", 12, layout::kConfigRow3Y + layout::kConfigRowHeight / 2);
-    tft_.drawString("BOOST BARO BASELINE", 12, layout::kConfigRow4Y + layout::kConfigRowHeight / 2);
+
+    // Theme name never changes today (only one theme exists), so it only
+    // needs to be drawn once here rather than every drawConfigUiDynamic() tick.
+    tft_.setTextDatum(MC_DATUM);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    tft_.setTextSize(1);
+    tft_.drawString("MODERN FLAT (ACTIVE) - OTHERS COMING SOON", (layout::kConfigMinusX + layout::kScreenWidth) / 2,
+                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+}
+
+void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
+    (void)nowMs;
+}
+
+// ---------------------------------------------------------------- Config: User Vars --
+
+void ClusterPages::drawConfigUserVarsStatic() {
+    tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
+                  theme_.background);
+
+    for (int i = 0; i <= 1; ++i) {
+        int32_t y = layout::kHeaderHeight + i * layout::kConfigRowHeight;
+        tft_.drawFastHLine(0, y, layout::kScreenWidth, theme_.bezel);
+    }
+
+    tft_.setTextDatum(ML_DATUM);
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    tft_.setTextSize(1);
+    tft_.drawString("BOOST BARO BASELINE", 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+
+    tft_.drawRoundRect(layout::kConfigMinusX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
+                        layout::kConfigMinusW, layout::kConfigButtonH, 4, theme_.bezel);
+    tft_.drawRoundRect(layout::kConfigPlusX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
+                        layout::kConfigPlusW, layout::kConfigButtonH, 4, theme_.bezel);
+    tft_.setTextDatum(MC_DATUM);
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    tft_.setTextSize(2);
+    tft_.drawString("-", layout::kConfigMinusX + layout::kConfigMinusW / 2,
+                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+    tft_.drawString("+", layout::kConfigPlusX + layout::kConfigPlusW / 2,
+                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+
+    // Force drawConfigUserVarsDynamic() to repaint every region the next time
+    // it runs, since the static redraw above just wiped them all.
+    runtimeState_.cfgBaroBaselineDrawn[0] = '\0';
+}
+
+void ClusterPages::drawConfigUserVarsDynamic(uint32_t nowMs) {
+    (void)nowMs;
+    const AppSettings& settings = configStore_.settings();
+    char buf[24];
+
+    snprintf(buf, sizeof(buf), "%.1f PSI", settings.baroBaselinePsi);
+    if (strcmp(buf, runtimeState_.cfgBaroBaselineDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
+                                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgBaroBaselineDrawn, buf, sizeof(runtimeState_.cfgBaroBaselineDrawn) - 1);
+    }
+}
+
+// ---------------------------------------------------------------- Config: Gauges --
+
+void ClusterPages::drawConfigGaugesStatic() {
+    tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
+                  theme_.background);
+
+    for (int i = 0; i <= 2; ++i) {
+        int32_t y = layout::kHeaderHeight + i * layout::kConfigRowHeight;
+        tft_.drawFastHLine(0, y, layout::kScreenWidth, theme_.bezel);
+    }
+
+    tft_.setTextDatum(ML_DATUM);
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    tft_.setTextSize(1);
+    tft_.drawString("SHIFT LIGHT RPM", 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+    tft_.drawString("REDLINE RPM", 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
 
     auto drawMinusPlusChrome = [&](int32_t rowY) {
         tft_.drawRoundRect(layout::kConfigMinusX, rowY + layout::kConfigButtonInsetY, layout::kConfigMinusW,
@@ -464,34 +556,17 @@ void ClusterPages::drawPage5Static() {
         tft_.drawString("-", layout::kConfigMinusX + layout::kConfigMinusW / 2, rowY + layout::kConfigRowHeight / 2);
         tft_.drawString("+", layout::kConfigPlusX + layout::kConfigPlusW / 2, rowY + layout::kConfigRowHeight / 2);
     };
+    drawMinusPlusChrome(layout::kConfigRow0Y);
     drawMinusPlusChrome(layout::kConfigRow1Y);
-    drawMinusPlusChrome(layout::kConfigRow2Y);
-    drawMinusPlusChrome(layout::kConfigRow4Y);
 
-    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow3Y + layout::kConfigButtonInsetY,
-                        layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
-
-    // Theme name never changes today (only one theme exists), so it only
-    // needs to be drawn once here rather than every drawPage5Dynamic() tick.
-    tft_.setTextDatum(MC_DATUM);
-    tft_.setTextColor(theme_.textSecondary, theme_.background);
-    tft_.setTextSize(1);
-    tft_.drawString("MODERN FLAT (ACTIVE) - OTHERS COMING SOON", (layout::kConfigMinusX + layout::kScreenWidth) / 2,
-                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
-
-    // Force drawPage5Dynamic() to repaint every region the next time it
-    // runs, since the static redraw above just wiped them all.
+    // Force drawConfigGaugesDynamic() to repaint every region the next time
+    // it runs, since the static redraw above just wiped them all.
     runtimeState_.cfgShiftLightRpmDrawn[0] = '\0';
     runtimeState_.cfgRedlineRpmDrawn[0] = '\0';
-    runtimeState_.cfgLogIntervalDrawn[0] = '\0';
-    runtimeState_.cfgBaroBaselineDrawn[0] = '\0';
-    runtimeState_.cfgSaveButtonDrawn = -1;
-    runtimeState_.cfgDeleteConfirmDrawn = -1;
-    runtimeState_.cfgLogSummaryDrawn[0] = '\0';
-    runtimeState_.cfgLogSummaryNextScanMs = 0;
 }
 
-void ClusterPages::drawPage5Dynamic(uint32_t nowMs) {
+void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
+    (void)nowMs;
     const AppSettings& settings = configStore_.settings();
     char buf[24];
 
@@ -501,7 +576,7 @@ void ClusterPages::drawPage5Dynamic(uint32_t nowMs) {
         tft_.setTextColor(theme_.textPrimary, theme_.background);
         tft_.setTextSize(2);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
-                                     layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
+                                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
                                      theme_.background);
         strncpy(runtimeState_.cfgShiftLightRpmDrawn, buf, sizeof(runtimeState_.cfgShiftLightRpmDrawn) - 1);
     }
@@ -512,10 +587,42 @@ void ClusterPages::drawPage5Dynamic(uint32_t nowMs) {
         tft_.setTextColor(theme_.textPrimary, theme_.background);
         tft_.setTextSize(2);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
-                                     layout::kConfigRow2Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
+                                     layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
                                      theme_.background);
         strncpy(runtimeState_.cfgRedlineRpmDrawn, buf, sizeof(runtimeState_.cfgRedlineRpmDrawn) - 1);
     }
+}
+
+// ---------------------------------------------------------------- Config: Logs --
+
+void ClusterPages::drawConfigLogsStatic() {
+    tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
+                  theme_.background);
+
+    for (int i = 0; i <= 2; ++i) {
+        int32_t y = layout::kHeaderHeight + i * layout::kConfigRowHeight;
+        tft_.drawFastHLine(0, y, layout::kScreenWidth, theme_.bezel);
+    }
+
+    tft_.setTextDatum(ML_DATUM);
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    tft_.setTextSize(1);
+    tft_.drawString("LOG INTERVAL", 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+
+    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
+                        layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
+
+    // Force drawConfigLogsDynamic() to repaint every region the next time it
+    // runs, since the static redraw above just wiped them all.
+    runtimeState_.cfgLogIntervalDrawn[0] = '\0';
+    runtimeState_.cfgDeleteConfirmDrawn = -1;
+    runtimeState_.cfgLogSummaryDrawn[0] = '\0';
+    runtimeState_.cfgLogSummaryNextScanMs = 0;
+}
+
+void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
+    const AppSettings& settings = configStore_.settings();
+    char buf[24];
 
     snprintf(buf, sizeof(buf), "%lu ms", static_cast<unsigned long>(settings.logIntervalMs));
     if (strcmp(buf, runtimeState_.cfgLogIntervalDrawn) != 0) {
@@ -523,36 +630,9 @@ void ClusterPages::drawPage5Dynamic(uint32_t nowMs) {
         tft_.setTextColor(theme_.textPrimary, theme_.background);
         tft_.setTextSize(2);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigCycleX + layout::kConfigCycleW / 2,
-                                     layout::kConfigRow3Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
+                                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
                                      theme_.background);
         strncpy(runtimeState_.cfgLogIntervalDrawn, buf, sizeof(runtimeState_.cfgLogIntervalDrawn) - 1);
-    }
-
-    snprintf(buf, sizeof(buf), "%.1f PSI", settings.baroBaselinePsi);
-    if (strcmp(buf, runtimeState_.cfgBaroBaselineDrawn) != 0) {
-        tft_.setTextDatum(MC_DATUM);
-        tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
-        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
-                                     layout::kConfigRow4Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
-                                     theme_.background);
-        strncpy(runtimeState_.cfgBaroBaselineDrawn, buf, sizeof(runtimeState_.cfgBaroBaselineDrawn) - 1);
-    }
-
-    bool showSavedFeedback = runtimeState_.configStatusMessage[0] != '\0' &&
-                              (nowMs - runtimeState_.configStatusMessageSetAtMs < 1500);
-    if (runtimeState_.configStatusMessage[0] != '\0' && !showSavedFeedback) {
-        runtimeState_.configStatusMessage[0] = '\0';
-    }
-    if (runtimeState_.cfgSaveButtonDrawn != static_cast<int8_t>(showSavedFeedback)) {
-        tft_.fillRoundRect(layout::kConfigSaveX, layout::kConfigRow5Y + layout::kConfigButtonInsetY,
-                            layout::kConfigSaveW, layout::kConfigButtonH, 6, theme_.primaryGaugeArc);
-        tft_.setTextDatum(MC_DATUM);
-        tft_.setTextSize(2);
-        tft_.setTextColor(theme_.background, theme_.primaryGaugeArc);
-        tft_.drawString(showSavedFeedback ? "SAVED!" : "SAVE TO SD", layout::kScreenWidth / 2,
-                         layout::kConfigRow5Y + layout::kConfigRowHeight / 2);
-        runtimeState_.cfgSaveButtonDrawn = static_cast<int8_t>(showSavedFeedback);
     }
 
     // getLogSummary() scans the SD card's log directory, so it's only
@@ -568,7 +648,7 @@ void ClusterPages::drawPage5Dynamic(uint32_t nowMs) {
             tft_.setTextDatum(ML_DATUM);
             tft_.setTextColor(theme_.textPrimary, theme_.background);
             tft_.setTextSize(1);
-            gaugewidgets::drawFieldText(tft_, buf, 12, layout::kConfigRow6Y + layout::kConfigRowHeight / 2,
+            gaugewidgets::drawFieldText(tft_, buf, 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2,
                                          layout::kConfigDeleteX - 20, theme_.background);
             strncpy(runtimeState_.cfgLogSummaryDrawn, buf, sizeof(runtimeState_.cfgLogSummaryDrawn) - 1);
         }
@@ -581,17 +661,51 @@ void ClusterPages::drawPage5Dynamic(uint32_t nowMs) {
     }
     if (runtimeState_.cfgDeleteConfirmDrawn != static_cast<int8_t>(confirmArmed)) {
         uint16_t deleteColor = confirmArmed ? theme_.warningActive : theme_.panel;
-        tft_.fillRoundRect(layout::kConfigDeleteX, layout::kConfigRow6Y + layout::kConfigButtonInsetY,
+        tft_.fillRoundRect(layout::kConfigDeleteX, layout::kConfigRow1Y + layout::kConfigButtonInsetY,
                             layout::kConfigDeleteW, layout::kConfigButtonH, 6, deleteColor);
-        tft_.drawRoundRect(layout::kConfigDeleteX, layout::kConfigRow6Y + layout::kConfigButtonInsetY,
+        tft_.drawRoundRect(layout::kConfigDeleteX, layout::kConfigRow1Y + layout::kConfigButtonInsetY,
                             layout::kConfigDeleteW, layout::kConfigButtonH, 6, theme_.bezel);
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextSize(1);
         tft_.setTextColor(confirmArmed ? theme_.background : theme_.textPrimary, deleteColor);
         tft_.drawString(confirmArmed ? "TAP TO CONFIRM" : "DELETE ALL LOGS",
                          layout::kConfigDeleteX + layout::kConfigDeleteW / 2,
-                         layout::kConfigRow6Y + layout::kConfigRowHeight / 2);
+                         layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
         runtimeState_.cfgDeleteConfirmDrawn = static_cast<int8_t>(confirmArmed);
+    }
+}
+
+// ---------------------------------------------------------------- Config: shared footer --
+
+void ClusterPages::drawConfigFooterStatic() {
+    tft_.drawFastHLine(0, layout::kConfigFooterY, layout::kScreenWidth, theme_.bezel);
+
+    // Force drawConfigFooterDynamic() to repaint the button the next time it
+    // runs, since a page switch may have just cleared this area.
+    runtimeState_.cfgSaveButtonDrawn = -1;
+}
+
+void ClusterPages::drawConfigFooterDynamic(uint32_t nowMs) {
+    bool showSavedFeedback = runtimeState_.configStatusMessage[0] != '\0' &&
+                              (nowMs - runtimeState_.configStatusMessageSetAtMs < 1500);
+    if (runtimeState_.configStatusMessage[0] != '\0' && !showSavedFeedback) {
+        runtimeState_.configStatusMessage[0] = '\0';
+    }
+
+    // 0 = clean (default color), 1 = unsaved changes (green), 2 = "SAVED!"
+    // feedback (default color) - tracked as one state so a color change and a
+    // text change are never missed independently of each other.
+    int8_t visualState = showSavedFeedback ? 2 : (configStore_.isDirty() ? 1 : 0);
+    if (runtimeState_.cfgSaveButtonDrawn != visualState) {
+        uint16_t fillColor = (visualState == 1) ? theme_.unsavedActive : theme_.primaryGaugeArc;
+        tft_.fillRoundRect(layout::kConfigSaveX, layout::kConfigFooterY + layout::kConfigButtonInsetY,
+                            layout::kConfigSaveW, layout::kConfigButtonH, 6, fillColor);
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextSize(2);
+        tft_.setTextColor(theme_.background, fillColor);
+        tft_.drawString(showSavedFeedback ? "SAVED!" : "SAVE TO SD", layout::kScreenWidth / 2,
+                         layout::kConfigFooterY + layout::kConfigRowHeight / 2);
+        runtimeState_.cfgSaveButtonDrawn = visualState;
     }
 }
 

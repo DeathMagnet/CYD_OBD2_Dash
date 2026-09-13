@@ -8,13 +8,15 @@ This document provides complete, technical design and implementation instruction
 
 ## ✅ Implementation Status
 
-All six pages render live OBD-II telemetry today, but with these deliberate deviations from the design above:
+The dashboard displays all six dashboard pages (1–4 and 6) plus four dedicated config pages (UI, GAUGES, USER VARS, LOGS), with these deliberate deviations from the design above:
 
-- **Only Modern Flat is implemented.** `getTheme()` (`src/display/theme.cpp`) returns the Modern Flat palette regardless of the requested `ThemeId`; Mustang S197 and Torque Neon are reserved enum values with no color table yet. Page 5's "Active Theme" row is display-only and reads "MODERN FLAT (ACTIVE) - OTHERS COMING SOON".
+- **Only Modern Flat is implemented.** `getTheme()` (`src/display/theme.cpp`) returns the Modern Flat palette regardless of the requested `ThemeId`; Mustang S197 and Torque Neon are reserved enum values with no color table yet. The UI config page's "Active Theme" row is display-only and reads "MODERN FLAT (ACTIVE) - OTHERS COMING SOON".
+- **Page organization: Dashboard group vs. Config group.** Dashboard pages (1–4, 6) form one group; config pages (UI, GAUGES, USER VARS, LOGS) form another. The header includes a mode toggle button: a steering wheel icon when viewing dashboard pages (tap to switch to the last-visited config page), and a cog icon when viewing config pages (tap to switch to the last-visited dashboard page). Prev/next navigation arrows cycle only within the active group, never across both groups.
 - **Direct-to-TFT rendering, not sprites.** This board's ESP32-32E has no PSRAM, and a full-frame RGB565 sprite (~300KB) does not fit in 320KB of SRAM alongside the Bluetooth stack and SD buffers. Each page has a `drawStatic()` pass (chrome/labels, called once per page change) and a `drawDynamic()` pass (values only, called on a throttled `config::kUiRefreshIntervalMs` cadence) that redraws its own bounded region using TFT_eSPI's background-color text redraw to avoid flicker. There is no slide/fade page-transition animation; page switches redraw immediately.
-- **RPM warning arc**: drawn as two solid zones, not a gradient, via `gaugewidgets::drawArcGauge`'s `cautionStart`/`dangerStart` parameters — orange (`theme.cautionArc`) from Page 5's "Shift Light RPM" setting (default 5800) up to its "Redline RPM" setting (default 6200), then red (`theme.dangerArc`) held from Redline RPM out to the end of the arc, so the sweep never drops back to unlit track.
+- **OBDII connection status badge.** The badge in the header displays the connection state with context-sensitive colors: green for `Live` (connected), blue for `Reconnecting`/`ObdConnecting`/`DisplayReady` (in progress), and crimson for `Boot`/`SdInit`/`Stale`/`Degraded` (error/disconnected).
+- **RPM warning arc**: drawn as two solid zones, not a gradient, via `gaugewidgets::drawArcGauge`'s `cautionStart`/`dangerStart` parameters — orange (`theme.cautionArc`) from the GAUGES config page's "Shift Light RPM" setting (default 5800) up to its "Redline RPM" setting (default 6200), then red (`theme.dangerArc`) held from Redline RPM out to the end of the arc, so the sweep never drops back to unlit track.
 - **Page 6 DTC list shows codes only** (e.g. `P0133`), not human-readable descriptions — no DTC description database is included. A read is triggered automatically whenever Page 6 is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
-- **Page 5 adds a log-management row** beyond the settings table below: a live count of session log files and their total size (`CsvLogger::getLogSummary()`), plus a "DELETE ALL LOGS" button (same 5-second tap-to-confirm pattern) that closes the active file, deletes every `mustang_log_*.csv`, and immediately opens a fresh session file. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space.
+- **Config pages: UI / GAUGES / USER VARS / LOGS.** Settings are organized into four focused pages with a shared Save button at the bottom. Each config page displays the Save button (green when any value differs from what's saved on SD, default color when everything matches); tapping it persists all settings across all config pages to `/config.txt` on the SD card and displays "SAVED!" feedback. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space.
 - **Actual source layout** differs from the "Proposed" structure at the bottom of this doc — see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#proposed-source-layout) for the as-built tree.
 
 ---
@@ -66,6 +68,8 @@ struct ThemeColors {
     uint16_t textSecondary;
     uint16_t warningActive;
     uint16_t touchHighlight;
+    uint16_t unsavedActive;  // Save button fill while a config page has unsaved changes (green).
+    uint16_t liveActive;     // OBDII status badge while ConnectionState::Live (green).
 };
 
 const ThemeColors& getTheme(ThemeId id);
@@ -131,27 +135,37 @@ On system boot (after boot animation fade-out), all gauge needles execute a clus
 
 ## 📱 Touch Navigation & Multi-Page Cluster Architecture
 
-The display is divided into a 6-page interactive cluster.
+The display is divided into two page groups: **Dashboard pages** (1–4, 6) and **Config pages** (UI, GAUGES, USER VARS, LOGS). Prev/next navigation cycles only within the active group.
 
 ```
+Dashboard Group:                        Config Group:
+[1] PRIMARY CLUSTER                     [UI] Active Theme
+[2] ENGINE LOAD & AIRFLOW               [GAUGES] Shift Light RPM, Redline RPM
+[3] CAR-SPECIFIC SENSORS                [USER VARS] Boost Baro Baseline
+[4] MY CAR PERFORMANCE                  [LOGS] Log Interval, Delete Logs
+[6] DIAGNOSTICS (DTC)
+```
+
+Header layout:
+```
 +-------------------------------------------------------------------+
-|  [<] PAGE 1: PRIMARY CLUSTER                   MIL [OFF]  [>]    |
-+-------------------------------------------------------------------+
-|                                                                   |
-|              ( RPM Gauge: Redline 5500-6200 )                      |
-|                                                                   |
-|    Speed         Coolant         IAT         Throttle             |
-|   72 MPH          195 °F        88 °F          24 %               |
+|[<]  ●SD  PAGE 1: PRIMARY CLUSTER    [OBDII]  ⚙️  [>]            |
 +-------------------------------------------------------------------+
 ```
+- `[<]` — Previous Page (within current group)
+- `●SD` — SD logging activity light (green when logging, red when inactive)
+- `PAGE TITLE` — Name of current page
+- `[OBDII]` — Connection status badge (green=Live, blue=Connecting, crimson=Error)
+- `⚙️` or `🧭` — Mode toggle button (cog when on dashboard → tap to go to config; steering wheel when on config → tap to go to dashboard)
+- `[>]` — Next Page (within current group)
 
 ### Navigation Touch Zones
 - **Header Touch Bar (Y: 0..40)**:
-  - Left region `(X: 0..60)`: Previous Page
-  - Right region `(X: 420..480)`: Next Page
-  - Title center `(X: 61..350)`: Open Config Menu (Page 5)
-- **Check Engine Light (MIL) Touch Zone (X: 351..419, Y: 0..40)**: Tapping the MIL icon when active (or inactive) jumps directly to **Page 6 (Diagnostics)**.
-- **Swipe Gestures**: Horizontal swipe left (>60px delta) advances page; horizontal swipe right returns.
+  - Left region `(X: 0..60)`: Previous Page (within active group; wraps around)
+  - Right region `(X: 420..480)`: Next Page (within active group; wraps around)
+  - Mode toggle button `(X: 365..420)`: Switch between dashboard and config groups (remembers which page you were on in each group)
+- **Check Engine Light (MIL) Touch Zone (X: 310..365, Y: 0..40)**: Tapping the MIL icon when active (or inactive) jumps directly to **Page 6 (Diagnostics)**.
+- **Swipe Gestures**: Horizontal swipe left (>60px delta) advances page within group; horizontal swipe right returns within group.
 
 ---
 
@@ -189,7 +203,7 @@ Custom PID calculations for key Ford engine parameters.
 - **Battery Voltage**: Measured via OBD PID `01 42` or ELM `ATRVR` command (9.0V – 16.0V range).
 - **Fuel Rail Pressure**: Ford specific PID `01 23` (PSI / kPa).
 - **MAP & Calculated Vacuum / Boost Gauge**:
-  - Uses Manifold Absolute Pressure (`PID 01 0B`) minus Barometric Baseline (configured in Page 5, default 14.7 PSI / 101.3 kPa).
+  - Uses Manifold Absolute Pressure (`PID 01 0B`) minus Barometric Baseline (configured in the USER VARS config page, default 14.7 PSI / 101.3 kPa).
   - Displays as **Vacuum (inHg)** when MAP < Baro, and **Boost (PSI)** when MAP > Baro. The caption is stacked on two lines (name above unit) so it clears the arc inside the gauge; with no MAP reading it shows `VAC/BOOST` and a blank unit line.
   - Vacuum range: 0 – 30 inHg; Boost range: 0 – 25 PSI.
   - Sits centered at (240, 194) with a 70 px radius, in the gap the two bottom panels leave between x 150 and x 330. Because the range flips between 25 and 30 with the mode, the arc state is re-validated on `maxValue` change rather than assuming a fixed scale.
@@ -216,17 +230,40 @@ Performance estimation and real-time intake graph.
 
 ---
 
-### Page 5 — Config Menu
-Touch interactive settings menu. All values persist across reboots by saving to `/config.json` or `/config.txt` on the SD card (or LittleFS fallback).
+### Config Pages — UI / GAUGES / USER VARS / LOGS
+
+All settings persist across reboots by saving to `/config.txt` on the SD card. A shared **Save** button appears at the bottom of every config page. The button is **green** when any value differs from what's currently saved to SD, and **default color** when all values match what's on disk (dirty-state tracking). Tapping Save writes all settings across all config pages to SD and displays "SAVED!" feedback.
+
+#### Config Page: UI
+Display-only page showing the active theme. This page exists as a placeholder for future UI settings.
 
 | Setting Field | Options / Range | Default | Description |
 | --- | --- | --- | --- |
-| **Active Theme** | Mustang S197, Torque Neon, Modern Flat | Mustang S197 | UI visual style |
-| **Shift Light RPM** | 3000 – 6800 RPM (step 100) | 5800 RPM | RPM bezel flash trigger |
-| **Redline RPM** | 5000 – 7000 RPM (step 100) | 6200 RPM | Redline gauge arc start |
-| **Logging Interval** | 50ms, 100ms, 250ms, 500ms, 1000ms | 100ms | SD CSV log row write cadence |
-| **Boost Baro Baseline** | 12.0 – 15.5 PSI (step 0.1) | 14.7 PSI | Baseline pressure for boost calc |
-| **Save Settings** | [ SAVE TO SD ] button | - | Writes current config to SD card |
+| **Active Theme** | Mustang S197, Torque Neon, Modern Flat | Modern Flat | UI visual style (display-only; future switching) |
+
+#### Config Page: GAUGES
+Gauge calibration settings for RPM warning zones.
+
+| Setting Field | Options / Range | Default | Description |
+| --- | --- | --- | --- |
+| **Shift Light RPM** | 3000 – 6800 RPM (step 100) | 5800 RPM | RPM bezel flash trigger; start of warning arc |
+| **Redline RPM** | 5000 – 7000 RPM (step 100) | 6200 RPM | Redline threshold; start of danger (red) arc |
+
+#### Config Page: USER VARS
+User-adjustable variables and baselines.
+
+| Setting Field | Options / Range | Default | Description |
+| --- | --- | --- | --- |
+| **Boost Baro Baseline** | 12.0 – 15.5 PSI (step 0.1) | 14.7 PSI | Baseline atmospheric pressure; used to calculate Vacuum/Boost on Page 3 |
+
+#### Config Page: LOGS
+SD card logging configuration and management.
+
+| Setting Field | Options / Range | Default | Description |
+| --- | --- | --- | --- |
+| **Log Interval** | 50ms, 100ms, 250ms, 500ms, 1000ms | 100ms | SD CSV log row write cadence |
+| **Log Summary** | (display-only) | - | Live file count and total size of all session logs on SD |
+| **Delete All Logs** | [ DELETE ALL LOGS ] button | - | Closes active log file, deletes every `mustang_log_*.csv`, opens fresh session. Requires second tap within 5 seconds to confirm. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for auto-pruning. |
 
 ---
 
@@ -279,14 +316,20 @@ src/
 
 ## 🧪 Verification Checklist
 
-- [ ] All 6 pages render cleanly at 480x320 landscape resolution.
-- [ ] Theme switching immediately recolors gauges, bezels, needles, and text.
+- [ ] All 6 dashboard pages (1–4, 6) render cleanly at 480×320 landscape resolution.
+- [ ] All 4 config pages (UI, GAUGES, USER VARS, LOGS) render cleanly.
+- [ ] Theme switching immediately recolors gauges, bezels, needles, and text (when Modern Flat variants are added).
 - [ ] Page 1 RPM gauge correctly displays the orange Shift Light-to-Redline arc and the red Redline-to-max arc, holds the red zone to the end of the sweep, and triggers bezel shift light flash.
+- [ ] Shift Light RPM and Redline RPM on GAUGES page control the arc colors correctly.
 - [ ] Needles perform a smooth full-scale sweep on boot and update continuously without jitter.
 - [ ] Sweeping a gauge up and back down leaves no seam lines in either the fill or the unlit track.
 - [ ] Readouts that lose a digit or change caption (RPM, coolant, vacuum/boost, MIL line) leave no leftover characters.
 - [ ] Tapping the MIL indicator on Page 1 switches instantly to Page 6.
+- [ ] Tapping the mode toggle button (⚙️ or 🧭) in the header switches between the dashboard group and config group, remembering which page was visited in each group.
+- [ ] Prev/next navigation cycles only within the active group (dashboard or config); never crosses into the other group.
+- [ ] OBDII connection badge displays: green when Live, blue when Reconnecting/ObdConnecting/DisplayReady, crimson for Boot/SdInit/Stale/Degraded.
+- [ ] Save button on config pages is green when any value differs from saved, default color when all match saved values.
 - [ ] Calculated Horsepower, Torque, Vacuum/Boost, and 0-60 timer update correctly on Pages 3 & 4.
-- [ ] Config menu settings save to SD card and persist after power cycle.
+- [ ] Config page settings save to SD card and persist after power cycle.
 - [ ] Page 6 correctly decodes and displays DTCs in `P0xxx` / `C0xxx` format.
 - [ ] Boot screen executes smooth fade-in and fade-out transitions before launching the cluster.

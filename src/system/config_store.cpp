@@ -93,6 +93,8 @@ void ConfigStore::begin() {
                   settings_.shiftLightRpm, settings_.redlineRpm,
                   static_cast<unsigned long>(settings_.logIntervalMs),
                   settings_.baroBaselinePsi, settings_.themeId);
+
+    savedSettings_ = settings_;
 }
 
 void ConfigStore::setShiftLightRpm(uint16_t rpm) {
@@ -109,6 +111,14 @@ void ConfigStore::setLogIntervalMs(uint32_t intervalMs) {
 
 void ConfigStore::setBaroBaselinePsi(float psi) {
     settings_.baroBaselinePsi = clampF(psi, config::kMinBaroBaselinePsi, config::kMaxBaroBaselinePsi);
+}
+
+bool ConfigStore::isDirty() const {
+    return settings_.shiftLightRpm != savedSettings_.shiftLightRpm ||
+           settings_.redlineRpm != savedSettings_.redlineRpm ||
+           settings_.logIntervalMs != savedSettings_.logIntervalMs ||
+           settings_.baroBaselinePsi != savedSettings_.baroBaselinePsi ||
+           settings_.themeId != savedSettings_.themeId;
 }
 
 bool ConfigStore::save() {
@@ -138,5 +148,6 @@ bool ConfigStore::save() {
     file.close();
 
     Serial.println("[Config] Settings saved to /config.txt.");
+    savedSettings_ = settings_;
     return true;
 }

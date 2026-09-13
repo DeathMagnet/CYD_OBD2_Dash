@@ -14,7 +14,7 @@ struct LogSummary {
 
 // Owns SD-card CSV telemetry logging: one session file per boot (see
 // docs/cyd-obd2-sd-logging-guide.md for the 20-column schema), a
-// user-configurable row interval (Page 5), periodic buffered flushes, and
+// user-configurable row interval (Logs config page), periodic buffered flushes, and
 // automatic pruning of the oldest session logs when the card runs low on
 // space so the active session never fails to write for lack of room.
 class CsvLogger {

@@ -26,6 +26,8 @@ struct ThemeColors {
     uint16_t textSecondary;
     uint16_t warningActive;
     uint16_t touchHighlight;
+    uint16_t unsavedActive; // Save button fill while a config page has unsaved changes.
+    uint16_t liveActive;    // OBDII status badge while ConnectionState::Live.
     const char* name;
 };
 

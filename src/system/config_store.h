@@ -35,8 +35,14 @@ public:
     void setLogIntervalMs(uint32_t intervalMs);
     void setBaroBaselinePsi(float psi);
 
+    // True whenever the current settings differ from the last saved/loaded
+    // snapshot (a live comparison, not a sticky flag - reverting a value back
+    // to what's on SD clears this again). Drives the shared config-page Save
+    // button's color.
+    bool isDirty() const;
+
     // Persists the current settings to /config.txt. Returns false if the SD
-    // card is unavailable or the write fails.
+    // card is unavailable or the write fails; clears isDirty() on success.
     bool save();
 
 private:
@@ -44,4 +50,5 @@ private:
 
     SdManager& sdManager_;
     AppSettings settings_;
+    AppSettings savedSettings_; // Snapshot of what's currently on SD, for isDirty().
 };

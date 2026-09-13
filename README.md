@@ -77,3 +77,27 @@ Page 6 serves a fixed set of fake DTCs that "Clear Codes" clears. Tunables live 
 the `kSim*` block of [src/app_config.h](src/app_config.h); add
 `-D SIM_TIME_SCALE=2.0F` to the environment's `build_flags` to sweep the cycle at
 double speed. SD logging is independent of simulation mode and stays enabled.
+
+## Dashboard Pages
+
+### Dashboard Group (Pages 1–5)
+Navigate with prev/next arrows in the header; cycles within this group only.
+
+- **Page 1 — Primary Cluster**: Large RPM gauge with real-time speed, coolant, IAT, and throttle readouts.
+- **Page 2 — Engine Load**: Engine load percentage, MAF sensor graph, spark timing, fuel trim diagnostics.
+- **Page 3 — Car-Specific**: Battery voltage, fuel rail pressure, vacuum/boost gauge, O2 sensor voltages.
+- **Page 4 — Performance**: Calculated horsepower and torque, 0–60 timer, intake airflow rolling graph.
+- **Page 5 — Diagnostics**: Read, decode, and clear OBD-II Diagnostic Trouble Codes (DTCs). Tapping the Check Engine Light (MIL) on any page jumps here.
+
+### Config Group (Pages UI, GAUGES, USER VARS, LOGS)
+Navigate with prev/next arrows in the header; cycles within this group only. All settings persist to `/config.txt` on the SD card.
+
+- **UI**: Display-only page showing the active theme (placeholder for future theme switching).
+- **GAUGES**: Configure Shift Light RPM and Redline RPM thresholds that control the warning arcs on Page 1.
+- **USER VARS**: User-adjustable variables like Boost Baro Baseline (atmospheric pressure baseline for vacuum/boost calculation).
+- **LOGS**: Configure SD card log write interval, view live log summary (file count and size), and delete all logs.
+
+A **shared Save button** appears at the bottom of every config page. It is **green** when any value differs from what's saved to SD, and **default color** when all settings match. Tap it to persist all changes to `/config.txt` and see "SAVED!" feedback.
+
+### Mode Toggle
+The header includes a mode toggle button: a **cog icon** (⚙️) when viewing dashboard pages (tap to switch to config), and a **steering wheel icon** (🧭) when viewing config pages (tap to switch to dashboard). The button remembers which page you were on in each group, so you don't lose your place when switching back and forth.
