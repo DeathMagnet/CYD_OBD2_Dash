@@ -89,7 +89,9 @@ struct ClusterPageRuntimeState {
     char cfgMaxRpmDrawn[24] = {0};         // Gauges page
     char cfgMaxSpeedDrawn[24] = {0};       // Gauges page
     char cfgBaroBaselineDrawn[24] = {0};   // User Vars page
+    char cfgUnitsDrawn[32] = {0};          // UI page
     char cfgLogIntervalDrawn[24] = {0};    // Logs page
+    char cfgLogUnitsDrawn[32] = {0};       // Logs page
     int8_t cfgDeleteConfirmDrawn = -1;     // Logs page
 
     // Shared config footer (Save button) - same "not drawn yet" convention as

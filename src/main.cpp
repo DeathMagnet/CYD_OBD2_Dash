@@ -63,6 +63,7 @@ void setup() {
     // 6. Start SD CSV logging (pruning old sessions first if needed). No-ops
     // safely when SD_LOGGING_ENABLED is unset or the card is missing.
 #ifdef SD_LOGGING_ENABLED
+    csvLogger.setUnitsMetric(configStore.settings().useMetricLogs);
     csvLogger.begin();
 #else
     Serial.println("[Log] SD_LOGGING_ENABLED not defined; logging disabled.");

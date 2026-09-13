@@ -48,6 +48,9 @@ public:
     // fresh session file so logging keeps working. Returns files deleted.
     uint32_t deleteAllLogs();
 
+    // Sets whether CSV logging should use metric or standard units
+    void setUnitsMetric(bool metric) { useMetricLogs_ = metric; }
+
 private:
     using LogFileVisitor = void (*)(void* context, const char* path, uint32_t sessionIndex, size_t fileSizeBytes);
 
@@ -62,4 +65,5 @@ private:
     bool loggingActive_ = false;
     uint32_t lastRowMs_ = 0;
     uint32_t lastFlushMs_ = 0;
+    bool useMetricLogs_ = false;
 };

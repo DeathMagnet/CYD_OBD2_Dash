@@ -235,7 +235,11 @@ Begin with a small, useful PID set:
 | Intake air temperature | `01 0F` | C or F | Auxiliary value |
 | Throttle position | `01 11` | percent | Auxiliary value |
 
-Store internally normalized units, then apply display-unit preferences at render time. Do not assume every ECU supports every PID. Each field requires a validity flag and last-updated timestamp so an unsupported or timed-out PID cannot be displayed as a genuine zero.
+Store telemetry in native Imperial units at decode time (speed in MPH, temperature in °F, pressure in kPa), then apply display-unit conversions and CSV logging conversions independently at render/write time. This avoids re-decoding OBD responses and keeps decode logic simple. Do not assume every ECU supports every PID. Each field requires a validity flag and last-updated timestamp so an unsupported or timed-out PID cannot be displayed as a genuine zero.
+
+**Display Unit System** (`UI` config page, `useMetricUnits` setting): Controls how speed, temperature, and pressure are rendered on all dashboard pages and config page fields. Metric mode displays km/h, °C, and kPa; Standard mode displays mph, °F, and psi. This setting also adjusts stepper increment sizes on the GAUGES and USER VARS pages so numeric entry feels natural in the chosen unit system.
+
+**CSV Logging Unit System** (`LOGS` config page, `useMetricLogs` setting): Controls the schema and unit values written to SD card. Independent of the display setting — you can view the dashboard in mph while logging in km/h, or vice versa. Toggling this setting stages a pending change; **deletion happens when the change is saved** (SAVE TO SD button), and **only if the unit system actually changed since the last save**. Toggling back to the original value before saving leaves existing logs untouched. This ensures each session file uses one consistent unit system from header to last row.
 
 A suitable snapshot shape is:
 
@@ -248,19 +252,27 @@ struct TelemetryValue {
 
 struct TelemetrySnapshot {
   TelemetryValue rpm;
-  TelemetryValue speedKph;
-  TelemetryValue coolantC;
+  TelemetryValue speedMph;          // Stored in MPH (converted from km/h at decode time)
+  TelemetryValue coolantF;          // Stored in °F (converted from °C at decode time)
   TelemetryValue engineLoadPercent;
-  TelemetryValue intakeAirC;
+  TelemetryValue iatF;              // Stored in °F (converted from °C at decode time)
   TelemetryValue throttlePercent;
   bool connected;
   uint32_t capturedAtMs;
 };
 ```
 
+**Note**: The actual implementation (`src/obd/telemetry.h`) stores speed in MPH and temperature in °F natively; conversions to metric units (km/h, °C, kPa) happen in two places:
+- **Display rendering** (`src/display/cluster_pages.cpp`): Uses `units::displaySpeed()`, `units::displayTemp()`, etc. to convert based on the UI config page's `useMetricUnits` setting.
+- **CSV logging** (`src/logging/csv_logger.cpp`): Uses the same conversion helpers based on the LOGS page's `useMetricLogs` setting to write the correct unit schema and values.
+
+This split design keeps OBD decode logic simple (no dual-path conversions) while allowing independent control of the display and logging unit systems.
+
 Treat the snapshot as the renderer and logger boundary. The OBD client updates it only after parsing a response; the renderer must not perform Bluetooth I/O. Poll high-priority values such as RPM and speed more frequently than secondary PIDs, while avoiding adapter overload. Start with measured refresh behavior and tune using serial timing data rather than hard-coded optimistic intervals.
 
 **As built**, `ObdClient` polls the full set of standard Mode 01 PIDs a 2006 Mustang GT (4.6L 3V) exposes over generic OBD-II — RPM and speed every cycle, plus one of the remaining 16 PIDs round-robined per cycle (monitor status/MIL+DTC count, engine load, coolant, STFT/LTFT bank 1, MAP, timing advance, IAT, MAF, throttle, O2 B1S1/B2S1, fuel rail pressure, fuel level, barometric pressure, and control module voltage — see `src/obd/obd_pids.cpp` for the exact PID bytes and decode formulas). Mode 03/07 (DTC read) and Mode 04 (clear codes) are issued on demand from Page 6, not on the polling cycle. The adapter's Bluetooth SPP device name and legacy PIN default to `"OBDII"`/`"1234"` (`config::kObdDefaultAdapterName/Pin`); override them per-device by copying `src/secrets/local_config.example.h` to `src/secrets/local_config.h` (gitignored) rather than editing checked-in source, per the Configuration and Secrets section below.
+
+**Units feature** (added post-spec): Both the UI and CSV logging support independent metric/standard toggles. Display units are configured on the UI config page and affect how speed, temperature, and pressure are rendered on all dashboard pages and stepper increments on config pages. CSV logging units are configured independently on the LOGS config page; changing this setting deletes all existing log files to prevent unit-mixed rows. See `src/system/units.h` for the conversion helper library and the UI & SD Logging guides for detailed mode documentation.
 
 ## Display and Gauge Behavior
 

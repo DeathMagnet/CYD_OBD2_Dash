@@ -1,5 +1,6 @@
 #include "display/touch_handler.h"
 #include "display/cluster_layout.h"
+#include "system/units.h"
 #include <string.h>
 
 ClusterTouchHandler::ClusterTouchHandler(ClusterPages& clusterPages, ConfigStore& configStore, CsvLogger& csvLogger,
@@ -78,26 +79,37 @@ bool ClusterTouchHandler::handleHeaderTap(uint16_t x, uint16_t y) {
 }
 
 bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t nowMs) {
-    // UI's remaining row (Active Theme) is display-only - nothing to hit-test
-    // yet, but the handler stays in place for whenever UI grows a control.
-    (void)x;
-    (void)y;
     (void)nowMs;
+    const AppSettings& settings = configStore_.settings();
+
+    // Units toggle row (row 1)
+    int32_t row1 = layout::kConfigRow1Y + layout::kConfigButtonInsetY;
+    int32_t row1End = row1 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigCycleX, row1, layout::kConfigCycleX + layout::kConfigCycleW, row1End)) {
+        configStore_.setUseMetricUnits(!settings.useMetricUnits);
+        return false;
+    }
+
     return false;
 }
 
 bool ClusterTouchHandler::handleConfigUserVarsTap(uint16_t x, uint16_t y, uint32_t nowMs) {
     (void)nowMs;
     const AppSettings& settings = configStore_.settings();
+    bool metric = settings.useMetricUnits;
 
     int32_t row0 = layout::kConfigRow0Y + layout::kConfigButtonInsetY;
     int32_t row0End = row0 + layout::kConfigButtonH;
+    float step = config::kBaroBaselineStepPsi;
+    if (metric) {
+        step = units::psiFromKpa(config::kBaroBaselineStepKpa);
+    }
     if (within(x, y, layout::kConfigMinusX, row0, layout::kConfigMinusX + layout::kConfigMinusW, row0End)) {
-        configStore_.setBaroBaselinePsi(settings.baroBaselinePsi - config::kBaroBaselineStepPsi);
+        configStore_.setBaroBaselinePsi(settings.baroBaselinePsi - step);
         return false;
     }
     if (within(x, y, layout::kConfigPlusX, row0, layout::kConfigPlusX + layout::kConfigPlusW, row0End)) {
-        configStore_.setBaroBaselinePsi(settings.baroBaselinePsi + config::kBaroBaselineStepPsi);
+        configStore_.setBaroBaselinePsi(settings.baroBaselinePsi + step);
         return false;
     }
 
@@ -107,6 +119,7 @@ bool ClusterTouchHandler::handleConfigUserVarsTap(uint16_t x, uint16_t y, uint32
 bool ClusterTouchHandler::handleConfigGaugesTap(uint16_t x, uint16_t y, uint32_t nowMs) {
     (void)nowMs;
     const AppSettings& settings = configStore_.settings();
+    bool metric = settings.useMetricUnits;
 
     int32_t row0 = layout::kConfigRow0Y + layout::kConfigButtonInsetY;
     int32_t row0End = row0 + layout::kConfigButtonH;
@@ -143,12 +156,16 @@ bool ClusterTouchHandler::handleConfigGaugesTap(uint16_t x, uint16_t y, uint32_t
 
     int32_t row3 = layout::kConfigRow3Y + layout::kConfigButtonInsetY;
     int32_t row3End = row3 + layout::kConfigButtonH;
+    uint16_t step = config::kMaxSpeedStepMph;
+    if (metric) {
+        step = static_cast<uint16_t>(units::mphFromKph(config::kMaxSpeedStepKph));
+    }
     if (within(x, y, layout::kConfigMinusX, row3, layout::kConfigMinusX + layout::kConfigMinusW, row3End)) {
-        configStore_.setMaxSpeedMph(settings.maxSpeedMph - config::kMaxSpeedStepMph);
+        configStore_.setMaxSpeedMph(settings.maxSpeedMph - step);
         return false;
     }
     if (within(x, y, layout::kConfigPlusX, row3, layout::kConfigPlusX + layout::kConfigPlusW, row3End)) {
-        configStore_.setMaxSpeedMph(settings.maxSpeedMph + config::kMaxSpeedStepMph);
+        configStore_.setMaxSpeedMph(settings.maxSpeedMph + step);
         return false;
     }
 
@@ -175,6 +192,14 @@ bool ClusterTouchHandler::handleConfigLogsTap(uint16_t x, uint16_t y, uint32_t n
         return false;
     }
 
+    // Log Units row (row 2)
+    int32_t row2 = layout::kConfigRow2Y + layout::kConfigButtonInsetY;
+    int32_t row2End = row2 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigCycleX, row2, layout::kConfigCycleX + layout::kConfigCycleW, row2End)) {
+        configStore_.setUseMetricLogs(!settings.useMetricLogs);
+        return false;
+    }
+
     int32_t row1 = layout::kConfigRow1Y + layout::kConfigButtonInsetY;
     int32_t row1End = row1 + layout::kConfigButtonH;
     if (within(x, y, layout::kConfigDeleteX, row1, layout::kConfigDeleteX + layout::kConfigDeleteW, row1End)) {
@@ -198,7 +223,17 @@ bool ClusterTouchHandler::handleConfigFooterTap(uint16_t x, uint16_t y, uint32_t
     int32_t footerY = layout::kConfigFooterY + layout::kConfigButtonInsetY;
     int32_t footerYEnd = footerY + layout::kConfigButtonH;
     if (within(x, y, layout::kConfigSaveX, footerY, layout::kConfigSaveX + layout::kConfigSaveW, footerYEnd)) {
+        bool logUnitsChanged = configStore_.isLogUnitsDirty();
+        bool newMetricLogs = configStore_.settings().useMetricLogs;
+
         configStore_.save();
+
+        if (logUnitsChanged) {
+            csvLogger_.setUnitsMetric(newMetricLogs);
+            csvLogger_.deleteAllLogs();
+            state.cfgLogSummaryNextScanMs = 0; // force the LOGS/MB summary to rescan and show the wipe immediately
+        }
+
         strncpy(state.configStatusMessage, "SAVED", sizeof(state.configStatusMessage) - 1);
         state.configStatusMessage[sizeof(state.configStatusMessage) - 1] = '\0';
         state.configStatusMessageSetAtMs = nowMs;

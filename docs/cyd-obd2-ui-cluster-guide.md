@@ -236,11 +236,12 @@ Performance estimation and real-time intake graph.
 All settings persist across reboots by saving to `/config.txt` on the SD card. A shared **Save** button appears at the bottom of every config page. The button is **green** when any value differs from what's currently saved to SD, and **default color** when all values match what's on disk (dirty-state tracking). Tapping Save writes all settings across all config pages to SD and displays "SAVED!" feedback.
 
 #### Config Page: UI
-Display-only page showing the active theme. This page exists as a placeholder for future UI settings.
+Settings for display appearance and unit system.
 
 | Setting Field | Options / Range | Default | Description |
 | --- | --- | --- | --- |
 | **Active Theme** | Mustang S197, Torque Neon, Modern Flat | Modern Flat | UI visual style (display-only; future switching) |
+| **Units** | Standard (MPH/°F/PSI), Metric (KM/H/°C/KPA) | Standard | Display units for speed, temperature, and pressure. Affects all dashboard pages and config field labels/steppers. Does not affect CSV logging (see LOGS page). |
 
 #### Config Page: GAUGES
 Gauge calibration settings for RPM warning zones.
@@ -264,6 +265,7 @@ SD card logging configuration and management.
 | --- | --- | --- | --- |
 | **Log Interval** | 50ms, 100ms, 250ms, 500ms, 1000ms | 100ms | SD CSV log row write cadence |
 | **Log Summary** | (display-only) | - | Live file count and total size of all session logs on SD |
+| **Log Units** | Standard (MPH/°F/PSI), Metric (KM/H/°C/KPA) | Standard | CSV logging unit system. **⚠️ CHANGING THIS DELETES ALL LOGS ON SAVE** (shown in red below the toggle) — the toggle stages a pending change; deletion happens when you tap SAVE TO SD, and only if the unit system actually changed since the last save. Toggling back to the original value before saving leaves existing logs untouched. This ensures no CSV file mixes units within its rows. Independent of the display Units setting (you can view the dashboard in one unit system while logging in another). |
 | **Delete All Logs** | [ DELETE ALL LOGS ] button | - | Closes active log file, deletes every `mustang_log_*.csv`, opens fresh session. Requires second tap within 5 seconds to confirm. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for auto-pruning. |
 
 ---

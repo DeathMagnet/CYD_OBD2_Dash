@@ -61,45 +61,64 @@ void buildLogFilePath(char* buffer, size_t bufferSize, uint32_t sessionIdx) {
 
 ## 📊 CSV Column Schema & Types
 
-Every log file begins with a single header row defining the exact 20-column schema:
+Every log file begins with a single header row defining the exact 20-column schema. The schema depends on the **Log Units** setting configured on the LOGS config page:
 
+### Standard Units (MPH/°F/PSI)
 ```csv
-timestamp_ms,rpm,speed_mph,coolant_f,throttle_pct,fuel_pct,voltage_v,map_kpa,iat_f,engine_load_pct,maf_gps,timing_advance_deg,stft_pct,ltft_pct,fuel_pressure_kpa,o2_b1s1_v,o2_b2s1_v,baro_kpa,cel_on,dtc_count
+timestamp_ms,rpm,speed_mph,coolant_f,throttle_pct,fuel_pct,voltage_v,map_psi,iat_f,engine_load_pct,maf_gps,timing_advance_deg,stft_pct,ltft_pct,fuel_pressure_psi,o2_b1s1_v,o2_b2s1_v,baro_psi,cel_on,dtc_count
 ```
+
+### Metric Units (KM/H/°C/KPA)
+```csv
+timestamp_ms,rpm,speed_kph,coolant_c,throttle_pct,fuel_pct,voltage_v,map_kpa,iat_c,engine_load_pct,maf_gps,timing_advance_deg,stft_pct,ltft_pct,fuel_pressure_kpa,o2_b1s1_v,o2_b2s1_v,baro_kpa,cel_on,dtc_count
+```
+
+**⚠️ Note**: Changing the Log Units setting on the LOGS config page stages a pending change; **deletion happens when the change is saved** (SAVE TO SD button), and **only if the unit system actually changed since the last save**. Toggling back to the original value before saving leaves existing logs untouched. This ensures no CSV file ever mixes unit systems within its rows.
 
 ### Field Definitions
 
-| Column | Type | Format | Description |
-| --- | --- | --- | --- |
-| `timestamp_ms` | Integer | `%lu` | Uptime in milliseconds since device boot (`millis()`) |
-| `rpm` | Integer | `%d` | Engine RPM (0 – 12,000) |
-| `speed_mph` | Integer | `%d` | Vehicle speed in MPH (or km/h if metric enabled) |
-| `coolant_f` | Integer | `%d` | Engine coolant temperature in °F (or °C if metric) |
-| `throttle_pct` | Integer | `%d` | Throttle position percentage (0–100%) |
-| `fuel_pct` | Integer | `%d` | Fuel tank level percentage (0–100%) |
-| `voltage_v` | Float | `%.2f` | Control module supply voltage (e.g. `14.20`) |
-| `map_kpa` | Integer | `%d` | Manifold Absolute Pressure in kPa |
-| `iat_f` | Integer | `%d` | Intake air temperature in °F |
-| `engine_load_pct` | Integer | `%d` | Calculated engine load percentage (0–100%) |
-| `maf_gps` | Float | `%.2f` | Mass Air Flow sensor reading in grams/second |
-| `timing_advance_deg` | Integer | `%d` | Ignition timing advance in degrees BTDC (-64 to +63) |
-| `stft_pct` | Integer | `%d` | Short-Term Fuel Trim Bank 1 (-25% to +25%) |
-| `ltft_pct` | Integer | `%d` | Long-Term Fuel Trim Bank 1 (-25% to +25%) |
-| `fuel_pressure_kpa` | Integer | `%d` | Fuel rail pressure in kPa (standard OBD PID 0x0A) |
-| `o2_b1s1_v` | Float | `%.2f` | Oxygen sensor Bank 1 Sensor 1 voltage (0.00 – 1.27V) |
-| `o2_b2s1_v` | Float | `%.2f` | Oxygen sensor Bank 2 Sensor 1 voltage (0.00 – 1.27V) |
-| `baro_kpa` | Integer | `%d` | Barometric pressure in kPa (used for vacuum/boost) |
-| `cel_on` | Integer | `%d` | Check Engine Light (MIL) status: `1` = active, `0` = inactive |
-| `dtc_count` | Integer | `%d` | Count of stored Diagnostic Trouble Codes at log time |
+| Column | Type | Format | Description | Unit Dependent? |
+| --- | --- | --- | --- | --- |
+| `timestamp_ms` | Integer | `%lu` | Uptime in milliseconds since device boot (`millis()`) | No |
+| `rpm` | Integer | `%d` | Engine RPM (0 – 12,000) | No |
+| `speed_mph` / `speed_kph` | Integer | `%d` | Vehicle speed in **MPH** (standard) or **km/h** (metric) | ✓ Yes |
+| `coolant_f` / `coolant_c` | Integer | `%d` | Engine coolant temperature in **°F** (standard) or **°C** (metric) | ✓ Yes |
+| `throttle_pct` | Integer | `%d` | Throttle position percentage (0–100%) | No |
+| `fuel_pct` | Integer | `%d` | Fuel tank level percentage (0–100%) | No |
+| `voltage_v` | Float | `%.2f` | Control module supply voltage (e.g. `14.20`) | No |
+| `map_psi` / `map_kpa` | Integer | `%d` | Manifold Absolute Pressure in **PSI** (standard) or **kPa** (metric) | ✓ Yes |
+| `iat_f` / `iat_c` | Integer | `%d` | Intake air temperature in **°F** (standard) or **°C** (metric) | ✓ Yes |
+| `engine_load_pct` | Integer | `%d` | Calculated engine load percentage (0–100%) | No |
+| `maf_gps` | Float | `%.2f` | Mass Air Flow sensor reading in grams/second | No |
+| `timing_advance_deg` | Integer | `%d` | Ignition timing advance in degrees BTDC (-64 to +63) | No |
+| `stft_pct` | Integer | `%d` | Short-Term Fuel Trim Bank 1 (-25% to +25%) | No |
+| `ltft_pct` | Integer | `%d` | Long-Term Fuel Trim Bank 1 (-25% to +25%) | No |
+| `fuel_pressure_psi` / `fuel_pressure_kpa` | Integer | `%d` | Fuel rail pressure in **PSI** (standard) or **kPa** (metric) | ✓ Yes |
+| `o2_b1s1_v` | Float | `%.2f` | Oxygen sensor Bank 1 Sensor 1 voltage (0.00 – 1.27V) | No |
+| `o2_b2s1_v` | Float | `%.2f` | Oxygen sensor Bank 2 Sensor 1 voltage (0.00 – 1.27V) | No |
+| `baro_psi` / `baro_kpa` | Integer | `%d` | Barometric pressure in **PSI** (standard) or **kPa** (metric) | ✓ Yes |
+| `cel_on` | Integer | `%d` | Check Engine Light (MIL) status: `1` = active, `0` = inactive | No |
+| `dtc_count` | Integer | `%d` | Count of stored Diagnostic Trouble Codes at log time | No |
 
 ### Sample CSV Log Output
 
+#### Standard Units (MPH/°F/PSI):
 ```csv
-timestamp_ms,rpm,speed_mph,coolant_f,throttle_pct,fuel_pct,voltage_v,map_kpa,iat_f,engine_load_pct,maf_gps,timing_advance_deg,stft_pct,ltft_pct,fuel_pressure_kpa,o2_b1s1_v,o2_b2s1_v,baro_kpa,cel_on,dtc_count
-0,0,0,72,0,87,12.40,101,68,12,2.10,10,-1,0,380,0.42,0.38,101,0,0
-103,820,0,73,2,87,12.40,101,68,14,2.40,11,-1,0,382,0.44,0.40,101,0,0
-207,1240,0,78,18,87,12.30,108,69,22,3.80,13,0,0,386,0.51,0.47,101,1,2
+timestamp_ms,rpm,speed_mph,coolant_f,throttle_pct,fuel_pct,voltage_v,map_psi,iat_f,engine_load_pct,maf_gps,timing_advance_deg,stft_pct,ltft_pct,fuel_pressure_psi,o2_b1s1_v,o2_b2s1_v,baro_psi,cel_on,dtc_count
+0,0,0,72,0,87,12.40,14,68,12,2.10,10,-1,0,55,0.42,0.38,14,0,0
+103,820,12,73,2,87,12.40,14,68,14,2.40,11,-1,0,55,0.44,0.40,14,0,0
+207,1240,32,78,18,87,12.30,15,69,22,3.80,13,0,0,56,0.51,0.47,14,1,2
 ```
+
+#### Metric Units (KM/H/°C/KPA):
+```csv
+timestamp_ms,rpm,speed_kph,coolant_c,throttle_pct,fuel_pct,voltage_v,map_kpa,iat_c,engine_load_pct,maf_gps,timing_advance_deg,stft_pct,ltft_pct,fuel_pressure_kpa,o2_b1s1_v,o2_b2s1_v,baro_kpa,cel_on,dtc_count
+0,0,0,22,0,87,12.40,101,20,12,2.10,10,-1,0,380,0.42,0.38,101,0,0
+103,820,19,23,2,87,12.40,101,20,14,2.40,11,-1,0,382,0.44,0.40,101,0,0
+207,1240,51,26,18,87,12.30,108,21,22,3.80,13,0,0,386,0.51,0.47,101,1,2
+```
+
+Note: The Log Units setting controls which unit system is logged. Switching between Standard and Metric modes **deletes all existing logs** and begins a fresh session, ensuring consistency within each log file.
 
 ---
 
@@ -259,8 +278,12 @@ void SdLogger::end() {}
 
 - [ ] Firmware builds cleanly with `-D SD_LOGGING_ENABLED` active in `platformio.ini`.
 - [ ] Firmware builds cleanly with `; -D SD_LOGGING_ENABLED` commented out (zero SD dependencies linked).
-- [ ] On boot with SD card inserted, `/mustang_log_001.csv` is created with the exact 20-column header.
+- [ ] On boot with SD card inserted, `/mustang_log_001.csv` is created with the exact 20-column header (Standard units by default).
 - [ ] Rebooting increments NVS index and creates `/mustang_log_002.csv`.
 - [ ] Removing SD card during operation degrades state gracefully to `SD OFFLINE` without crashing the display loop.
 - [ ] Display needle updates remain at 30 FPS without stutter during periodic 500ms SD flushes.
 - [ ] Inspected CSV file on host PC contains valid, uncorrupted, comma-separated numeric rows.
+- [ ] On LOGS config page, tapping "LOG UNITS" to toggle the setting does not immediately delete any log files (button label updates, but Save button turns green to show pending change).
+- [ ] Tapping "LOG UNITS" twice (e.g. Standard → Metric → Standard) before hitting Save leaves all log files intact, since the net setting didn't actually change.
+- [ ] After toggling Log Units to a new value and tapping SAVE TO SD, the previous session file closes, all existing `mustang_log_*.csv` files are deleted, and a fresh session file opens with the new unit schema (metric column names: `speed_kph`, `coolant_c`, `map_kpa`, `fuel_pressure_kpa`, `baro_kpa`).
+- [ ] Log Units setting is independent of the display Units setting (on UI config page) — you can view the dashboard in one unit system while logging in another.

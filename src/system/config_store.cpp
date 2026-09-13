@@ -63,6 +63,10 @@ bool ConfigStore::parseLine(const char* line) {
     } else if (strcmp(key, "theme") == 0) {
         long theme = atol(valueStr);
         settings_.themeId = (theme >= 0 && theme <= 2) ? static_cast<uint8_t>(theme) : 2;
+    } else if (strcmp(key, "units") == 0) {
+        settings_.useMetricUnits = (atol(valueStr) != 0);
+    } else if (strcmp(key, "log_units") == 0) {
+        settings_.useMetricLogs = (atol(valueStr) != 0);
     } else {
         return false;
     }
@@ -140,6 +144,14 @@ void ConfigStore::setBaroBaselinePsi(float psi) {
     settings_.baroBaselinePsi = clampF(psi, config::kMinBaroBaselinePsi, config::kMaxBaroBaselinePsi);
 }
 
+void ConfigStore::setUseMetricUnits(bool metric) {
+    settings_.useMetricUnits = metric;
+}
+
+void ConfigStore::setUseMetricLogs(bool metric) {
+    settings_.useMetricLogs = metric;
+}
+
 bool ConfigStore::isDirty() const {
     return settings_.shiftLightRpm != savedSettings_.shiftLightRpm ||
            settings_.redlineRpm != savedSettings_.redlineRpm ||
@@ -147,7 +159,13 @@ bool ConfigStore::isDirty() const {
            settings_.maxSpeedMph != savedSettings_.maxSpeedMph ||
            settings_.logIntervalMs != savedSettings_.logIntervalMs ||
            settings_.baroBaselinePsi != savedSettings_.baroBaselinePsi ||
-           settings_.themeId != savedSettings_.themeId;
+           settings_.themeId != savedSettings_.themeId ||
+           settings_.useMetricUnits != savedSettings_.useMetricUnits ||
+           settings_.useMetricLogs != savedSettings_.useMetricLogs;
+}
+
+bool ConfigStore::isLogUnitsDirty() const {
+    return settings_.useMetricLogs != savedSettings_.useMetricLogs;
 }
 
 bool ConfigStore::save() {
@@ -175,6 +193,8 @@ bool ConfigStore::save() {
     file.printf("max_speed_mph=%u\n", settings_.maxSpeedMph);
     file.printf("log_interval_ms=%lu\n", static_cast<unsigned long>(settings_.logIntervalMs));
     file.printf("baro_baseline_psi=%.2f\n", settings_.baroBaselinePsi);
+    file.printf("units=%u\n", settings_.useMetricUnits ? 1 : 0);
+    file.printf("log_units=%u\n", settings_.useMetricLogs ? 1 : 0);
     file.flush();
     file.close();
 

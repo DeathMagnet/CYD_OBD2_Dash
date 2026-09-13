@@ -1,4 +1,5 @@
 #include "logging/csv_logger.h"
+#include "system/units.h"
 #include <Arduino.h>
 #include <Preferences.h>
 #include <string.h>
@@ -129,9 +130,15 @@ void CsvLogger::forEachLogFile(LogFileVisitor visitor, void* context) const {
 }
 
 void CsvLogger::writeHeader() {
-    logFile_.println("timestamp_ms,rpm,speed_mph,coolant_f,throttle_pct,fuel_pct,"
-                      "voltage_v,map_kpa,iat_f,engine_load_pct,maf_gps,timing_advance_deg,"
-                      "stft_pct,ltft_pct,fuel_pressure_kpa,o2_b1s1_v,o2_b2s1_v,baro_kpa,cel_on,dtc_count");
+    if (useMetricLogs_) {
+        logFile_.println("timestamp_ms,rpm,speed_kph,coolant_c,throttle_pct,fuel_pct,"
+                          "voltage_v,map_kpa,iat_c,engine_load_pct,maf_gps,timing_advance_deg,"
+                          "stft_pct,ltft_pct,fuel_pressure_kpa,o2_b1s1_v,o2_b2s1_v,baro_kpa,cel_on,dtc_count");
+    } else {
+        logFile_.println("timestamp_ms,rpm,speed_mph,coolant_f,throttle_pct,fuel_pct,"
+                          "voltage_v,map_psi,iat_f,engine_load_pct,maf_gps,timing_advance_deg,"
+                          "stft_pct,ltft_pct,fuel_pressure_psi,o2_b1s1_v,o2_b2s1_v,baro_psi,cel_on,dtc_count");
+    }
     logFile_.flush();
 }
 
@@ -217,22 +224,62 @@ void CsvLogger::update(const TelemetrySnapshot& snapshot, uint32_t nowMs, uint32
         char o2b1F[12], o2b2F[12], baroF[12], celF[4], dtcF[6];
 
         formatIntField(rpmF, sizeof(rpmF), snapshot.rpm);
-        formatIntField(speedF, sizeof(speedF), snapshot.speedMph);
-        formatIntField(coolantF, sizeof(coolantF), snapshot.coolantF);
+
+        // Speed: convert if metric
+        TelemetryValue speedValue = snapshot.speedMph;
+        if (useMetricLogs_ && speedValue.valid) {
+            speedValue.value = units::kphFromMph(speedValue.value);
+        }
+        formatIntField(speedF, sizeof(speedF), speedValue);
+
+        // Coolant: convert if metric
+        TelemetryValue coolantValue = snapshot.coolantF;
+        if (useMetricLogs_ && coolantValue.valid) {
+            coolantValue.value = units::celsiusFromFahrenheit(coolantValue.value);
+        }
+        formatIntField(coolantF, sizeof(coolantF), coolantValue);
+
         formatIntField(throttleF, sizeof(throttleF), snapshot.throttlePct);
         formatIntField(fuelF, sizeof(fuelF), snapshot.fuelPct);
         formatFloatField(voltageF, sizeof(voltageF), snapshot.voltageV);
-        formatIntField(mapF, sizeof(mapF), snapshot.mapKpa);
-        formatIntField(iatF, sizeof(iatF), snapshot.iatF);
+
+        // MAP: convert if not metric
+        TelemetryValue mapValue = snapshot.mapKpa;
+        if (!useMetricLogs_ && mapValue.valid) {
+            mapValue.value = units::psiFromKpa(mapValue.value);
+        }
+        formatIntField(mapF, sizeof(mapF), mapValue);
+
+        // IAT: convert if metric
+        TelemetryValue iatValue = snapshot.iatF;
+        if (useMetricLogs_ && iatValue.valid) {
+            iatValue.value = units::celsiusFromFahrenheit(iatValue.value);
+        }
+        formatIntField(iatF, sizeof(iatF), iatValue);
+
         formatIntField(loadF, sizeof(loadF), snapshot.engineLoadPct);
         formatFloatField(mafF, sizeof(mafF), snapshot.mafGps);
         formatIntField(timingF, sizeof(timingF), snapshot.timingAdvanceDeg);
         formatIntField(stftF, sizeof(stftF), snapshot.stftPct);
         formatIntField(ltftF, sizeof(ltftF), snapshot.ltftPct);
-        formatIntField(fuelPresF, sizeof(fuelPresF), snapshot.fuelPressureKpa);
+
+        // Fuel Pressure: convert if not metric
+        TelemetryValue fuelPresValue = snapshot.fuelPressureKpa;
+        if (!useMetricLogs_ && fuelPresValue.valid) {
+            fuelPresValue.value = units::psiFromKpa(fuelPresValue.value);
+        }
+        formatIntField(fuelPresF, sizeof(fuelPresF), fuelPresValue);
+
         formatFloatField(o2b1F, sizeof(o2b1F), snapshot.o2B1S1V);
         formatFloatField(o2b2F, sizeof(o2b2F), snapshot.o2B2S1V);
-        formatIntField(baroF, sizeof(baroF), snapshot.baroKpa);
+
+        // Baro: convert if not metric
+        TelemetryValue baroValue = snapshot.baroKpa;
+        if (!useMetricLogs_ && baroValue.valid) {
+            baroValue.value = units::psiFromKpa(baroValue.value);
+        }
+        formatIntField(baroF, sizeof(baroF), baroValue);
+
         if (snapshot.milOn.valid) {
             snprintf(celF, sizeof(celF), "%d", (snapshot.milOn.value != 0.0F) ? 1 : 0);
         } else {
