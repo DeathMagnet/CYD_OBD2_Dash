@@ -191,7 +191,7 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(rpmTextColor, theme_.background);
     tft_.setTextSize(4);
     gaugewidgets::drawFieldText(tft_, rpmBuf, kRpmGaugeCx, kGaugeCy - 5, 120, theme_.background);
-    tft_.setTextSize(1);
+    tft_.setTextSize(2);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     tft_.drawString(labels::kUnitRpm, kRpmGaugeCx, kGaugeCy + 25);
 
@@ -205,7 +205,7 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(theme_.textPrimary, theme_.background);
     tft_.setTextSize(4);
     gaugewidgets::drawFieldText(tft_, speedBuf, kSpeedGaugeCx, kGaugeCy - 5, 120, theme_.background);
-    tft_.setTextSize(1);
+    tft_.setTextSize(2);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     tft_.drawString(units::speedUnitLabel(metric), kSpeedGaugeCx, kGaugeCy + 25);
 
