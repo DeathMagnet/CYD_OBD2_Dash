@@ -18,7 +18,6 @@ public:
     void clear(uint16_t color = TFT_BLACK);
 
     void drawBootImage();
-    void drawHelloWorld(uint16_t touchX, uint16_t touchY, bool isTouched);
 
     TFT_eSPI& getTft() { return tft_; }
 
