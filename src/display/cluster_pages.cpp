@@ -224,6 +224,13 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     }
     tft_.setTextDatum(MC_DATUM);
     tft_.setTextColor(rpmTextColor, theme_.background);
+    applyValueFont(tft_, theme_, 4);
+    gaugewidgets::drawFieldText(tft_, rpmBuf, kRpmGaugeCx, kGaugeCy - 5, 120, theme_.background);
+    resetValueFont(tft_);
+    tft_.setTextSize(2);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    int32_t rpmLabelY = kGaugeCy + 25 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
+    tft_.drawString(labels::kUnitRpm, kRpmGaugeCx, rpmLabelY);
     beginLargeText(4);
     // Font 7 digits are 32px wide each at size 1, so 4 digits (up to maxRpm=9000) need
     // 128px - wider than the 120px field sized for the default font. A field narrower
@@ -243,6 +250,13 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     }
     tft_.setTextDatum(MC_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
+    applyValueFont(tft_, theme_, 4);
+    gaugewidgets::drawFieldText(tft_, speedBuf, kSpeedGaugeCx, kGaugeCy - 5, 120, theme_.background);
+    resetValueFont(tft_);
+    tft_.setTextSize(2);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    int32_t speedLabelY = kGaugeCy + 25 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
+    tft_.drawString(units::speedUnitLabel(metric), kSpeedGaugeCx, speedLabelY);
     beginLargeText(4);
     gaugewidgets::drawFieldText(tft_, speedBuf, kSpeedGaugeCx, kGaugeCy - 5, 120, theme_.background);
     endLargeText();
@@ -311,6 +325,16 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
                                 theme_.background, theme_);
 
     tft_.setTextDatum(MC_DATUM);
+    snprintf(buf, sizeof(buf), theme_.numberedFonts[1] != 0 ? "%d" : "%d%%", static_cast<int>(targetLoad));
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    applyValueFont(tft_, theme_, 3);
+    gaugewidgets::drawFieldText(tft_, snapshot.engineLoadPct.valid ? buf : "--", kGaugeCx, kGaugeCy, 100,
+                                 theme_.background);
+    resetValueFont(tft_);
+    tft_.setTextSize(1);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    int32_t engineLoadLabelY = kGaugeCy + 22 + (theme_.numberedFonts[1] != 0 ? 8 : 0);
+    tft_.drawString(labels::kLabelEngineLoad, kGaugeCx, engineLoadLabelY);
     if (theme_.useSevenSegmentFont) {
         snprintf(buf, sizeof(buf), "%d", static_cast<int>(targetLoad)); // Font 7 has no '%' glyph.
     } else {
@@ -438,6 +462,16 @@ void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextDatum(MC_DATUM);
     snprintf(buf, sizeof(buf), "%.1f", gaugeValue);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
+    applyValueFont(tft_, theme_, 3);
+    int32_t vacFieldWidth = (theme_.numberedFonts[1] != 0) ? 140 : 96;
+    int32_t vacDigitY = (theme_.numberedFonts[1] != 0) ? (kVacCy - 20) : (kVacCy - 14);
+    int32_t vacLabelY = (theme_.numberedFonts[1] != 0) ? (kVacCy + 22) : (kVacCy + 14);
+    gaugewidgets::drawFieldText(tft_, haveMap ? buf : "--", kVacCx, vacDigitY, vacFieldWidth, theme_.background);
+    resetValueFont(tft_);
+    tft_.setTextSize(1);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    gaugewidgets::drawFieldText(tft_, gaugeLabel, kVacCx, vacLabelY, 90, theme_.background);
+    gaugewidgets::drawFieldText(tft_, gaugeUnit, kVacCx, kVacCy + 26, 90, theme_.background);
     beginLargeText(3);
     // A 2-digit reading plus the decimal point needs more room under Font 7 (32px/digit)
     // than the default font, same reasoning as the RPM field fix.

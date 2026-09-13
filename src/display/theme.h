@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <TFT_eSPI.h>
 
 // Three themes are implemented (docs/cyd-obd2-ui-cluster-guide.md): Mustang
 // S197, Torque Neon, and Modern Flat.
@@ -31,6 +32,12 @@ struct ThemeColors {
     bool showOuterTicks;    // Draw the tick segment outside the gauge ring too (inner segment always drawn).
     bool useSevenSegmentFont; // Use TFT_eSPI's built-in Font 7 (7-segment LED look) for large text (TextSize > 2).
     const char* name;
+    const GFXfont* valueFonts[3]; // Fonts for setTextSize(2/3/4); indexed by (size - 2). nullptr = use default GLCD font.
+    uint8_t numberedFonts[3]; // Numbered fonts (Font 1-8) for setTextSize(2/3/4). 0 = no override (use default); else font number passed to setTextFont().
 };
 
 const ThemeColors& getTheme(ThemeId id);
+
+void initializeThemeFonts();
+void applyValueFont(TFT_eSPI& tft, const ThemeColors& theme, uint8_t size);
+void resetValueFont(TFT_eSPI& tft);

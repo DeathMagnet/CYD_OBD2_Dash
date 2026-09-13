@@ -45,6 +45,8 @@ void setup() {
     Serial.println("   CYD 4.0\" ESP32-32E OBD-II Dashboard    ");
     Serial.println("==========================================");
 
+    initializeThemeFonts();
+
     // 1. Initialize Display & Backlight
     displayManager.begin();
 

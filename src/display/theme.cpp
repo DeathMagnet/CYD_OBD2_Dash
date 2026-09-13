@@ -1,12 +1,18 @@
 #include "display/theme.h"
 #include "labels.h"
 
+extern const GFXfont FreeSans12pt7b;
+extern const GFXfont FreeSans18pt7b;
+extern const GFXfont FreeSans24pt7b;
+extern const GFXfont Orbitron_Light_24;
+extern const GFXfont Orbitron_Light_32;
+
 namespace {
 
 // Modern Flat: minimalist EV/performance HUD look (see
 // docs/cyd-obd2-ui-cluster-guide.md). Slate background, crisp white gauge
 // faces, accent blue arcs, crimson warning badges.
-constexpr ThemeColors kModernFlatTheme = {
+ThemeColors kModernFlatTheme = {
     0x18C3, // background: slate gray
     0x2965, // panel: slightly lighter slate for card surfaces
     0x03FF, // primaryGaugeArc: accent blue
@@ -27,12 +33,14 @@ constexpr ThemeColors kModernFlatTheme = {
     true,   // showOuterTicks
     false,  // useSevenSegmentFont
     labels::kThemeNameModernFlat,
+    {},     // valueFonts: initialized via initializeThemeFonts()
+    {},     // numberedFonts: not used
 };
 
 // Torque Neon: high-tech digital look inspired by the Torque Pro Android app
 // (see docs/cyd-obd2-ui-cluster-guide.md). Black background, saturated neon
 // gauge arcs, hot-orange warnings.
-constexpr ThemeColors kTorqueNeonTheme = {
+ThemeColors kTorqueNeonTheme = {
     0x0000, // background: black
     0x0862, // panel: near-black blue card surface
     0x07E0, // primaryGaugeArc: neon green
@@ -53,6 +61,8 @@ constexpr ThemeColors kTorqueNeonTheme = {
     true,   // showOuterTicks
     false,  // useSevenSegmentFont
     labels::kThemeNameTorqueNeon,
+    {},     // valueFonts: initialized via initializeThemeFonts()
+    {},     // numberedFonts: not used
 };
 
 // Mustang S197: OEM 2005-2010 Ford Mustang instrument cluster look (see
@@ -79,6 +89,8 @@ constexpr ThemeColors kMustangS197Theme = {
     false,  // showOuterTicks: only the inner tick segment is shown
     true,   // useSevenSegmentFont: TFT_eSPI Font 7 for large readouts
     labels::kThemeNameMustangS197,
+    {},     // valueFonts: nullptr array (use default GLCD font)
+    {0, 7, 7}, // numberedFonts: Font 7 (7-segment LCD) for tiers 3/4 (boost/vacuum and RPM/Speed); tier 2 (drawValueBox) stays on default
 };
 
 } // namespace
@@ -90,4 +102,45 @@ const ThemeColors& getTheme(ThemeId id) {
         case ThemeId::ModernFlat:
         default: return kModernFlatTheme;
     }
+}
+
+void applyValueFont(TFT_eSPI& tft, const ThemeColors& theme, uint8_t size) {
+    if (size < 2 || size > 4) {
+        return;
+    }
+    int idx = size - 2;
+
+    // Check free fonts first (GFXFF)
+    const GFXfont* font = theme.valueFonts[idx];
+    if (font != nullptr) {
+        tft.setFreeFont(font);
+        tft.setTextSize(1);
+        return;
+    }
+
+    // Check numbered fonts (Font 1-8)
+    uint8_t numberedFont = theme.numberedFonts[idx];
+    if (numberedFont > 0) {
+        tft.setTextFont(numberedFont);
+        tft.setTextSize(1);
+        return;
+    }
+
+    // Fall back to default: Font 1 at the original size tier
+    tft.setTextFont(1);
+    tft.setTextSize(size);
+}
+
+void resetValueFont(TFT_eSPI& tft) {
+    tft.setTextFont(1);
+}
+
+void initializeThemeFonts() {
+    kModernFlatTheme.valueFonts[0] = &FreeSans12pt7b;
+    kModernFlatTheme.valueFonts[1] = &FreeSans18pt7b;
+    kModernFlatTheme.valueFonts[2] = &FreeSans24pt7b;
+
+    kTorqueNeonTheme.valueFonts[0] = &Orbitron_Light_24;
+    kTorqueNeonTheme.valueFonts[1] = &Orbitron_Light_24;
+    kTorqueNeonTheme.valueFonts[2] = &Orbitron_Light_32;
 }

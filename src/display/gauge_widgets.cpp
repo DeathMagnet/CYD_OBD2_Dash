@@ -206,6 +206,9 @@ void drawValueBox(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width,
     // original fixed offset exactly when labelTextSize is left at its default.
     int32_t valueY = y + 8 * labelTextSize + 6;
     tft.setTextColor(valid ? theme.textPrimary : theme.textSecondary, theme.panel);
+    applyValueFont(tft, theme, 2);
+    drawFieldText(tft, valid ? formattedValue : "--", x + width / 2, y + 14, width - 4, theme.panel);
+    resetValueFont(tft);
     tft.setTextSize(valueTextSize);
     drawFieldText(tft, valid ? formattedValue : "--", x + width / 2, valueY, width - 4, theme.panel);
 }
