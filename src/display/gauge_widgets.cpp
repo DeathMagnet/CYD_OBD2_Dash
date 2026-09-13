@@ -202,14 +202,23 @@ void drawStatusBadge(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width, int32_t
 }
 
 void drawMilIndicator(TFT_eSPI& tft, int32_t centerX, int32_t centerY, bool milOn, const ThemeColors& theme) {
-    uint16_t ringColor = milOn ? theme.warningActive : theme.textSecondary;
-    tft.fillCircle(centerX, centerY, 10, milOn ? ringColor : theme.panel);
-    tft.drawCircle(centerX, centerY, 10, ringColor);
+    // Clear the indicator's bounding box on every redraw to prevent stale pixels
+    // when the MIL transitions from on to off.
+    constexpr int32_t kClearRadius = 12;
+    tft.fillCircle(centerX, centerY, kClearRadius, theme.panel);
 
+    if (!milOn) {
+        return; // Indicator only shown when MIL is active
+    }
+
+    // Draw three bold exclamation points in warning red
     tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(milOn ? theme.background : ringColor, milOn ? ringColor : theme.panel);
-    tft.setTextSize(1);
-    tft.drawString("CEL", centerX, centerY);
+    tft.setTextColor(theme.warningActive, theme.panel);
+    tft.setTextSize(2);
+
+    // Simulate bold by drawing twice with a 1px horizontal offset
+    tft.drawString("!!!", centerX - 1, centerY);
+    tft.drawString("!!!", centerX, centerY);
 }
 
 void drawModeToggleButton(TFT_eSPI& tft, int32_t centerX, int32_t centerY, bool showGear, const ThemeColors& theme) {
