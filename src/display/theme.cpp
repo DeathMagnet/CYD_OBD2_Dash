@@ -11,6 +11,7 @@ constexpr ThemeColors kModernFlatTheme = {
     0x2965, // panel: slightly lighter slate for card surfaces
     0x03FF, // primaryGaugeArc: accent blue
     0x7BEF, // secondaryGaugeArc: muted gray-blue
+    0x7BEF, // tickInactiveColor: muted gray-blue (matches secondaryGaugeArc)
     0xFFFF, // needle: crisp white
     0x03FF, // needleCap: accent blue
     0xFD20, // cautionArc: orange (Shift Light RPM -> Redline RPM zone)
@@ -22,6 +23,8 @@ constexpr ThemeColors kModernFlatTheme = {
     0x5D1F, // touchHighlight: light blue
     0x262B, // unsavedActive: green (Save button, unsaved config changes)
     0x262B, // liveActive: green (OBDII badge, connection live)
+    false,  // showGaugeBezel
+    true,   // showOuterTicks
     labels::kThemeNameModernFlat,
 };
 
@@ -33,6 +36,7 @@ constexpr ThemeColors kTorqueNeonTheme = {
     0x0862, // panel: near-black blue card surface
     0x07E0, // primaryGaugeArc: neon green
     0x07FF, // secondaryGaugeArc: electric cyan
+    0x07FF, // tickInactiveColor: electric cyan (matches secondaryGaugeArc)
     0xFFFF, // needle: crisp white
     0xF81F, // needleCap: neon magenta accent
     0xFFE0, // cautionArc: neon yellow (Shift Light RPM -> Redline RPM zone)
@@ -44,7 +48,34 @@ constexpr ThemeColors kTorqueNeonTheme = {
     0xF81F, // touchHighlight: neon magenta
     0x07E0, // unsavedActive: neon green (Save button, unsaved config changes)
     0x07E0, // liveActive: neon green (OBDII badge, connection live)
+    false,  // showGaugeBezel
+    true,   // showOuterTicks
     labels::kThemeNameTorqueNeon,
+};
+
+// Mustang S197: OEM 2005-2010 Ford Mustang instrument cluster look (see
+// docs/cyd-obd2-ui-cluster-guide.md). Deep midnight background, LED-green
+// gauge arcs and text, chrome bezels, vibrant red needle.
+constexpr ThemeColors kMustangS197Theme = {
+    0x0821, // background: deep midnight navy
+    0x10A5, // panel: slightly lighter navy card surface
+    0x07E0, // primaryGaugeArc: LED green
+    0x0000, // secondaryGaugeArc: black
+    0xC618, // tickInactiveColor: silver (lights up LED green once the needle passes)
+    0xF800, // needle: vibrant red
+    0xC618, // needleCap: chrome hub
+    0xFD20, // cautionArc: amber (Shift Light RPM -> Redline RPM zone)
+    0xF800, // dangerArc: red (Redline RPM -> end of sweep)
+    0xC618, // bezel: metallic chrome
+    0x07E0, // textPrimary: LED green
+    0x5D8D, // textSecondary: soft LED green
+    0xF8C0, // warningActive: amber-orange
+    0x559F, // touchHighlight: light ice-blue
+    0x062B, // unsavedActive: green (Save button, unsaved config changes)
+    0x062B, // liveActive: green (OBDII badge, connection live)
+    true,   // showGaugeBezel: OEM chrome ring around round gauges
+    false,  // showOuterTicks: only the inner tick segment is shown
+    labels::kThemeNameMustangS197,
 };
 
 } // namespace
@@ -52,10 +83,7 @@ constexpr ThemeColors kTorqueNeonTheme = {
 const ThemeColors& getTheme(ThemeId id) {
     switch (id) {
         case ThemeId::TorqueNeon: return kTorqueNeonTheme;
-        // Mustang S197 is not implemented yet (deliberately deferred); it
-        // falls back to Modern Flat so callers always get a complete,
-        // correct palette.
-        case ThemeId::MustangS197:
+        case ThemeId::MustangS197: return kMustangS197Theme;
         case ThemeId::ModernFlat:
         default: return kModernFlatTheme;
     }

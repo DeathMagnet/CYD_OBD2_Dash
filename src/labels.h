@@ -120,5 +120,6 @@ constexpr const char* kTouchAnywhereToCalibrate = "Touch anywhere on screen";
 // ---- Theme ----
 constexpr const char* kThemeNameModernFlat = "Modern Flat";
 constexpr const char* kThemeNameTorqueNeon = "Torque Neon";
+constexpr const char* kThemeNameMustangS197 = "Mustang S197";
 
 } // namespace labels

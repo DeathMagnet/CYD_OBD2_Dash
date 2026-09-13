@@ -54,7 +54,9 @@ void ClusterPages::drawStatusStrip(ConnectionState connectionState, bool sdLoggi
     gaugewidgets::drawStatusBadge(tft_, layout::kBadgeX, layout::kBadgeY, layout::kBadgeW, layout::kBadgeH, label,
                                    color, theme_.background);
 
-    uint16_t sdColor = sdLoggingActive ? theme_.primaryGaugeArc : theme_.warningActive;
+    constexpr uint16_t kSdActiveColor = 0x07E0;   // green: SD logging active
+    constexpr uint16_t kSdInactiveColor = 0x0320; // dark green: SD logging inactive
+    uint16_t sdColor = sdLoggingActive ? kSdActiveColor : kSdInactiveColor;
     tft_.fillCircle(layout::kSdLightCenterX, layout::kSdLightCenterY, layout::kSdLightRadius, sdColor);
 }
 
@@ -150,6 +152,11 @@ void ClusterPages::drawPage1Static() {
     speedArc_.invalidate();
     throttleBar_.invalidate();
 
+    // Must match the RPM/Speed gauge geometry in drawPage1Dynamic().
+    constexpr int32_t kRpmGaugeCx = 130, kSpeedGaugeCx = 350, kGaugeCy = 145, kGaugeRadius = 95;
+    gaugewidgets::drawGaugeBezel(tft_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, theme_);
+    gaugewidgets::drawGaugeBezel(tft_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, theme_);
+
     constexpr int32_t kRowY = 250, kRowH = 60, kColW = 154, kColGap = 5;
     for (int i = 0; i < 3; ++i) {
         int32_t x = 4 + i * (kColW + kColGap);
@@ -158,7 +165,7 @@ void ClusterPages::drawPage1Static() {
 }
 
 void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
-    constexpr int32_t kRpmGaugeCx = 130, kSpeedGaugeCx = 350, kGaugeCy = 150, kGaugeRadius = 95;
+    constexpr int32_t kRpmGaugeCx = 130, kSpeedGaugeCx = 350, kGaugeCy = 145, kGaugeRadius = 95;
 
     const AppSettings& settings = configStore_.settings();
     bool metric = settings.useMetricUnits;
@@ -265,6 +272,11 @@ void ClusterPages::drawPage2Static() {
     loadArc_.invalidate();
     stftBar_.invalidate();
     ltftBar_.invalidate();
+
+    // Must match the Engine Load gauge geometry in drawPage2Dynamic().
+    constexpr int32_t kGaugeCx = 130, kGaugeCy = 130, kGaugeRadius = 78;
+    gaugewidgets::drawGaugeBezel(tft_, kGaugeCx, kGaugeCy, kGaugeRadius, theme_);
+
     tft_.fillRoundRect(250, 50, 220, 110, 6, theme_.panel);
     tft_.fillRoundRect(20, 220, 210, 80, 6, theme_.panel);
     tft_.fillRoundRect(250, 220, 210, 80, 6, theme_.panel);
@@ -330,6 +342,11 @@ void ClusterPages::drawPage3Static() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
     vacuumArc_.invalidate();
+
+    // Must match the Vacuum/Boost gauge geometry in drawPage3Dynamic().
+    constexpr int32_t kVacCx = 240, kVacCy = 194, kVacR = 70;
+    gaugewidgets::drawGaugeBezel(tft_, kVacCx, kVacCy, kVacR, theme_);
+
     tft_.fillRoundRect(10, 50, 225, 70, 6, theme_.panel);
     tft_.fillRoundRect(245, 50, 225, 70, 6, theme_.panel);
     tft_.fillRoundRect(10, 245, 140, 65, 6, theme_.panel);
