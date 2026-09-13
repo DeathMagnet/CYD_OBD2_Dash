@@ -691,10 +691,13 @@ void ClusterPages::drawConfigLogsStatic() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
 
-    for (int i = 0; i <= 4; ++i) {
-        int32_t y = layout::kHeaderHeight + i * layout::kConfigRowHeight;
-        tft_.drawFastHLine(0, y, layout::kScreenWidth, theme_.bezel);
-    }
+    // Log Units + its warning form a taller section than the standard 40px
+    // row, so the grid lines below aren't evenly spaced like the loop-based
+    // approach other config pages use.
+    tft_.drawFastHLine(0, layout::kConfigRow0Y, layout::kScreenWidth, theme_.bezel);
+    tft_.drawFastHLine(0, layout::kConfigRow1Y, layout::kScreenWidth, theme_.bezel);
+    tft_.drawFastHLine(0, layout::kLogsSummaryRowY, layout::kScreenWidth, theme_.bezel);
+    tft_.drawFastHLine(0, layout::kLogsSummaryRowY + layout::kConfigRowHeight, layout::kScreenWidth, theme_.bezel);
 
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
@@ -704,17 +707,17 @@ void ClusterPages::drawConfigLogsStatic() {
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
 
-    // Log Units row (row 2)
-    tft_.drawString(labels::kLabelLogUnits, 12, layout::kConfigRow2Y + layout::kConfigRowHeight / 2);
-    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow2Y + layout::kConfigButtonInsetY,
+    // Log Units row (row 1), with the warning drawn directly below it
+    tft_.drawString(labels::kLabelLogUnits, 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
+    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow1Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
 
-    // Warning text (row 3) — drawn static since it never changes
-    tft_.setTextDatum(MC_DATUM);
+    // Warning text, left-aligned directly under the Log Units label — drawn
+    // static since it never changes
+    tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.warningActive, theme_.background);
     tft_.setTextSize(1);
-    tft_.drawString(labels::kWarningLogUnitsDeletesLogs, layout::kScreenWidth / 2,
-                     layout::kConfigRow3Y + layout::kConfigRowHeight / 2);
+    tft_.drawString(labels::kWarningLogUnitsDeletesLogs, 12, layout::kConfigRow1Y + layout::kConfigRowHeight + 6);
 
     // Force drawConfigLogsDynamic() to repaint every region the next time it
     // runs, since the static redraw above just wiped them all.
@@ -740,14 +743,14 @@ void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
         strncpy(runtimeState_.cfgLogIntervalDrawn, buf, sizeof(runtimeState_.cfgLogIntervalDrawn) - 1);
     }
 
-    // Log Units row (row 2)
+    // Log Units row (row 1)
     snprintf(buf, sizeof(buf), "%s", settings.useMetricLogs ? labels::kLabelUnitsMetric : labels::kLabelUnitsStandard);
     if (strcmp(buf, runtimeState_.cfgLogUnitsDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
         tft_.setTextSize(1);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigCycleX + layout::kConfigCycleW / 2,
-                                     layout::kConfigRow2Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
+                                     layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
                                      theme_.background);
         strncpy(runtimeState_.cfgLogUnitsDrawn, buf, sizeof(runtimeState_.cfgLogUnitsDrawn) - 1);
     }
@@ -765,7 +768,7 @@ void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
             tft_.setTextDatum(ML_DATUM);
             tft_.setTextColor(theme_.textPrimary, theme_.background);
             tft_.setTextSize(1);
-            gaugewidgets::drawFieldText(tft_, buf, 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2,
+            gaugewidgets::drawFieldText(tft_, buf, 12, layout::kLogsSummaryRowY + layout::kConfigRowHeight / 2,
                                          layout::kConfigDeleteX - 20, theme_.background);
             strncpy(runtimeState_.cfgLogSummaryDrawn, buf, sizeof(runtimeState_.cfgLogSummaryDrawn) - 1);
         }
@@ -778,16 +781,16 @@ void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
     }
     if (runtimeState_.cfgDeleteConfirmDrawn != static_cast<int8_t>(confirmArmed)) {
         uint16_t deleteColor = confirmArmed ? theme_.warningActive : theme_.panel;
-        tft_.fillRoundRect(layout::kConfigDeleteX, layout::kConfigRow1Y + layout::kConfigButtonInsetY,
+        tft_.fillRoundRect(layout::kConfigDeleteX, layout::kLogsSummaryRowY + layout::kConfigButtonInsetY,
                             layout::kConfigDeleteW, layout::kConfigButtonH, 6, deleteColor);
-        tft_.drawRoundRect(layout::kConfigDeleteX, layout::kConfigRow1Y + layout::kConfigButtonInsetY,
+        tft_.drawRoundRect(layout::kConfigDeleteX, layout::kLogsSummaryRowY + layout::kConfigButtonInsetY,
                             layout::kConfigDeleteW, layout::kConfigButtonH, 6, theme_.bezel);
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextSize(1);
         tft_.setTextColor(confirmArmed ? theme_.background : theme_.textPrimary, deleteColor);
         tft_.drawString(confirmArmed ? labels::kButtonTapToConfirm : labels::kButtonDeleteAllLogs,
                          layout::kConfigDeleteX + layout::kConfigDeleteW / 2,
-                         layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
+                         layout::kLogsSummaryRowY + layout::kConfigRowHeight / 2);
         runtimeState_.cfgDeleteConfirmDrawn = static_cast<int8_t>(confirmArmed);
     }
 }

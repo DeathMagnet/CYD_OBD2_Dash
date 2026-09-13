@@ -64,7 +64,12 @@ constexpr int32_t kConfigButtonH = kConfigRowHeight - 2 * kConfigButtonInsetY;
 
 constexpr int32_t kConfigCycleX = 240, kConfigCycleW = 210;   // Logs row 0: tap-to-cycle log interval
 constexpr int32_t kConfigSaveX = 20, kConfigSaveW = 440;      // Footer: full-width save button
-constexpr int32_t kConfigDeleteX = 300, kConfigDeleteW = 160; // Logs row 1: delete-all-logs button
+constexpr int32_t kConfigDeleteX = 300, kConfigDeleteW = 160; // Logs: delete-all-logs button
+
+// Logs page only: Log Units + its warning line form a taller section than
+// the standard 40px row, so the Log Summary/Delete row that follows it is
+// pushed down and no longer lines up with the shared row grid.
+constexpr int32_t kLogsSummaryRowY = kConfigRow1Y + 58; // 138
 
 // Page 4 (Performance & Telemetry): 0-60 MPH timer tap-to-reset box.
 constexpr int32_t kPerfTimerX0 = 140, kPerfTimerY0 = 125, kPerfTimerX1 = 340, kPerfTimerY1 = 180;
