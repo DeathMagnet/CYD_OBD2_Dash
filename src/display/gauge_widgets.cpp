@@ -108,10 +108,14 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
 }
 
 void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, float value, float maxValue,
-                     float minorInterval, float majorInterval, float excludeFromValue, const ThemeColors& theme) {
-    if (minorInterval <= 0.0F || maxValue <= 0.0F) {
+                     float minorInterval, float majorInterval, float excludeFromValue, TickMode tickMode,
+                     const ThemeColors& theme) {
+    if (minorInterval <= 0.0F || maxValue <= 0.0F || tickMode == TickMode::Off) {
         return;
     }
+    bool drawInner = tickMode == TickMode::InsideOnly || tickMode == TickMode::InsideAndOutside;
+    bool drawOuter = theme.showOuterTicks &&
+                      (tickMode == TickMode::OutsideOnly || tickMode == TickMode::InsideAndOutside);
     constexpr float kDegToRad = 3.14159265F / 180.0F;
     constexpr int32_t kMinorTickLenPx = 4;
     constexpr int32_t kMajorTickLenPx = 8;
@@ -144,10 +148,12 @@ void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t rad
         int32_t yInner1 = centerY + static_cast<int32_t>(dirY * innerRadius);
 
         uint16_t tickColor = (value >= tickValue) ? theme.primaryGaugeArc : theme.tickInactiveColor;
-        if (theme.showOuterTicks) {
+        if (drawOuter) {
             tft.drawLine(xOuter0, yOuter0, xOuter1, yOuter1, tickColor);  // outside: radius to radius+tickLen
         }
-        tft.drawLine(xInner0, yInner0, xInner1, yInner1, tickColor);   // inside: innerRadius-tickLen to innerRadius
+        if (drawInner) {
+            tft.drawLine(xInner0, yInner0, xInner1, yInner1, tickColor);   // inside: innerRadius-tickLen to innerRadius
+        }
     }
 }
 

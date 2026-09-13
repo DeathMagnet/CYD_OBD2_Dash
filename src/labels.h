@@ -61,8 +61,10 @@ constexpr const char* kLabelUnits = "UNITS";
 constexpr const char* kLabelUnitsStandard = "STANDARD (MPH/F/PSI)";
 constexpr const char* kLabelUnitsMetric = "METRIC (KM/H/C/KPA)";
 constexpr const char* kLabelGaugeTicks = "GAUGE TICKS";
-constexpr const char* kLabelTicksOn = "ON";
-constexpr const char* kLabelTicksOff = "OFF";
+constexpr const char* kLabelTickModeOff = "TICS OFF";
+constexpr const char* kLabelTickModeInsideOnly = "INSIDE TICS ONLY";
+constexpr const char* kLabelTickModeOutsideOnly = "OUTSIDE TICS ONLY";
+constexpr const char* kLabelTickModeInsideAndOutside = "INSIDE AND OUTSIDE TICS";
 
 // ---- Config: User Vars ----
 constexpr const char* kLabelBoostBaroBaseline = "BOOST BARO BASELINE";

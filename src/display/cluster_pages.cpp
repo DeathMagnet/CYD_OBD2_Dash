@@ -203,13 +203,14 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     gaugewidgets::drawArcGauge(tft_, speedArc_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
                                 kSpeedMax, kSpeedMax, kSpeedMax, theme_.background, theme_);
 
-    if (settings.showGaugeTicks) {
+    TickMode tickMode = static_cast<TickMode>(settings.tickMode);
+    if (tickMode != TickMode::Off) {
         gaugewidgets::drawGaugeTicks(tft_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue, kRpmMax,
                                       config::kRpmTickIntervalMinor, config::kRpmTickIntervalMajor,
-                                      static_cast<float>(settings.redlineRpm), theme_);
+                                      static_cast<float>(settings.redlineRpm), tickMode, theme_);
         gaugewidgets::drawGaugeTicks(tft_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
                                       kSpeedMax, config::kSpeedTickIntervalMinor, config::kSpeedTickIntervalMajor,
-                                      kSpeedMax, theme_);
+                                      kSpeedMax, tickMode, theme_);
     }
 
     bool shiftLightOn = snapshot.rpm.valid && snapshot.rpm.value >= settings.shiftLightRpm;
@@ -664,7 +665,15 @@ void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
         strncpy(runtimeState_.cfgUnitsDrawn, buf, sizeof(runtimeState_.cfgUnitsDrawn) - 1);
     }
 
-    snprintf(buf, sizeof(buf), "%s", settings.showGaugeTicks ? labels::kLabelTicksOn : labels::kLabelTicksOff);
+    const char* tickModeLabel;
+    switch (static_cast<TickMode>(settings.tickMode)) {
+        case TickMode::InsideOnly: tickModeLabel = labels::kLabelTickModeInsideOnly; break;
+        case TickMode::OutsideOnly: tickModeLabel = labels::kLabelTickModeOutsideOnly; break;
+        case TickMode::InsideAndOutside: tickModeLabel = labels::kLabelTickModeInsideAndOutside; break;
+        case TickMode::Off:
+        default: tickModeLabel = labels::kLabelTickModeOff; break;
+    }
+    snprintf(buf, sizeof(buf), "%s", tickModeLabel);
     if (strcmp(buf, runtimeState_.cfgTicksDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
