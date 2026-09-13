@@ -4,8 +4,10 @@
 //
 // Copy this file to "local_config.h" (same directory) and adjust the values
 // for your own adapter. "local_config.h" is gitignored so personal Bluetooth
-// identifiers never land in version control. If "local_config.h" is absent,
-// obd_client.cpp falls back to the generic defaults in app_config.h.
+// identifiers never land in version control. When present, this always takes
+// priority over the on-device Config: OBD Adapter page. If "local_config.h"
+// is absent, obd_client.cpp uses the adapter name/PIN picked on that page
+// (persisted via ConfigStore, defaulting to app_config.h's generic defaults).
 
 namespace localconfig {
 

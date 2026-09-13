@@ -73,6 +73,7 @@ void ClusterPages::drawStatic(ClusterPage page, const TelemetrySnapshot& snapsho
         case ClusterPage::ConfigGauges: drawConfigGaugesStatic(); break;
         case ClusterPage::ConfigUserVars: drawConfigUserVarsStatic(); break;
         case ClusterPage::ConfigLogs: drawConfigLogsStatic(); break;
+        case ClusterPage::ConfigObd: drawConfigObdStatic(); break;
         case ClusterPage::Diagnostics: drawPage6Static(); break;
         default: break;
     }
@@ -96,6 +97,7 @@ void ClusterPages::drawDynamic(ClusterPage page, const TelemetrySnapshot& snapsh
         case ClusterPage::ConfigGauges: drawConfigGaugesDynamic(nowMs); break;
         case ClusterPage::ConfigUserVars: drawConfigUserVarsDynamic(nowMs); break;
         case ClusterPage::ConfigLogs: drawConfigLogsDynamic(nowMs); break;
+        case ClusterPage::ConfigObd: drawConfigObdDynamic(nowMs); break;
         case ClusterPage::Diagnostics: drawPage6Dynamic(snapshot, nowMs); break;
         default: break;
     }
@@ -792,6 +794,66 @@ void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
                          layout::kConfigDeleteX + layout::kConfigDeleteW / 2,
                          layout::kLogsSummaryRowY + layout::kConfigRowHeight / 2);
         runtimeState_.cfgDeleteConfirmDrawn = static_cast<int8_t>(confirmArmed);
+    }
+}
+
+// ---------------------------------------------------------------- Config: OBD Adapter --
+
+void ClusterPages::drawConfigObdStatic() {
+    tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
+                  theme_.background);
+
+    tft_.drawFastHLine(0, layout::kConfigRow0Y, layout::kScreenWidth, theme_.bezel);
+    tft_.drawFastHLine(0, layout::kConfigRow1Y, layout::kScreenWidth, theme_.bezel);
+    tft_.drawFastHLine(0, layout::kConfigRow1Y + layout::kConfigRowHeight, layout::kScreenWidth, theme_.bezel);
+
+    tft_.setTextDatum(ML_DATUM);
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    tft_.setTextSize(1);
+    tft_.drawString(labels::kLabelObdAdapterName, 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+    tft_.drawString(labels::kLabelObdAdapterPin, 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
+
+    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
+                        layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
+    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow1Y + layout::kConfigButtonInsetY,
+                        layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
+
+    // Informational hint, not a warning - drawn static since it never changes.
+    tft_.setTextDatum(MC_DATUM);
+    tft_.setTextColor(theme_.textSecondary, theme_.background);
+    tft_.setTextSize(1);
+    tft_.drawString(labels::kHintObdReconnectOnSave, layout::kScreenWidth / 2, layout::kConfigRow1Y + layout::kConfigRowHeight + 24);
+
+    // Force drawConfigObdDynamic() to repaint every region the next time it
+    // runs, since the static redraw above just wiped them all.
+    runtimeState_.cfgObdAdapterNameDrawn[0] = '\0';
+    runtimeState_.cfgObdAdapterPinDrawn[0] = '\0';
+}
+
+void ClusterPages::drawConfigObdDynamic(uint32_t nowMs) {
+    (void)nowMs;
+    const AppSettings& settings = configStore_.settings();
+
+    if (strcmp(settings.obdAdapterName, runtimeState_.cfgObdAdapterNameDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, settings.obdAdapterName, layout::kConfigCycleX + layout::kConfigCycleW / 2,
+                                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgObdAdapterNameDrawn, settings.obdAdapterName,
+                sizeof(runtimeState_.cfgObdAdapterNameDrawn) - 1);
+    }
+
+    if (strcmp(settings.obdAdapterPin, runtimeState_.cfgObdAdapterPinDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, settings.obdAdapterPin, layout::kConfigCycleX + layout::kConfigCycleW / 2,
+                                     layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgObdAdapterPinDrawn, settings.obdAdapterPin,
+                sizeof(runtimeState_.cfgObdAdapterPinDrawn) - 1);
     }
 }
 

@@ -27,7 +27,32 @@ bool isValidLogIntervalMs(uint32_t intervalMs) {
     return false;
 }
 
+bool isValidObdAdapterName(const char* name) {
+    for (size_t i = 0; i < config::kObdAdapterNameOptionCount; ++i) {
+        if (strcmp(config::kObdAdapterNameOptions[i], name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isValidObdAdapterPin(const char* pin) {
+    for (size_t i = 0; i < config::kObdAdapterPinOptionCount; ++i) {
+        if (strcmp(config::kObdAdapterPinOptions[i], pin) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
+
+AppSettings::AppSettings() {
+    strncpy(obdAdapterName, config::kObdDefaultAdapterName, sizeof(obdAdapterName) - 1);
+    obdAdapterName[sizeof(obdAdapterName) - 1] = '\0';
+    strncpy(obdAdapterPin, config::kObdDefaultAdapterPin, sizeof(obdAdapterPin) - 1);
+    obdAdapterPin[sizeof(obdAdapterPin) - 1] = '\0';
+}
 
 ConfigStore::ConfigStore(SdManager& sdManager) : sdManager_(sdManager) {}
 
@@ -67,6 +92,14 @@ bool ConfigStore::parseLine(const char* line) {
         settings_.useMetricUnits = (atol(valueStr) != 0);
     } else if (strcmp(key, "log_units") == 0) {
         settings_.useMetricLogs = (atol(valueStr) != 0);
+    } else if (strcmp(key, "obd_adapter_name") == 0) {
+        const char* name = isValidObdAdapterName(valueStr) ? valueStr : config::kObdAdapterNameOptions[0];
+        strncpy(settings_.obdAdapterName, name, sizeof(settings_.obdAdapterName) - 1);
+        settings_.obdAdapterName[sizeof(settings_.obdAdapterName) - 1] = '\0';
+    } else if (strcmp(key, "obd_adapter_pin") == 0) {
+        const char* pin = isValidObdAdapterPin(valueStr) ? valueStr : config::kObdAdapterPinOptions[0];
+        strncpy(settings_.obdAdapterPin, pin, sizeof(settings_.obdAdapterPin) - 1);
+        settings_.obdAdapterPin[sizeof(settings_.obdAdapterPin) - 1] = '\0';
     } else {
         return false;
     }
@@ -156,6 +189,22 @@ void ConfigStore::setUseMetricLogs(bool metric) {
     settings_.useMetricLogs = metric;
 }
 
+void ConfigStore::setObdAdapterName(const char* name) {
+    if (!isValidObdAdapterName(name)) {
+        return;
+    }
+    strncpy(settings_.obdAdapterName, name, sizeof(settings_.obdAdapterName) - 1);
+    settings_.obdAdapterName[sizeof(settings_.obdAdapterName) - 1] = '\0';
+}
+
+void ConfigStore::setObdAdapterPin(const char* pin) {
+    if (!isValidObdAdapterPin(pin)) {
+        return;
+    }
+    strncpy(settings_.obdAdapterPin, pin, sizeof(settings_.obdAdapterPin) - 1);
+    settings_.obdAdapterPin[sizeof(settings_.obdAdapterPin) - 1] = '\0';
+}
+
 bool ConfigStore::isDirty() const {
     return settings_.shiftLightRpm != savedSettings_.shiftLightRpm ||
            settings_.redlineRpm != savedSettings_.redlineRpm ||
@@ -165,11 +214,18 @@ bool ConfigStore::isDirty() const {
            settings_.baroBaselinePsi != savedSettings_.baroBaselinePsi ||
            settings_.themeId != savedSettings_.themeId ||
            settings_.useMetricUnits != savedSettings_.useMetricUnits ||
-           settings_.useMetricLogs != savedSettings_.useMetricLogs;
+           settings_.useMetricLogs != savedSettings_.useMetricLogs ||
+           strcmp(settings_.obdAdapterName, savedSettings_.obdAdapterName) != 0 ||
+           strcmp(settings_.obdAdapterPin, savedSettings_.obdAdapterPin) != 0;
 }
 
 bool ConfigStore::isLogUnitsDirty() const {
     return settings_.useMetricLogs != savedSettings_.useMetricLogs;
+}
+
+bool ConfigStore::isObdCredentialsDirty() const {
+    return strcmp(settings_.obdAdapterName, savedSettings_.obdAdapterName) != 0 ||
+           strcmp(settings_.obdAdapterPin, savedSettings_.obdAdapterPin) != 0;
 }
 
 bool ConfigStore::save() {
@@ -199,6 +255,8 @@ bool ConfigStore::save() {
     file.printf("baro_baseline_psi=%.2f\n", settings_.baroBaselinePsi);
     file.printf("units=%u\n", settings_.useMetricUnits ? 1 : 0);
     file.printf("log_units=%u\n", settings_.useMetricLogs ? 1 : 0);
+    file.printf("obd_adapter_name=%s\n", settings_.obdAdapterName);
+    file.printf("obd_adapter_pin=%s\n", settings_.obdAdapterPin);
     file.flush();
     file.close();
 

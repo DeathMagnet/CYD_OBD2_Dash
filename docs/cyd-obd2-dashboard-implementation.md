@@ -137,7 +137,7 @@ src/
   app_config.h
   labels.h                   # Centralized UI label/status/button strings (namespace labels)
   secrets/
-    local_config.example.h   # Copy to local_config.h (gitignored) for your adapter's name/PIN
+    local_config.example.h   # Optional: copy to local_config.h (gitignored) to override adapter name/PIN at compile time (takes priority over the Config: OBD ADAPTER page if present)
   display/
     display_manager.h/.cpp   # TFT init, backlight, boot image (pre-existing)
     theme.h/.cpp             # ThemeColors + getTheme() - Modern Flat only today
@@ -270,7 +270,7 @@ This split design keeps OBD decode logic simple (no dual-path conversions) while
 
 Treat the snapshot as the renderer and logger boundary. The OBD client updates it only after parsing a response; the renderer must not perform Bluetooth I/O. Poll high-priority values such as RPM and speed more frequently than secondary PIDs, while avoiding adapter overload. Start with measured refresh behavior and tune using serial timing data rather than hard-coded optimistic intervals.
 
-**As built**, `ObdClient` polls the full set of standard Mode 01 PIDs a 2006 Mustang GT (4.6L 3V) exposes over generic OBD-II — RPM and speed every cycle, plus one of the remaining 16 PIDs round-robined per cycle (monitor status/MIL+DTC count, engine load, coolant, STFT/LTFT bank 1, MAP, timing advance, IAT, MAF, throttle, O2 B1S1/B2S1, fuel rail pressure, fuel level, barometric pressure, and control module voltage — see `src/obd/obd_pids.cpp` for the exact PID bytes and decode formulas). Mode 03/07 (DTC read) and Mode 04 (clear codes) are issued on demand from Page 6, not on the polling cycle. The adapter's Bluetooth SPP device name and legacy PIN default to `"OBDII"`/`"1234"` (`config::kObdDefaultAdapterName/Pin`); override them per-device by copying `src/secrets/local_config.example.h` to `src/secrets/local_config.h` (gitignored) rather than editing checked-in source, per the Configuration and Secrets section below.
+**As built**, `ObdClient` polls the full set of standard Mode 01 PIDs a 2006 Mustang GT (4.6L 3V) exposes over generic OBD-II — RPM and speed every cycle, plus one of the remaining 16 PIDs round-robined per cycle (monitor status/MIL+DTC count, engine load, coolant, STFT/LTFT bank 1, MAP, timing advance, IAT, MAF, throttle, O2 B1S1/B2S1, fuel rail pressure, fuel level, barometric pressure, and control module voltage — see `src/obd/obd_pids.cpp` for the exact PID bytes and decode formulas). Mode 03/07 (DTC read) and Mode 04 (clear codes) are issued on demand from Page 6, not on the polling cycle. The adapter's Bluetooth SPP device name and legacy PIN default to `"OBDII"`/`"1234"` (`config::kObdDefaultAdapterName/Pin`). Most users configure these at runtime via the Config: OBD ADAPTER page, where they can pick from preset lists (OBDII/OBDLink/Vgate/VEEPEAK/OBD2 and 1234/0000/1111/6789) and save to persist and reconnect immediately with no reboot. For adapters outside these presets, override the defaults per-device by copying `src/secrets/local_config.example.h` to `src/secrets/local_config.h` (gitignored); this compile-time override always takes priority over the Config page.
 
 **Units feature** (added post-spec): Both the UI and CSV logging support independent metric/standard toggles. Display units are configured on the UI config page and affect how speed, temperature, and pressure are rendered on all dashboard pages and stepper increments on config pages. CSV logging units are configured independently on the LOGS config page; changing this setting deletes all existing log files to prevent unit-mixed rows. See `src/system/units.h` for the conversion helper library and the UI & SD Logging guides for detailed mode documentation.
 
@@ -335,7 +335,7 @@ Logging rules:
 
 ## Configuration and Secrets
 
-Place user-adjustable values in `app_config.h`, including the Bluetooth adapter identity or pairing configuration, units, gauge ranges, warning thresholds, display/log intervals, and boot mode defaults. Centralize on-screen display text (labels, units, button/status strings, page titles) in `src/labels.h` (`namespace labels`) to keep rendered content audit-able and localization-ready. Do not hardcode personal adapter addresses, PINs, Wi-Fi credentials, or tokens in tracked source. Provide an ignored local configuration header or documented build flags for sensitive machine-specific settings.
+Place user-adjustable values in `app_config.h`, including default Bluetooth adapter identity or pairing configuration, units, gauge ranges, warning thresholds, display/log intervals, and boot mode defaults. The adapter name and PIN are also runtime-configurable via the Config: OBD ADAPTER page, where they persist to `/config.txt` through `ConfigStore` (most common use case), or via the compile-time `src/secrets/local_config.h` override for adapters outside the page's preset lists (takes priority when present). Centralize on-screen display text (labels, units, button/status strings, page titles) in `src/labels.h` (`namespace labels`) to keep rendered content audit-able and localization-ready. Do not hardcode personal adapter addresses, PINs, Wi-Fi credentials, or tokens in tracked source. Provide an ignored local configuration header or documented build flags for sensitive machine-specific settings.
 
 ## Implementation Sequence
 
@@ -363,6 +363,7 @@ Run these checks as implementation progresses:
 - Insert an SD card, confirm a new CSV has one header and parseable rows, then inspect it on a host machine.
 - Repeat without an SD card and confirm the dashboard stays functional while reporting logging unavailable.
 - Observe display rendering and Bluetooth recovery for an extended bench session; confirm no uncontrolled memory growth, watchdog resets, or UI stalls.
+- On the Config: OBD ADAPTER page, tap-cycle the Adapter Name and PIN rows through their presets, then tap Save and confirm the status badge drops to CONNECTING and re-establishes LIVE (live reconnect with new credentials, no reboot).
 
 ## Safety and Scope Notes
 

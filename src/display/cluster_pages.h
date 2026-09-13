@@ -26,6 +26,7 @@ enum class ClusterPage : uint8_t {
     ConfigGauges,         // config-group page ("GAUGES")
     ConfigUserVars,       // config-group page ("USER VARS")
     ConfigLogs,           // config-group page ("LOGS")
+    ConfigObd,            // config-group page ("OBD ADAPTER")
     Count
 };
 
@@ -94,6 +95,8 @@ struct ClusterPageRuntimeState {
     char cfgLogIntervalDrawn[24] = {0};    // Logs page
     char cfgLogUnitsDrawn[32] = {0};       // Logs page
     int8_t cfgDeleteConfirmDrawn = -1;     // Logs page
+    char cfgObdAdapterNameDrawn[24] = {0}; // OBD Adapter page
+    char cfgObdAdapterPinDrawn[16] = {0};  // OBD Adapter page
 
     // Shared config footer (Save button) - same "not drawn yet" convention as
     // above, reset whenever any config page's Static function reopens.
@@ -151,6 +154,8 @@ private:
     void drawConfigUserVarsDynamic(uint32_t nowMs);
     void drawConfigLogsStatic();
     void drawConfigLogsDynamic(uint32_t nowMs);
+    void drawConfigObdStatic();
+    void drawConfigObdDynamic(uint32_t nowMs);
     void drawConfigFooterStatic();
     void drawConfigFooterDynamic(uint32_t nowMs);
     void drawPage6Static();

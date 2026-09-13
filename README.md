@@ -89,13 +89,14 @@ Navigate with prev/next arrows in the header; cycles within this group only.
 - **Page 4 — Performance**: Calculated horsepower and torque, 0–60 timer, intake airflow rolling graph.
 - **Page 5 — Diagnostics**: Read, decode, and clear OBD-II Diagnostic Trouble Codes (DTCs). Tapping the Check Engine Light (MIL) on any page jumps here.
 
-### Config Group (Pages UI, GAUGES, USER VARS, LOGS)
+### Config Group (Pages UI, GAUGES, USER VARS, LOGS, OBD ADAPTER)
 Navigate with prev/next arrows in the header; cycles within this group only. All settings persist to `/config.txt` on the SD card.
 
 - **UI**: Display-only page showing the active theme (placeholder for future theme switching).
 - **GAUGES**: Configure Shift Light RPM and Redline RPM thresholds that control the warning arcs on Page 1.
 - **USER VARS**: User-adjustable variables like Boost Baro Baseline (atmospheric pressure baseline for vacuum/boost calculation).
 - **LOGS**: Configure SD card log write interval, view live log summary (file count and size), and delete all logs.
+- **OBD ADAPTER**: Pick the ELM327 Bluetooth adapter name and pairing PIN from preset lists (OBDII/OBDLink/Vgate/VEEPEAK/OBD2 and 1234/0000/1111/6789); saving reconnects immediately using the new values, no reboot required.
 
 A **shared Save button** appears at the bottom of every config page. It is **green** when any value differs from what's saved to SD, and **default color** when all settings match. Tap it to persist all changes to `/config.txt` and see "SAVED!" feedback.
 
