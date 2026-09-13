@@ -56,7 +56,6 @@ constexpr const char* kLabelZeroToHundredKph = "0-100 KM/H (TAP TO RESET)";
 
 // ---- Config: UI ----
 constexpr const char* kLabelActiveTheme = "ACTIVE THEME";
-constexpr const char* kLabelThemeStatus = "MODERN FLAT (ACTIVE) - OTHERS COMING SOON";
 constexpr const char* kLabelUnits = "UNITS";
 constexpr const char* kLabelUnitsStandard = "STANDARD (MPH/F/PSI)";
 constexpr const char* kLabelUnitsMetric = "METRIC (KM/H/C/KPA)";
@@ -111,5 +110,6 @@ constexpr const char* kTouchAnywhereToCalibrate = "Touch anywhere on screen";
 
 // ---- Theme ----
 constexpr const char* kThemeNameModernFlat = "Modern Flat";
+constexpr const char* kThemeNameTorqueNeon = "Torque Neon";
 
 } // namespace labels

@@ -90,6 +90,7 @@ struct ClusterPageRuntimeState {
     char cfgMaxSpeedDrawn[24] = {0};       // Gauges page
     char cfgBaroBaselineDrawn[24] = {0};   // User Vars page
     char cfgUnitsDrawn[32] = {0};          // UI page
+    char cfgThemeDrawn[24] = {0};          // UI page
     char cfgLogIntervalDrawn[24] = {0};    // Logs page
     char cfgLogUnitsDrawn[32] = {0};       // Logs page
     int8_t cfgDeleteConfirmDrawn = -1;     // Logs page
@@ -126,6 +127,10 @@ public:
 
     ClusterPageRuntimeState& runtimeState() { return runtimeState_; }
 
+    // Switches the active color theme. Callers must repaint (drawStatic) the
+    // visible page afterward to see the change; this only updates theme_.
+    void applyTheme(ThemeId id) { theme_ = getTheme(id); }
+
 private:
     void drawHeader(ClusterPage page, bool milOn);
     void drawStatusStrip(ConnectionState connectionState, bool sdLoggingActive);
@@ -155,7 +160,7 @@ private:
     ConfigStore& configStore_;
     CsvLogger& csvLogger_;
     ObdClient& obdClient_;
-    const ThemeColors& theme_;
+    ThemeColors theme_;
     ClusterPageRuntimeState runtimeState_;
     NeedlePhysics rpmNeedle_;
     NeedlePhysics speedNeedle_;

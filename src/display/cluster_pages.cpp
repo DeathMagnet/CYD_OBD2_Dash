@@ -483,13 +483,8 @@ void ClusterPages::drawConfigUiStatic() {
     tft_.setTextSize(1);
     tft_.drawString(labels::kLabelActiveTheme, 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
 
-    // Theme name never changes today (only one theme exists), so it only
-    // needs to be drawn once here rather than every drawConfigUiDynamic() tick.
-    tft_.setTextDatum(MC_DATUM);
-    tft_.setTextColor(theme_.textSecondary, theme_.background);
-    tft_.setTextSize(1);
-    tft_.drawString(labels::kLabelThemeStatus, (layout::kConfigMinusX + layout::kScreenWidth) / 2,
-                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
+                        layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
 
     // Units row
     tft_.setTextDatum(ML_DATUM);
@@ -502,12 +497,23 @@ void ClusterPages::drawConfigUiStatic() {
 
     // Force drawConfigUiDynamic() to repaint every region the next time it runs
     runtimeState_.cfgUnitsDrawn[0] = '\0';
+    runtimeState_.cfgThemeDrawn[0] = '\0';
 }
 
 void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
     (void)nowMs;
     const AppSettings& settings = configStore_.settings();
     char buf[32];
+
+    if (strcmp(theme_.name, runtimeState_.cfgThemeDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(1);
+        gaugewidgets::drawFieldText(tft_, theme_.name, layout::kConfigCycleX + layout::kConfigCycleW / 2,
+                                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgThemeDrawn, theme_.name, sizeof(runtimeState_.cfgThemeDrawn) - 1);
+    }
 
     snprintf(buf, sizeof(buf), "%s", settings.useMetricUnits ? labels::kLabelUnitsMetric : labels::kLabelUnitsStandard);
     if (strcmp(buf, runtimeState_.cfgUnitsDrawn) != 0) {
