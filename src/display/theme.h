@@ -41,6 +41,10 @@ struct ThemeColors {
     bool showGaugeBezel;    // Draw a decorative chrome ring around round gauges.
     bool showOuterTicks;    // Draw the tick segment outside the gauge ring too (inner segment always drawn).
     bool useSevenSegmentFont; // Use TFT_eSPI's built-in Font 7 (7-segment LED look) for large text (TextSize > 2).
+    bool useSegmentedBars;    // Render bar gauges as a segmented LED/VU-meter style
+                              // (discrete lit blocks) instead of a smooth continuous fill.
+    bool useSegmentedArcs;    // Render round gauges as a segmented LED ring style
+                              // (discrete lit wedges) instead of a smooth continuous arc.
     const char* name;
     const GFXfont* valueFonts[3]; // Fonts for setTextSize(2/3/4); indexed by (size - 2). nullptr = use default GLCD font.
     uint8_t numberedFonts[3]; // Numbered fonts (Font 1-8) for setTextSize(2/3/4). 0 = no override (use default); else font number passed to setTextFont().
