@@ -242,10 +242,18 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     } else {
         strcpy(rpmBuf, "--");
     }
+    // Reserve the field width from the widest expected reading (RPM can reach
+    // 4 digits, e.g. up to kMaxMaxRpm = 9000) rather than a guessed constant:
+    // Mustang S197's 7-segment font is wider per digit than other themes'
+    // fonts, so a fixed 120px field left part of a 4-digit value undrawn by
+    // the clear rect, leaving stale segments once the value dropped back to
+    // 3 digits.
+    constexpr const char* kRpmRepValue = "9000";
+    int32_t rpmFieldWidth = gaugewidgets::reservedValueWidth(tft_, theme_, 4, kRpmRepValue);
     tft_.setTextDatum(MC_DATUM);
     tft_.setTextColor(rpmTextColor, theme_.background);
     applyValueFont(tft_, theme_, 4);
-    gaugewidgets::drawFieldText(tft_, rpmBuf, kRpmGaugeCx, kGaugeCy - 5, 120, theme_.background);
+    gaugewidgets::drawFieldText(tft_, rpmBuf, kRpmGaugeCx, kGaugeCy - 5, rpmFieldWidth, theme_.background);
     resetValueFont(tft_);
     tft_.setTextSize(2);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
@@ -258,10 +266,15 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     } else {
         strcpy(speedBuf, "--");
     }
+    // See kRpmRepValue above: reserve the field from the widest expected
+    // reading rather than a guessed constant. Speed tops out at 3 digits even
+    // in km/h at the max configurable speed.
+    constexpr const char* kSpeedRepValue = "999";
+    int32_t speedFieldWidth = gaugewidgets::reservedValueWidth(tft_, theme_, 4, kSpeedRepValue);
     tft_.setTextDatum(MC_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
     applyValueFont(tft_, theme_, 4);
-    gaugewidgets::drawFieldText(tft_, speedBuf, kSpeedGaugeCx, kGaugeCy - 5, 120, theme_.background);
+    gaugewidgets::drawFieldText(tft_, speedBuf, kSpeedGaugeCx, kGaugeCy - 5, speedFieldWidth, theme_.background);
     resetValueFont(tft_);
     tft_.setTextSize(2);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
