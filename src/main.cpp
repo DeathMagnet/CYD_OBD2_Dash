@@ -10,6 +10,8 @@
 #include "obd/telemetry.h"
 #include "display/cluster_pages.h"
 #include "display/touch_handler.h"
+#include "display/theme.h"
+#include "system/status_led.h"
 
 // Subsystem instances
 static DisplayManager displayManager;
@@ -20,6 +22,7 @@ static CsvLogger csvLogger(sdManager);
 static ObdClient obdClient;
 static ClusterPages clusterPages(displayManager.getTft(), configStore, csvLogger, obdClient);
 static ClusterTouchHandler touchHandler(clusterPages, configStore, csvLogger, obdClient);
+static StatusLed statusLed;
 
 // State variables
 static uint32_t lastTouchPollMs = 0;
@@ -44,6 +47,9 @@ void setup() {
 
     // 1. Initialize Display & Backlight
     displayManager.begin();
+
+    // Initialize onboard RGB LED (Check Engine / shift-light indicator)
+    statusLed.begin();
 
     // 2. Render Static Boot Screen from native RGB565 PROGMEM array
     Serial.println("[Boot] Displaying static boot image...");
@@ -108,6 +114,12 @@ void loop() {
 
     TelemetrySnapshot snapshot;
     obdClient.getSnapshot(snapshot);
+
+    bool checkEngineOn = snapshot.milOn.valid && snapshot.milOn.value != 0.0F;
+    const AppSettings& settings = configStore.settings();
+    bool shiftLightOn = snapshot.rpm.valid && snapshot.rpm.value >= settings.shiftLightRpm;
+    uint16_t warningColor = getTheme(static_cast<ThemeId>(settings.themeId)).warningActive;
+    statusLed.update(checkEngineOn, shiftLightOn, warningColor, nowMs);
 
     clusterPages.updateBackgroundTelemetry(snapshot, nowMs);
 
