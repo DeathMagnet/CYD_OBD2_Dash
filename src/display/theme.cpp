@@ -111,7 +111,7 @@ const ThemeColors& getTheme(ThemeId id) {
 }
 
 void applyValueFont(TFT_eSPI& tft, const ThemeColors& theme, uint8_t size) {
-    if (size < 2 || size > 4) {
+    if (size < 2 || size > 5) {
         return;
     }
     int idx = size - 2;
@@ -132,6 +132,13 @@ void applyValueFont(TFT_eSPI& tft, const ThemeColors& theme, uint8_t size) {
         return;
     }
 
+    if (size == 5) {
+        // No dedicated tier-5 override for this theme (e.g. Mustang S197): fall back
+        // to tier 3 instead of an oversized default GLCD font.
+        applyValueFont(tft, theme, 3);
+        return;
+    }
+
     // Fall back to default: Font 1 at the original size tier
     tft.setTextFont(1);
     tft.setTextSize(size);
@@ -149,4 +156,9 @@ void initializeThemeFonts() {
     kTorqueNeonTheme.valueFonts[0] = &Orbitron_Light_24_Fixed;
     kTorqueNeonTheme.valueFonts[1] = &Orbitron_Light_24_Fixed;
     kTorqueNeonTheme.valueFonts[2] = &Orbitron_Light_32_Fixed;
+
+    // Tier 5: dedicated, larger Engine Load value font (reuses the RPM/Speed
+    // tier-4 font) without changing Boost/Vacuum's shared tier-3 size.
+    kModernFlatTheme.valueFonts[3] = &FreeSans24pt7b;
+    kTorqueNeonTheme.valueFonts[3] = &Orbitron_Light_32_Fixed;
 }

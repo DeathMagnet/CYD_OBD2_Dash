@@ -366,7 +366,7 @@ void ClusterPages::drawPage2Static() {
     // value width so the pair reads as centered on the gauge instead of
     // hugging its edge. Must match the layout in drawPage2Dynamic().
     int32_t loadUnitW = gaugewidgets::fixedUnitWidth(tft_, "%", 2);
-    int32_t loadValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 3, "100");
+    int32_t loadValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 5, "100");
     gaugewidgets::ValueUnitGroup loadGroup = gaugewidgets::centerValueUnitGroup(kGaugeCx, loadValueW, loadUnitW, 4);
     gaugewidgets::drawFixedUnit(tft_, "%", loadGroup.unitRightX, kGaugeCy, MR_DATUM, 2, theme_, theme_.background);
 
@@ -429,11 +429,11 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
 
     snprintf(buf, sizeof(buf), "%d", static_cast<int>(targetLoad));
     int32_t loadUnitW = gaugewidgets::fixedUnitWidth(tft_, "%", 2);
-    int32_t loadValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 3, "100");
+    int32_t loadValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 5, "100");
     gaugewidgets::ValueUnitGroup loadGroup = gaugewidgets::centerValueUnitGroup(kGaugeCx, loadValueW, loadUnitW, 4);
     tft_.setTextDatum(MR_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
-    applyValueFont(tft_, theme_, 3);
+    applyValueFont(tft_, theme_, 5);
     gaugewidgets::drawFieldText(tft_, snapshot.engineLoadPct.valid ? buf : "--", loadGroup.valueRightX, kGaugeCy,
                                  loadValueW, theme_.background);
     resetValueFont(tft_);

@@ -46,8 +46,10 @@ struct ThemeColors {
     bool useSegmentedArcs;    // Render round gauges as a segmented LED ring style
                               // (discrete lit wedges) instead of a smooth continuous arc.
     const char* name;
-    const GFXfont* valueFonts[3]; // Fonts for setTextSize(2/3/4); indexed by (size - 2). nullptr = use default GLCD font.
-    uint8_t numberedFonts[3]; // Numbered fonts (Font 1-8) for setTextSize(2/3/4). 0 = no override (use default); else font number passed to setTextFont().
+    const GFXfont* valueFonts[4]; // Fonts for setTextSize(2/3/4/5); indexed by (size - 2). nullptr = use default GLCD font.
+                                   // Tier 5 (index 3) is reserved for Engine Load's optionally-enlarged value; a
+                                   // theme that leaves it unset falls back to tier 3 (see applyValueFont()).
+    uint8_t numberedFonts[4]; // Numbered fonts (Font 1-8) for setTextSize(2/3/4/5). 0 = no override (use default); else font number passed to setTextFont().
 };
 
 const ThemeColors& getTheme(ThemeId id);
