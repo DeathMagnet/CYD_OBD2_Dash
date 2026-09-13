@@ -1,5 +1,6 @@
 #include "display/display_manager.h"
 #include "assets/boot_0_rgb565.h"
+#include "labels.h"
 #include <Arduino.h>
 
 DisplayManager::DisplayManager()
@@ -53,7 +54,7 @@ void DisplayManager::drawHelloWorld(uint16_t touchX, uint16_t touchY, bool isTou
     tft_.setTextColor(0x051D, 0x0821); // Cyan text
     tft_.setTextSize(2);
     tft_.setTextDatum(MC_DATUM);
-    tft_.drawString("CYD OBD-II DASHBOARD", 240, 20);
+    tft_.drawString(labels::kBootTitle, 240, 20);
 
     // Main Card Frame
     tft_.fillRoundRect(40, 60, 400, 180, 8, 0x18C3); // Slate frame
@@ -62,11 +63,11 @@ void DisplayManager::drawHelloWorld(uint16_t touchX, uint16_t touchY, bool isTou
     // Hello World Title
     tft_.setTextColor(TFT_WHITE, 0x18C3);
     tft_.setTextSize(3);
-    tft_.drawString("Hello, World!", 240, 110);
+    tft_.drawString(labels::kHelloWorld, 240, 110);
 
     tft_.setTextColor(0x07E0, 0x18C3); // Neon Green
     tft_.setTextSize(2);
-    tft_.drawString("Touch Calibration Active", 240, 160);
+    tft_.drawString(labels::kTouchCalibrationActive, 240, 160);
 
     // Touch readout box
     tft_.fillRect(40, 260, 400, 45, TFT_BLACK);
@@ -84,6 +85,6 @@ void DisplayManager::drawHelloWorld(uint16_t touchX, uint16_t touchY, bool isTou
         tft_.drawCircle(touchX, touchY, 7, TFT_WHITE);
     } else {
         tft_.setTextColor(0x7BEF, TFT_BLACK); // Gray
-        tft_.drawString("Touch anywhere on screen", 240, 282);
+        tft_.drawString(labels::kTouchAnywhereToCalibrate, 240, 282);
     }
 }

@@ -1,4 +1,5 @@
 #include "display/theme.h"
+#include "labels.h"
 
 namespace {
 
@@ -21,7 +22,7 @@ constexpr ThemeColors kModernFlatTheme = {
     0x5D1F, // touchHighlight: light blue
     0x262B, // unsavedActive: green (Save button, unsaved config changes)
     0x262B, // liveActive: green (OBDII badge, connection live)
-    "Modern Flat",
+    labels::kThemeNameModernFlat,
 };
 
 } // namespace

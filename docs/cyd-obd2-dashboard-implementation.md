@@ -135,6 +135,7 @@ The tree above was the starting proposal; the cluster UI and OBD/logging work la
 src/
   main.cpp
   app_config.h
+  labels.h                   # Centralized UI label/status/button strings (namespace labels)
   secrets/
     local_config.example.h   # Copy to local_config.h (gitignored) for your adapter's name/PIN
   display/
@@ -322,7 +323,7 @@ Logging rules:
 
 ## Configuration and Secrets
 
-Place user-adjustable values in `app_config.h`, including the Bluetooth adapter identity or pairing configuration, units, gauge ranges, warning thresholds, display/log intervals, and boot mode defaults. Do not hardcode personal adapter addresses, PINs, Wi-Fi credentials, or tokens in tracked source. Provide an ignored local configuration header or documented build flags for sensitive machine-specific settings.
+Place user-adjustable values in `app_config.h`, including the Bluetooth adapter identity or pairing configuration, units, gauge ranges, warning thresholds, display/log intervals, and boot mode defaults. Centralize on-screen display text (labels, units, button/status strings, page titles) in `src/labels.h` (`namespace labels`) to keep rendered content audit-able and localization-ready. Do not hardcode personal adapter addresses, PINs, Wi-Fi credentials, or tokens in tracked source. Provide an ignored local configuration header or documented build flags for sensitive machine-specific settings.
 
 ## Implementation Sequence
 
