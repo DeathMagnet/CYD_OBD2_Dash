@@ -21,6 +21,10 @@ constexpr const char* kPageTitles[] = {
 // ---- Page 1: Primary Cluster ----
 constexpr const char* kUnitRpm = "RPM";
 constexpr const char* kUnitMph = "MPH";
+constexpr const char* kUnitKph = "KM/H";
+constexpr const char* kUnitCelsius = "C";
+constexpr const char* kUnitFahrenheit = "F";
+constexpr const char* kUnitKpa = "KPA";
 constexpr const char* kLabelCoolant = "COOLANT";
 constexpr const char* kLabelIat = "IAT";
 constexpr const char* kLabelThrottle = "THROTTLE";
@@ -48,10 +52,14 @@ constexpr const char* kLabelIntakeAirflow60s = "INTAKE AIRFLOW (LAST 60s)";
 constexpr const char* kLabelEstHorsepower = "EST. HORSEPOWER";
 constexpr const char* kLabelEstTorque = "EST. TORQUE";
 constexpr const char* kLabelZeroToSixty = "0-60 MPH (TAP TO RESET)";
+constexpr const char* kLabelZeroToHundredKph = "0-100 KM/H (TAP TO RESET)";
 
 // ---- Config: UI ----
 constexpr const char* kLabelActiveTheme = "ACTIVE THEME";
 constexpr const char* kLabelThemeStatus = "MODERN FLAT (ACTIVE) - OTHERS COMING SOON";
+constexpr const char* kLabelUnits = "UNITS";
+constexpr const char* kLabelUnitsStandard = "STANDARD (MPH/F/PSI)";
+constexpr const char* kLabelUnitsMetric = "METRIC (KM/H/C/KPA)";
 
 // ---- Config: User Vars ----
 constexpr const char* kLabelBoostBaroBaseline = "BOOST BARO BASELINE";
@@ -61,9 +69,12 @@ constexpr const char* kLabelShiftLightRpm = "SHIFT LIGHT RPM";
 constexpr const char* kLabelRedlineRpm = "REDLINE RPM";
 constexpr const char* kLabelMaxRpm = "MAX RPM";
 constexpr const char* kLabelMaxSpeedMph = "MAX SPEED MPH";
+constexpr const char* kLabelMaxSpeedKph = "MAX SPEED KM/H";
 
 // ---- Config: Logs ----
 constexpr const char* kLabelLogInterval = "LOG INTERVAL";
+constexpr const char* kLabelLogUnits = "LOG UNITS";
+constexpr const char* kWarningLogUnitsDeletesLogs = "CHANGING THIS DELETES ALL LOGS ON SAVE";
 
 // ---- Config: Buttons & Status ----
 constexpr const char* kStepperMinus = "-";

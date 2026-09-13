@@ -20,6 +20,8 @@ struct AppSettings {
     // Modern Flat (2) renders today; Mustang S197 (0) and Torque Neon (1)
     // are reserved until those themes are implemented.
     uint8_t themeId = 2;
+    bool useMetricUnits = false; // Display units (dashboard pages, config fields)
+    bool useMetricLogs = false;  // CSV logging units
 };
 
 class ConfigStore {
@@ -38,12 +40,19 @@ public:
     void setMaxSpeedMph(uint16_t mph);
     void setLogIntervalMs(uint32_t intervalMs);
     void setBaroBaselinePsi(float psi);
+    void setUseMetricUnits(bool metric);
+    void setUseMetricLogs(bool metric);
 
     // True whenever the current settings differ from the last saved/loaded
     // snapshot (a live comparison, not a sticky flag - reverting a value back
     // to what's on SD clears this again). Drives the shared config-page Save
     // button's color.
     bool isDirty() const;
+
+    // True if useMetricLogs has changed since the last save; used to gate
+    // whether log files get wiped when Save is tapped (wipe only once, only if
+    // it actually changed relative to what's on SD).
+    bool isLogUnitsDirty() const;
 
     // Persists the current settings to /config.txt. Returns false if the SD
     // card is unavailable or the write fails; clears isDirty() on success.

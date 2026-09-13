@@ -98,6 +98,9 @@ constexpr uint16_t kMinMaxSpeedMph = 120;
 constexpr uint16_t kMaxMaxSpeedMph = 260;
 constexpr uint16_t kMaxSpeedStepMph = 10;
 constexpr uint16_t kDefaultMaxSpeedMph = 200; // Matches the previous hardcoded gauge scale.
+constexpr uint16_t kMaxSpeedStepKph = 10; // Metric equivalent step for Max Speed
+
+constexpr float kBaroBaselineStepKpa = 1.0F; // Metric equivalent step for Baro Baseline
 
 constexpr float kMinBaroBaselinePsi = 12.0F;
 constexpr float kMaxBaroBaselinePsi = 15.5F;
