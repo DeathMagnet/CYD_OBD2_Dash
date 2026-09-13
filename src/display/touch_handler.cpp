@@ -207,17 +207,18 @@ bool ClusterTouchHandler::handleConfigLogsTap(uint16_t x, uint16_t y, uint32_t n
         return false;
     }
 
-    // Log Units row (row 2)
-    int32_t row2 = layout::kConfigRow2Y + layout::kConfigButtonInsetY;
-    int32_t row2End = row2 + layout::kConfigButtonH;
-    if (within(x, y, layout::kConfigCycleX, row2, layout::kConfigCycleX + layout::kConfigCycleW, row2End)) {
+    // Log Units row (row 1)
+    int32_t row1 = layout::kConfigRow1Y + layout::kConfigButtonInsetY;
+    int32_t row1End = row1 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigCycleX, row1, layout::kConfigCycleX + layout::kConfigCycleW, row1End)) {
         configStore_.setUseMetricLogs(!settings.useMetricLogs);
         return false;
     }
 
-    int32_t row1 = layout::kConfigRow1Y + layout::kConfigButtonInsetY;
-    int32_t row1End = row1 + layout::kConfigButtonH;
-    if (within(x, y, layout::kConfigDeleteX, row1, layout::kConfigDeleteX + layout::kConfigDeleteW, row1End)) {
+    int32_t summaryRow = layout::kLogsSummaryRowY + layout::kConfigButtonInsetY;
+    int32_t summaryRowEnd = summaryRow + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigDeleteX, summaryRow, layout::kConfigDeleteX + layout::kConfigDeleteW,
+               summaryRowEnd)) {
         if (state.deleteLogsConfirmArmed && (nowMs - state.deleteLogsConfirmArmedAtMs < 5000)) {
             csvLogger_.deleteAllLogs();
             state.deleteLogsConfirmArmed = false;
