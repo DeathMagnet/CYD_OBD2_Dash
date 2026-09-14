@@ -74,6 +74,7 @@ void ClusterPages::drawStatic(ClusterPage page, const TelemetrySnapshot& snapsho
     bool milOn = snapshot.milOn.valid && snapshot.milOn.value != 0.0F;
     drawHeader(page, milOn);
     runtimeState_.headerMilOnDrawn = static_cast<int8_t>(milOn);
+    runtimeState_.statusStripDrawn = -1;
 
     switch (page) {
         case ClusterPage::PrimaryCluster: drawPage1Static(); break;
@@ -100,7 +101,10 @@ void ClusterPages::drawDynamic(ClusterPage page, const TelemetrySnapshot& snapsh
         gaugewidgets::drawMilIndicator(tft_, layout::kMilCenterX, layout::kMilCenterY, milOn, theme_);
         runtimeState_.headerMilOnDrawn = static_cast<int8_t>(milOn);
     }
-    drawStatusStrip(connectionState);
+    if (runtimeState_.statusStripDrawn != static_cast<int8_t>(connectionState)) {
+        drawStatusStrip(connectionState);
+        runtimeState_.statusStripDrawn = static_cast<int8_t>(connectionState);
+    }
 
     switch (page) {
         case ClusterPage::PrimaryCluster: drawPage1Dynamic(snapshot, nowMs); break;
@@ -158,6 +162,8 @@ void ClusterPages::drawPage1Static() {
     rpmArc_.invalidate();
     speedArc_.invalidate();
     throttleBar_.invalidate();
+    runtimeState_.rpmTickLitCountDrawn = -1;
+    runtimeState_.speedTickLitCountDrawn = -1;
 
     // Must match the RPM/Speed gauge geometry in drawPage1Dynamic().
     constexpr int32_t kRpmGaugeCx = 130, kSpeedGaugeCx = 350, kGaugeCy = 145, kGaugeRadius = 95;
@@ -222,12 +228,27 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
 
     TickMode tickMode = static_cast<TickMode>(settings.tickMode);
     if (tickMode != TickMode::Off) {
-        gaugewidgets::drawGaugeTicks(tft_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue, kRpmMax,
-                                      config::kRpmTickIntervalMinor, config::kRpmTickIntervalMajor,
-                                      static_cast<float>(settings.redlineRpm), tickMode, theme_);
-        gaugewidgets::drawGaugeTicks(tft_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
-                                      kSpeedMax, config::kSpeedTickIntervalMinor, config::kSpeedTickIntervalMajor,
-                                      kSpeedMax, tickMode, theme_);
+        // Ticks only visually change when the needle crosses into/out of a
+        // new lit tick, not on every UI refresh tick; skip the ~32 drawLine
+        // calls per gauge when the lit count hasn't moved since last drawn.
+        float rpmLitValue = (rpmNeedle_.currentValue < static_cast<float>(settings.redlineRpm))
+                                 ? rpmNeedle_.currentValue
+                                 : static_cast<float>(settings.redlineRpm);
+        int32_t rpmLitCount = static_cast<int32_t>(rpmLitValue / config::kRpmTickIntervalMinor);
+        if (rpmLitCount != runtimeState_.rpmTickLitCountDrawn) {
+            gaugewidgets::drawGaugeTicks(tft_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue, kRpmMax,
+                                          config::kRpmTickIntervalMinor, config::kRpmTickIntervalMajor,
+                                          static_cast<float>(settings.redlineRpm), tickMode, theme_);
+            runtimeState_.rpmTickLitCountDrawn = rpmLitCount;
+        }
+        float speedLitValue = (speedNeedle_.currentValue < kSpeedMax) ? speedNeedle_.currentValue : kSpeedMax;
+        int32_t speedLitCount = static_cast<int32_t>(speedLitValue / config::kSpeedTickIntervalMinor);
+        if (speedLitCount != runtimeState_.speedTickLitCountDrawn) {
+            gaugewidgets::drawGaugeTicks(tft_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
+                                          kSpeedMax, config::kSpeedTickIntervalMinor, config::kSpeedTickIntervalMajor,
+                                          kSpeedMax, tickMode, theme_);
+            runtimeState_.speedTickLitCountDrawn = speedLitCount;
+        }
     }
 
     bool shiftLightOn = snapshot.rpm.valid && snapshot.rpm.value >= settings.shiftLightRpm;
@@ -657,6 +678,7 @@ void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
 void ClusterPages::drawPage4Static() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
+    runtimeState_.mafGraphDrawnAtSampleMs = 0xFFFFFFFFu;
     tft_.fillRoundRect(10, 50, 220, 65, 6, theme_.panel);
     tft_.fillRoundRect(250, 50, 220, 65, 6, theme_.panel);
     tft_.fillRoundRect(140, 125, 200, 70, 6, theme_.panel);
@@ -718,24 +740,31 @@ void ClusterPages::drawPage4Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     gaugewidgets::drawFieldText(tft_, buf, timerGroup.valueRightX, 155, timerValueW, theme_.panel);
     resetValueFont(tft_);
 
-    constexpr int32_t kGraphX = 12, kGraphY = 227, kGraphW = 456, kGraphH = 84;
-    tft_.fillRect(kGraphX, kGraphY, kGraphW, kGraphH, theme_.background);
-    uint8_t count = runtimeState_.mafHistoryCount;
-    if (count >= 2) {
-        float maxSeen = 1.0F;
-        for (uint8_t i = 0; i < count; ++i) {
-            if (runtimeState_.mafHistory[i] > maxSeen) {
-                maxSeen = runtimeState_.mafHistory[i];
+    // mafHistory only gains a new sample once per second (see
+    // updateBackgroundTelemetry's kMafSampleIntervalMs); redrawing this
+    // region on every 100ms UI tick would just clear-and-repaint identical
+    // content 10x more often than the data actually changes.
+    if (runtimeState_.mafGraphDrawnAtSampleMs != runtimeState_.lastMafSampleMs) {
+        runtimeState_.mafGraphDrawnAtSampleMs = runtimeState_.lastMafSampleMs;
+        constexpr int32_t kGraphX = 12, kGraphY = 227, kGraphW = 456, kGraphH = 84;
+        tft_.fillRect(kGraphX, kGraphY, kGraphW, kGraphH, theme_.background);
+        uint8_t count = runtimeState_.mafHistoryCount;
+        if (count >= 2) {
+            float maxSeen = 1.0F;
+            for (uint8_t i = 0; i < count; ++i) {
+                if (runtimeState_.mafHistory[i] > maxSeen) {
+                    maxSeen = runtimeState_.mafHistory[i];
+                }
             }
-        }
-        for (uint8_t i = 0; i < count - 1; ++i) {
-            int32_t xA = kGraphX + ((kGraphW - 1) * i) / (ClusterPageRuntimeState::kMafHistorySize - 1);
-            int32_t xB = kGraphX + ((kGraphW - 1) * (i + 1)) / (ClusterPageRuntimeState::kMafHistorySize - 1);
-            int32_t yA = kGraphY + (kGraphH - 1) -
-                         static_cast<int32_t>((runtimeState_.mafHistory[i] / maxSeen) * (kGraphH - 1));
-            int32_t yB = kGraphY + (kGraphH - 1) -
-                         static_cast<int32_t>((runtimeState_.mafHistory[i + 1] / maxSeen) * (kGraphH - 1));
-            tft_.drawLine(xA, yA, xB, yB, theme_.primaryGaugeArc);
+            for (uint8_t i = 0; i < count - 1; ++i) {
+                int32_t xA = kGraphX + ((kGraphW - 1) * i) / (ClusterPageRuntimeState::kMafHistorySize - 1);
+                int32_t xB = kGraphX + ((kGraphW - 1) * (i + 1)) / (ClusterPageRuntimeState::kMafHistorySize - 1);
+                int32_t yA = kGraphY + (kGraphH - 1) -
+                             static_cast<int32_t>((runtimeState_.mafHistory[i] / maxSeen) * (kGraphH - 1));
+                int32_t yB = kGraphY + (kGraphH - 1) -
+                             static_cast<int32_t>((runtimeState_.mafHistory[i + 1] / maxSeen) * (kGraphH - 1));
+                tft_.drawLine(xA, yA, xB, yB, theme_.primaryGaugeArc);
+            }
         }
     }
 }

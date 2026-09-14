@@ -83,7 +83,8 @@ void setup() {
     obdClient.begin(configStore.settings().obdAdapterName, configStore.settings().obdAdapterPin);
 
     // 8. Draw Page 1 chrome; drawDynamic() in loop() fills in live values.
-    displayManager.clear(TFT_BLACK);
+    // drawStatic() below already repaints every pixel it touches (header +
+    // full-screen background), so no pre-clear is needed here.
     TelemetrySnapshot initialSnapshot;
     obdClient.getSnapshot(initialSnapshot);
     clusterPages.drawStatic(touchHandler.currentPage(), initialSnapshot);
@@ -107,7 +108,9 @@ void loop() {
             if (pageChanged && touchHandler.currentPage() != previousPage) {
                 TelemetrySnapshot snapshot;
                 obdClient.getSnapshot(snapshot);
-                displayManager.clear(TFT_BLACK);
+                // drawStatic() repaints every pixel of the new page (header +
+                // full-screen background) itself; pre-clearing to black here
+                // only injected a one-frame black flash on non-black themes.
                 clusterPages.drawStatic(touchHandler.currentPage(), snapshot);
             }
         }

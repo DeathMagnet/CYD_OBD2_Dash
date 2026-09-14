@@ -1,5 +1,5 @@
 #include "display/display_manager.h"
-#include "assets/boot_0_rgb565.h"
+#include "assets/boot_logo_png.h"
 #include "labels.h"
 #include <Arduino.h>
 
@@ -37,11 +37,32 @@ void DisplayManager::clear(uint16_t color) {
 }
 
 void DisplayManager::drawBootImage() {
-    // kBoot0Rgb565 stores standard (non-byte-swapped) RGB565 values; pushPixels only
-    // emits the byte order this panel expects when swap is enabled (fillScreen's
-    // pushBlock path does this swap internally, which is why solid fills look correct
-    // even when this flag is wrong).
+    // The boot logo is stored as a losslessly-compressed indexed PNG
+    // (kBootLogoPng, ~72KB) rather than the ~300KB raw RGB565 array it used
+    // to be, and is decoded here one scanline at a time via PNGdec. Standard
+    // (non-byte-swapped) RGB565 values are requested from getLineAsRGB565,
+    // matching the same "standard" register order the raw array used to
+    // hold, so setSwapBytes(true) still applies here for the same reason it
+    // did before: pushImage only emits the byte order this panel expects
+    // when swap is enabled.
     tft_.setSwapBytes(true);
-    tft_.pushImage(0, 0, config::kScreenWidth, config::kScreenHeight, kBoot0Rgb565);
+    png_ = new PNG();
+    int rc = png_->openRAM(const_cast<uint8_t*>(kBootLogoPng), kBootLogoPngSize, pngDrawCallback);
+    if (rc == PNG_SUCCESS) {
+        png_->decode(this, 0);
+        png_->close();
+    } else {
+        Serial.printf("[Display] Boot logo PNG open failed: %d\n", rc);
+    }
+    delete png_;
+    png_ = nullptr;
     Serial.println("[Display] Static boot screen rendered.");
+}
+
+int DisplayManager::pngDrawCallback(PNGDRAW* pDraw) {
+    DisplayManager* self = static_cast<DisplayManager*>(pDraw->pUser);
+    uint16_t lineBuffer[config::kScreenWidth];
+    self->png_->getLineAsRGB565(pDraw, lineBuffer, PNG_RGB565_LITTLE_ENDIAN, 0xFFFFFFFF);
+    self->tft_.pushImage(0, pDraw->y, pDraw->iWidth, 1, lineBuffer);
+    return 1;
 }

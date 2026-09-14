@@ -76,6 +76,26 @@ struct ClusterPageRuntimeState {
     // -1 means "not drawn yet" and forces a redraw the first time.
     int8_t headerMilOnDrawn = -1;
 
+    // Header connection status badge - last-drawn state, so drawDynamic()
+    // only repaints the badge when connectionState actually changes instead
+    // of every UI refresh tick. -1 means "not drawn yet" and forces a
+    // redraw the first time.
+    int8_t statusStripDrawn = -1;
+
+    // Page 1 - last-drawn "lit tick count" for each gauge's tick marks, so
+    // drawPage1Dynamic() only repaints ticks when the needle has actually
+    // crossed into/out of a new tick instead of every UI refresh tick. -1
+    // means "not drawn yet" and forces a redraw the first time.
+    int32_t rpmTickLitCountDrawn = -1;
+    int32_t speedTickLitCountDrawn = -1;
+
+    // Page 4 - last-drawn sample timestamp for the MAF history graph, so
+    // drawPage4Dynamic() only redraws it when a new sample has actually been
+    // recorded (once per second) instead of every UI refresh tick. Sentinel
+    // (impossible millis() value the real timestamp can't equal at boot)
+    // forces a redraw the first time.
+    uint32_t mafGraphDrawnAtSampleMs = 0xFFFFFFFFu;
+
     // Logs page - delete-all-logs confirmation.
     bool deleteLogsConfirmArmed = false;
     uint32_t deleteLogsConfirmArmedAtMs = 0;
