@@ -2,6 +2,7 @@
 #include "display/cluster_layout.h"
 #include "system/units.h"
 #include <string.h>
+#include <cmath>
 
 ClusterTouchHandler::ClusterTouchHandler(ClusterPages& clusterPages, ConfigStore& configStore, CsvLogger& csvLogger,
                                           ObdClient& obdClient)
@@ -260,7 +261,7 @@ bool ClusterTouchHandler::handleConfigGaugesTap(uint16_t x, uint16_t y, uint32_t
     int32_t row3End = row3 + layout::kConfigButtonH;
     uint16_t step = config::kMaxSpeedStepMph;
     if (metric) {
-        step = static_cast<uint16_t>(units::mphFromKph(config::kMaxSpeedStepKph));
+        step = static_cast<uint16_t>(std::lroundf(units::mphFromKph(config::kMaxSpeedStepKph)));
     }
     if (within(x, y, layout::kConfigMinusX, row3, layout::kConfigMinusX + layout::kConfigMinusW, row3End)) {
         configStore_.setMaxSpeedMph(settings.maxSpeedMph - step);
