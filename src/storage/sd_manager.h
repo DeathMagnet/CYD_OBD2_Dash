@@ -20,6 +20,7 @@ public:
 
     bool loadTouchCalibration(uint16_t calData[config::kTouchCalDataSize]);
     bool saveTouchCalibration(const uint16_t calData[config::kTouchCalDataSize]);
+    bool deleteTouchCalibration();
 
 private:
     SPIClass sdSpiBus_;

@@ -7,15 +7,18 @@ DisplayManager::DisplayManager()
     : tft_() {
 }
 
-bool DisplayManager::begin() {
+bool DisplayManager::begin(bool flipped) {
     Serial.println("[Display] Initializing ST7796S TFT display...");
-    
+
     // Set up backlight pin
     pinMode(config::kTftBacklightPin, OUTPUT);
     digitalWrite(config::kTftBacklightPin, LOW); // Start dark to prevent boot flicker
 
     tft_.init();
-    tft_.setRotation(config::kDisplayRotation);
+    // Rotation 3 is the exact 180-degree counterpart of the normal landscape
+    // rotation (kDisplayRotation = 1) on this ST7796S driver - same 480x320
+    // dimensions either way, just mounted upside-down.
+    tft_.setRotation(flipped ? 3 : config::kDisplayRotation);
     tft_.fillScreen(TFT_BLACK);
 
     // Turn backlight on

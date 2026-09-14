@@ -219,6 +219,8 @@ Navigate with the prev/next arrows; cycles within the config group only. All set
 - **Units** (tap-to-toggle): `STANDARD (MPH/°F/PSI)` ↔ `METRIC (KM/H/°C/KPA)`. Affects all displayed temperatures, pressures, and distances. The displayed gauge values and axis labels update immediately, but the internal configuration never changes — only the display multipliers swap.
 - **Gauge Ticks** (tap-to-cycle): `TICS OFF` → `INSIDE TICS ONLY` → `OUTSIDE TICS ONLY` → `INSIDE AND OUTSIDE TICS` → (wraps).
   - **Constraint**: If the active theme is "S197", only the first two options are available (`OFF` ↔ `INSIDE ONLY`), because the S197 theme's bezel art lacks space for outer tick marks. Attempting to cycle past `INSIDE ONLY` wraps back to `OFF`.
+- **Flip Screen** (tap-to-toggle): `NORMAL` ↔ `FLIPPED 180`. Rotates the display 180° for boards mounted upside-down behind the gauge cluster.
+  - **⚠️ Warning**: Changing this setting **restarts the device** when you save, and re-runs touch calibration in the new orientation (same as the first-boot calibration routine). Make sure you're ready to re-tap the 4 calibration corners after saving.
 
 #### GAUGES Page
 
@@ -280,9 +282,11 @@ Appears at the bottom of every config page:
   - **Green**, label "SAVE TO SD": One or more settings differ from `/config.txt`. Tap to commit them.
   - **Default color**, label "SAVED!": Just after you tap Save, the page shows this feedback for 1.5 seconds, then reverts to the clean state.
 
-- **Behavior**: Tapping Save while any setting is dirty (different from `/config.txt`) writes all 18 keys to `/config.txt` in `key=value` format, line by line. If any setting is out of range or invalid (e.g., from a hand-edited config file), it is silently clamped to the valid range before saving—an out-of-range value can never persist.
+- **Behavior**: Tapping Save while any setting is dirty (different from `/config.txt`) writes all 19 keys to `/config.txt` in `key=value` format, line by line. If any setting is out of range or invalid (e.g., from a hand-edited config file), it is silently clamped to the valid range before saving—an out-of-range value can never persist.
 
 - **For OBD Adapter credentials**: Saving new credentials triggers an immediate Bluetooth reconnection attempt in the background; no device reboot is needed.
+
+- **For Flip Screen**: Saving while this setting is dirty deletes the saved touch calibration and restarts the device so the new orientation and a fresh touch calibration both take effect together.
 
 ## Status LED Behavior
 

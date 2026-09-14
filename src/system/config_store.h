@@ -29,6 +29,10 @@ struct AppSettings {
     uint8_t themeId = config::kDefaultThemeId;
     bool useMetricUnits = false; // Display units (dashboard pages, config fields)
     bool useMetricLogs = false;  // CSV logging units
+    // Physical mounting orientation. Only takes effect on the restart that
+    // Saving this setting triggers (see ConfigStore::isScreenFlipDirty);
+    // see display/display_manager.h.
+    bool screenFlipped = false;
     // Page 1 RPM/Speed arc tick marks (TickMode, display/theme.h). S197
     // only supports Off/InsideOnly; see ConfigStore::clampTickModeForTheme.
     uint8_t tickMode = config::kDefaultTickMode;
@@ -69,6 +73,7 @@ public:
     void setThemeId(uint8_t id);
     void setUseMetricUnits(bool metric);
     void setUseMetricLogs(bool metric);
+    void setScreenFlipped(bool flipped);
     void setTickMode(uint8_t mode);
     void setObdAdapterName(const char* name);
     void setObdAdapterPin(const char* pin);
@@ -83,6 +88,11 @@ public:
     // whether log files get wiped when Save is tapped (wipe only once, only if
     // it actually changed relative to what's on SD).
     bool isLogUnitsDirty() const;
+
+    // True if screenFlipped has changed since the last save; used to gate
+    // the device restart + forced touch recalibration that Save triggers
+    // when the mounting orientation actually changed relative to what's on SD.
+    bool isScreenFlipDirty() const;
 
     // True if the OBD adapter name or PIN has changed since the last save;
     // used to gate the live Bluetooth reconnect when Save is tapped (only

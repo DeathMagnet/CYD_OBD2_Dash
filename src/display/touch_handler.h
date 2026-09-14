@@ -5,6 +5,7 @@
 #include "system/config_store.h"
 #include "logging/csv_logger.h"
 #include "obd/obd_client.h"
+#include "storage/sd_manager.h"
 
 // Translates raw touch points (already calibrated/debounced by TouchManager)
 // into cluster navigation and per-page control actions (config pages,
@@ -14,7 +15,7 @@
 class ClusterTouchHandler {
 public:
     ClusterTouchHandler(ClusterPages& clusterPages, ConfigStore& configStore, CsvLogger& csvLogger,
-                         ObdClient& obdClient);
+                         ObdClient& obdClient, SdManager& sdManager);
 
     // Call once per new touch-down edge (not on every poll while held) with
     // the touch point. Returns true if the active page changed; the caller
@@ -40,6 +41,7 @@ private:
     ConfigStore& configStore_;
     CsvLogger& csvLogger_;
     ObdClient& obdClient_;
+    SdManager& sdManager_;
     ClusterPage currentPage_ = ClusterPage::PrimaryCluster;
 
     // Remembered per-group page so the mode-toggle button returns you to

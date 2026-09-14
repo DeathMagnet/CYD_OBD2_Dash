@@ -90,3 +90,22 @@ bool SdManager::saveTouchCalibration(const uint16_t calData[config::kTouchCalDat
                   calData[0], calData[1], calData[2], calData[3], calData[4]);
     return true;
 }
+
+bool SdManager::deleteTouchCalibration() {
+    if (!isMounted_) {
+        Serial.println("[SD] Cannot delete calibration: SD not mounted");
+        return false;
+    }
+
+    if (!SD.exists(config::kTouchCalFilePath)) {
+        return true;
+    }
+
+    if (!SD.remove(config::kTouchCalFilePath)) {
+        Serial.printf("[SD] Failed to delete '%s'.\n", config::kTouchCalFilePath);
+        return false;
+    }
+
+    Serial.printf("[SD] Deleted touch calibration file '%s'.\n", config::kTouchCalFilePath);
+    return true;
+}

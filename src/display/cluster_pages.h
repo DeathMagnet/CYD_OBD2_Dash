@@ -125,6 +125,7 @@ struct ClusterPageRuntimeState {
     char cfgUnitsDrawn[32] = {0};          // UI page
     char cfgThemeDrawn[24] = {0};          // UI page
     char cfgTicksDrawn[32] = {0};          // UI page
+    char cfgFlipDrawn[16] = {0};           // UI page
     char cfgLogIntervalDrawn[24] = {0};    // Logs page
     char cfgLogUnitsDrawn[32] = {0};       // Logs page
     int8_t cfgDeleteConfirmDrawn = -1;     // Logs page
@@ -166,6 +167,11 @@ public:
     // Switches the active color theme. Callers must repaint (drawStatic) the
     // visible page afterward to see the change; this only updates theme_.
     void applyTheme(ThemeId id) { theme_ = getTheme(id); }
+
+    // Forces an immediate repaint of the config footer's Save button (e.g. to
+    // show "SAVED - RESTARTING" right before a blocking ESP.restart() call,
+    // since the normal per-frame redraw in loop() won't get a chance to run).
+    void drawSavedFeedback(uint32_t nowMs) { drawConfigFooterDynamic(nowMs); }
 
 private:
     void drawHeader(ClusterPage page, bool milOn);

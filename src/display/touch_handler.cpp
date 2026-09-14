@@ -1,12 +1,14 @@
 #include "display/touch_handler.h"
 #include "display/cluster_layout.h"
 #include "system/units.h"
+#include <Arduino.h>
 #include <string.h>
 #include <cmath>
 
 ClusterTouchHandler::ClusterTouchHandler(ClusterPages& clusterPages, ConfigStore& configStore, CsvLogger& csvLogger,
-                                          ObdClient& obdClient)
-    : clusterPages_(clusterPages), configStore_(configStore), csvLogger_(csvLogger), obdClient_(obdClient) {}
+                                          ObdClient& obdClient, SdManager& sdManager)
+    : clusterPages_(clusterPages), configStore_(configStore), csvLogger_(csvLogger), obdClient_(obdClient),
+      sdManager_(sdManager) {}
 
 bool ClusterTouchHandler::within(uint16_t x, uint16_t y, int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
     return static_cast<int32_t>(x) >= x0 && static_cast<int32_t>(x) < x1 && static_cast<int32_t>(y) >= y0 &&
@@ -133,6 +135,17 @@ bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t now
             }
         }
         configStore_.setTickMode(static_cast<uint8_t>(next));
+        return false;
+    }
+
+    // Flip screen toggle row (row 3): stages the change only. The actual
+    // rotation swap + touch recalibration happens on Save (see
+    // handleConfigFooterTap), matching the Log Units page's stage-until-save
+    // pattern.
+    int32_t row3 = layout::kConfigRow3Y + layout::kConfigButtonInsetY;
+    int32_t row3End = row3 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigCycleX, row3, layout::kConfigCycleX + layout::kConfigCycleW, row3End)) {
+        configStore_.setScreenFlipped(!settings.screenFlipped);
         return false;
     }
 
@@ -391,6 +404,7 @@ bool ClusterTouchHandler::handleConfigFooterTap(uint16_t x, uint16_t y, uint32_t
         bool logUnitsChanged = configStore_.isLogUnitsDirty();
         bool newMetricLogs = configStore_.settings().useMetricLogs;
         bool credentialsChanged = configStore_.isObdCredentialsDirty();
+        bool screenFlipChanged = configStore_.isScreenFlipDirty();
 
         configStore_.save();
 
@@ -403,6 +417,22 @@ bool ClusterTouchHandler::handleConfigFooterTap(uint16_t x, uint16_t y, uint32_t
         if (credentialsChanged) {
             obdClient_.updateAdapterCredentials(configStore_.settings().obdAdapterName,
                                                  configStore_.settings().obdAdapterPin);
+        }
+
+        if (screenFlipChanged) {
+            // Delete the saved touch calibration so TouchManager::begin()
+            // falls through to its existing auto-calibration routine on the
+            // next boot, now running in the new (flipped) rotation.
+            sdManager_.deleteTouchCalibration();
+            strncpy(state.configStatusMessage, "SAVED - RESTARTING", sizeof(state.configStatusMessage) - 1);
+            state.configStatusMessage[sizeof(state.configStatusMessage) - 1] = '\0';
+            state.configStatusMessageSetAtMs = nowMs;
+            // Force the message onto the screen now: the normal per-frame
+            // redraw in loop() never gets a chance to run before the
+            // restart below.
+            clusterPages_.drawSavedFeedback(nowMs);
+            delay(1200);
+            ESP.restart();
         }
 
         strncpy(state.configStatusMessage, "SAVED", sizeof(state.configStatusMessage) - 1);

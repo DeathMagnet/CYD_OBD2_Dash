@@ -775,7 +775,7 @@ void ClusterPages::drawConfigUiStatic() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
 
-    for (int i = 0; i <= 2; ++i) {
+    for (int i = 0; i <= 3; ++i) {
         int32_t y = layout::kHeaderHeight + i * layout::kConfigRowHeight;
         tft_.drawFastHLine(0, y, layout::kScreenWidth, theme_.bezel);
     }
@@ -809,10 +809,29 @@ void ClusterPages::drawConfigUiStatic() {
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow2Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
 
+    // Flip screen toggle row
+    tft_.setTextDatum(ML_DATUM);
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    applyLabelFont(tft_);
+    tft_.drawString(labels::kLabelFlipScreen, 12, layout::kConfigRow3Y + layout::kConfigRowHeight / 2);
+    resetValueFont(tft_);
+
+    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow3Y + layout::kConfigButtonInsetY,
+                        layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
+
+    // Warning text, left-aligned directly under the Flip Screen label — drawn
+    // static since it never changes (same convention as the Logs page's Log
+    // Units warning).
+    tft_.setTextDatum(ML_DATUM);
+    tft_.setTextColor(theme_.warningActive, theme_.background);
+    tft_.setTextSize(1);
+    tft_.drawString(labels::kWarningFlipScreenRestarts, 12, layout::kConfigRow3Y + layout::kConfigRowHeight + 6);
+
     // Force drawConfigUiDynamic() to repaint every region the next time it runs
     runtimeState_.cfgUnitsDrawn[0] = '\0';
     runtimeState_.cfgThemeDrawn[0] = '\0';
     runtimeState_.cfgTicksDrawn[0] = '\0';
+    runtimeState_.cfgFlipDrawn[0] = '\0';
 }
 
 void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
@@ -861,6 +880,18 @@ void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
                                      theme_.background);
         resetValueFont(tft_);
         strncpy(runtimeState_.cfgTicksDrawn, buf, sizeof(runtimeState_.cfgTicksDrawn) - 1);
+    }
+
+    snprintf(buf, sizeof(buf), "%s", settings.screenFlipped ? labels::kLabelFlipScreenFlipped : labels::kLabelFlipScreenNormal);
+    if (strcmp(buf, runtimeState_.cfgFlipDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        applyLabelFont(tft_);
+        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigCycleX + layout::kConfigCycleW / 2,
+                                     layout::kConfigRow3Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
+                                     theme_.background);
+        resetValueFont(tft_);
+        strncpy(runtimeState_.cfgFlipDrawn, buf, sizeof(runtimeState_.cfgFlipDrawn) - 1);
     }
 }
 

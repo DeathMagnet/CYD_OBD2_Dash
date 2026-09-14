@@ -65,6 +65,10 @@ constexpr const char* kLabelTickModeOff = "TICS OFF";
 constexpr const char* kLabelTickModeInsideOnly = "INSIDE TICS ONLY";
 constexpr const char* kLabelTickModeOutsideOnly = "OUTSIDE TICS ONLY";
 constexpr const char* kLabelTickModeInsideAndOutside = "INSIDE AND OUTSIDE TICS";
+constexpr const char* kLabelFlipScreen = "FLIP SCREEN 180";
+constexpr const char* kLabelFlipScreenNormal = "NORMAL";
+constexpr const char* kLabelFlipScreenFlipped = "FLIPPED 180";
+constexpr const char* kWarningFlipScreenRestarts = "CHANGING THIS RESTARTS DEVICE ON SAVE";
 
 // ---- Config: User Vars ----
 constexpr const char* kLabelBoostBaroBaseline = "BOOST BARO BASELINE";
