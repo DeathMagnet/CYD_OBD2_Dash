@@ -296,7 +296,7 @@ Keep layout dimensions, colors, gauge ranges, units, polling intervals, animatio
 
 Support static and animated boot assets selected at compile time through `BOOT_IMAGE_MODE`. Use `BOOT_RGB666_ASSETS_AVAILABLE` to guard asset-dependent code so a build without generated assets still compiles and reaches the dashboard.
 
-The current static boot image is stored as a standard RGB565 `uint16_t` PROGMEM array (`src/assets/boot_0_rgb565.h`) and drawn with `TFT_eSPI::pushImage()`; TFT_eSPI's own SPI write path already handles this panel's actual output format, so asset generation does not need to pre-pack pixels to 18-bit RGB666. (`BOOT_RGB666_ASSETS_AVAILABLE` names the planned animated-frame format described below, not the current static asset's in-memory layout.)
+The current static boot image is stored as a losslessly-compressed indexed PNG PROGMEM byte array (`src/assets/boot_logo_png.h`, ~72KB vs. ~300KB for the raw RGB565 array it replaced) and decoded scanline-by-scanline at boot via PNGdec (`DisplayManager::drawBootImage()`), pushing each line to the display with `TFT_eSPI::pushImage()`. The `PNG` decoder object is heap-allocated only for the duration of that call and freed immediately after — its internal zlib window/pixel buffers (~39KB) are only needed once at boot, before the Bluetooth stack and SD/touch subsystems claim heap, and this board has no PSRAM to spare holding that buffer permanently. (`BOOT_RGB666_ASSETS_AVAILABLE` names the planned animated-frame format described below, not the current static asset's in-memory layout.)
 
 For generated boot image/frame data:
 
