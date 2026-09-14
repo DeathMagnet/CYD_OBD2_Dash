@@ -53,6 +53,11 @@ constexpr int32_t kConfigRow0Y = kHeaderHeight;
 constexpr int32_t kConfigRow1Y = kConfigRow0Y + kConfigRowHeight;
 constexpr int32_t kConfigRow2Y = kConfigRow1Y + kConfigRowHeight;
 constexpr int32_t kConfigRow3Y = kConfigRow2Y + kConfigRowHeight;
+// Rows 4-5: the row grid stops here rather than continuing indefinitely
+// because this is exactly where it hits the shared Save footer below - only
+// GAUGES (6 rows) currently reaches this far.
+constexpr int32_t kConfigRow4Y = kConfigRow3Y + kConfigRowHeight;
+constexpr int32_t kConfigRow5Y = kConfigRow4Y + kConfigRowHeight;
 
 constexpr int32_t kConfigFooterY = kScreenHeight - kConfigRowHeight; // Shared save button
 

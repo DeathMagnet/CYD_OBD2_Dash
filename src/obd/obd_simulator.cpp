@@ -154,12 +154,12 @@ void ObdSimulator::update(uint32_t deltaMs, uint32_t nowMs, TelemetrySnapshot& o
     float coolantF = lerpF(config::kSimColdCoolantF, config::kSimHotCoolantF, smoothStep(warmFraction)) +
                      sinf(sessionElapsedMs_ * 0.00035F) * 3.0F;
     if (isWarningSweep) {
-        coolantF = config::kHighCoolantWarningF + 12.0F + jitter(1.5F);
+        coolantF = config::kDefaultCoolantWarningF + 12.0F + jitter(1.5F);
     }
 
     float voltageV = isIdling ? 13.6F : 14.1F - (engineLoadPct / 100.0F) * 0.45F;
     if (isWarningSweep) {
-        voltageV = config::kLowVoltageWarningV - 0.4F + jitter(0.05F);
+        voltageV = config::kDefaultLowVoltageWarningV - 0.4F + jitter(0.05F);
     }
 
     float iatF = 84.0F + 18.0F * (1.0F - clampF(speedMph / 45.0F, 0.0F, 1.0F)) + jitter(0.6F);

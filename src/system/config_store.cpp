@@ -85,6 +85,20 @@ bool ConfigStore::parseLine(const char* line) {
         settings_.logIntervalMs = isValidLogIntervalMs(interval) ? interval : config::kDefaultLogRowIntervalMs;
     } else if (strcmp(key, "baro_baseline_psi") == 0) {
         settings_.baroBaselinePsi = clampF(static_cast<float>(atof(valueStr)), config::kMinBaroBaselinePsi, config::kMaxBaroBaselinePsi);
+    } else if (strcmp(key, "coolant_warning_f") == 0) {
+        settings_.coolantWarningF = clampF(static_cast<float>(atof(valueStr)), config::kMinCoolantWarningF, config::kMaxCoolantWarningF);
+    } else if (strcmp(key, "low_voltage_warning_v") == 0) {
+        settings_.lowVoltageWarningV = clampF(static_cast<float>(atof(valueStr)), config::kMinLowVoltageWarningV, config::kMaxLowVoltageWarningV);
+    } else if (strcmp(key, "boost_max_psi") == 0) {
+        settings_.boostMaxPsi = clampF(static_cast<float>(atof(valueStr)), config::kMinBoostMaxPsi, config::kMaxBoostMaxPsi);
+    } else if (strcmp(key, "vacuum_max_inhg") == 0) {
+        settings_.vacuumMaxInHg = clampF(static_cast<float>(atof(valueStr)), config::kMinVacuumMaxInHg, config::kMaxVacuumMaxInHg);
+    } else if (strcmp(key, "zero_sixty_target_mph") == 0) {
+        settings_.zeroSixtyTargetMph = clampF(static_cast<float>(atof(valueStr)), config::kMinZeroSixtyTargetMph, config::kMaxZeroSixtyTargetMph);
+    } else if (strcmp(key, "hp_estimation_factor") == 0) {
+        settings_.hpEstimationFactor = clampF(static_cast<float>(atof(valueStr)), config::kMinHpEstimationFactor, config::kMaxHpEstimationFactor);
+    } else if (strcmp(key, "fuel_trim_range_pct") == 0) {
+        settings_.fuelTrimRangePct = clampF(static_cast<float>(atof(valueStr)), config::kMinFuelTrimRangePct, config::kMaxFuelTrimRangePct);
     } else if (strcmp(key, "theme") == 0) {
         long theme = atol(valueStr);
         settings_.themeId = (theme >= 0 && theme <= 2) ? static_cast<uint8_t>(theme) : 2;
@@ -181,6 +195,34 @@ void ConfigStore::setBaroBaselinePsi(float psi) {
     settings_.baroBaselinePsi = clampF(psi, config::kMinBaroBaselinePsi, config::kMaxBaroBaselinePsi);
 }
 
+void ConfigStore::setCoolantWarningF(float f) {
+    settings_.coolantWarningF = clampF(f, config::kMinCoolantWarningF, config::kMaxCoolantWarningF);
+}
+
+void ConfigStore::setLowVoltageWarningV(float v) {
+    settings_.lowVoltageWarningV = clampF(v, config::kMinLowVoltageWarningV, config::kMaxLowVoltageWarningV);
+}
+
+void ConfigStore::setBoostMaxPsi(float psi) {
+    settings_.boostMaxPsi = clampF(psi, config::kMinBoostMaxPsi, config::kMaxBoostMaxPsi);
+}
+
+void ConfigStore::setVacuumMaxInHg(float inHg) {
+    settings_.vacuumMaxInHg = clampF(inHg, config::kMinVacuumMaxInHg, config::kMaxVacuumMaxInHg);
+}
+
+void ConfigStore::setZeroSixtyTargetMph(float mph) {
+    settings_.zeroSixtyTargetMph = clampF(mph, config::kMinZeroSixtyTargetMph, config::kMaxZeroSixtyTargetMph);
+}
+
+void ConfigStore::setHpEstimationFactor(float factor) {
+    settings_.hpEstimationFactor = clampF(factor, config::kMinHpEstimationFactor, config::kMaxHpEstimationFactor);
+}
+
+void ConfigStore::setFuelTrimRangePct(float pct) {
+    settings_.fuelTrimRangePct = clampF(pct, config::kMinFuelTrimRangePct, config::kMaxFuelTrimRangePct);
+}
+
 void ConfigStore::setThemeId(uint8_t id) {
     settings_.themeId = (id <= 2) ? id : 2;
     clampTickModeForTheme();
@@ -232,6 +274,13 @@ bool ConfigStore::isDirty() const {
            settings_.maxSpeedMph != savedSettings_.maxSpeedMph ||
            settings_.logIntervalMs != savedSettings_.logIntervalMs ||
            settings_.baroBaselinePsi != savedSettings_.baroBaselinePsi ||
+           settings_.coolantWarningF != savedSettings_.coolantWarningF ||
+           settings_.lowVoltageWarningV != savedSettings_.lowVoltageWarningV ||
+           settings_.boostMaxPsi != savedSettings_.boostMaxPsi ||
+           settings_.vacuumMaxInHg != savedSettings_.vacuumMaxInHg ||
+           settings_.zeroSixtyTargetMph != savedSettings_.zeroSixtyTargetMph ||
+           settings_.hpEstimationFactor != savedSettings_.hpEstimationFactor ||
+           settings_.fuelTrimRangePct != savedSettings_.fuelTrimRangePct ||
            settings_.themeId != savedSettings_.themeId ||
            settings_.useMetricUnits != savedSettings_.useMetricUnits ||
            settings_.useMetricLogs != savedSettings_.useMetricLogs ||
@@ -274,6 +323,13 @@ bool ConfigStore::save() {
     file.printf("max_speed_mph=%u\n", settings_.maxSpeedMph);
     file.printf("log_interval_ms=%lu\n", static_cast<unsigned long>(settings_.logIntervalMs));
     file.printf("baro_baseline_psi=%.2f\n", settings_.baroBaselinePsi);
+    file.printf("coolant_warning_f=%.1f\n", settings_.coolantWarningF);
+    file.printf("low_voltage_warning_v=%.1f\n", settings_.lowVoltageWarningV);
+    file.printf("boost_max_psi=%.1f\n", settings_.boostMaxPsi);
+    file.printf("vacuum_max_inhg=%.1f\n", settings_.vacuumMaxInHg);
+    file.printf("zero_sixty_target_mph=%.1f\n", settings_.zeroSixtyTargetMph);
+    file.printf("hp_estimation_factor=%.2f\n", settings_.hpEstimationFactor);
+    file.printf("fuel_trim_range_pct=%.1f\n", settings_.fuelTrimRangePct);
     file.printf("units=%u\n", settings_.useMetricUnits ? 1 : 0);
     file.printf("log_units=%u\n", settings_.useMetricLogs ? 1 : 0);
     file.printf("tick_mode=%u\n", settings_.tickMode);

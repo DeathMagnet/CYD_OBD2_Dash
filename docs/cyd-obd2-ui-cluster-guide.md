@@ -119,7 +119,7 @@ The display is divided into two page groups: **Dashboard pages** (1–4, 6) and 
 Dashboard Group:                        Config Group:
 [1] PRIMARY CLUSTER                     [UI] Active Theme
 [2] ENGINE LOAD & AIRFLOW               [GAUGES] Shift Light RPM, Redline RPM
-[3] CAR-SPECIFIC SENSORS                [USER VARS] Boost Baro Baseline
+[3] CAR-SPECIFIC SENSORS                [USER VARS] Boost Baro Baseline, Warnings, 0-60 Target, HP Factor
 [4] MY CAR PERFORMANCE                  [LOGS] Log Interval, Delete Logs
 [6] DIAGNOSTICS (DTC)                   [OBD ADAPTER] Adapter Name, Adapter PIN
 ```
@@ -230,13 +230,20 @@ Gauge calibration settings for RPM warning zones.
 | --- | --- | --- | --- |
 | **Shift Light RPM** | 3000 – 6800 RPM (step 100) | 5800 RPM | RPM bezel flash trigger; start of warning arc |
 | **Redline RPM** | 5000 – 7000 RPM (step 100) | 6200 RPM | Redline threshold; start of danger (red) arc |
+| **Vacuum Gauge Max** | 15 – 30 inHg (step 1) | 30 inHg | Full-scale value for the Page 3 vacuum bar gauge |
+| **Boost Gauge Max** | 10 – 40 PSI (step 1) | 25 PSI | Full-scale value for the Page 3 boost bar gauge |
 
 #### Config Page: USER VARS
-User-adjustable variables and baselines.
+User-adjustable variables, warning thresholds, and baselines.
 
 | Setting Field | Options / Range | Default | Description |
 | --- | --- | --- | --- |
 | **Boost Baro Baseline** | 12.0 – 15.5 PSI (step 0.1) | 14.7 PSI | Baseline atmospheric pressure; used to calculate Vacuum/Boost on Page 3 |
+| **Coolant Warning Temp** | 180 – 250 °F (step 5) | 220 °F | Coolant temperature above which the Page 1 coolant readout turns the warning color |
+| **Low Voltage Warning** | 9.0 – 13.0 V (step 0.1) | 11.5 V | Battery voltage below which the Page 3 voltage readout turns the warning color |
+| **0-60 Target Speed** | 40 – 100 MPH (step 5) | 60 MPH | Target speed for the Page 4 acceleration timer |
+| **HP Estimate Factor** | 0.5 – 1.2 (step 0.05) | 0.8 | MAF-to-horsepower multiplier used in the Page 4 estimated HP/torque calculation |
+| **Fuel Trim Range** | 10 – 50% (step 5) | 25% | +/- range the Page 2 STFT/LTFT bar gauges are scaled to |
 
 #### Config Page: LOGS
 SD card logging configuration and management.

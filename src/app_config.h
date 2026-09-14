@@ -88,8 +88,9 @@ constexpr uint32_t kSimBlipStaleHoldMs = 4000;         // Must exceed kTelemetry
 constexpr uint32_t kSimBlipReconnectingMs = 4000;
 constexpr uint32_t kSimBlipConnectingMs = 1500;
 
-// Drives coolant past kHighCoolantWarningF and voltage below kLowVoltageWarningV
-// so the warning paths on Pages 1/3 are reachable without a fault injection.
+// Drives coolant past kDefaultCoolantWarningF and voltage below
+// kDefaultLowVoltageWarningV so the warning paths on Pages 1/3 are reachable
+// without a fault injection.
 constexpr bool kSimWarningSweepEnabled = true;
 constexpr uint32_t kSimWarningSweepIntervalMs = 180000;
 constexpr uint32_t kSimWarningSweepDurationMs = 12000;
@@ -123,8 +124,46 @@ constexpr float kMaxBaroBaselinePsi = 15.5F;
 constexpr float kBaroBaselineStepPsi = 0.1F;
 constexpr float kDefaultBaroBaselinePsi = 14.7F;
 
-constexpr float kHighCoolantWarningF = 220.0F;
-constexpr float kLowVoltageWarningV = 11.5F;
+constexpr float kMinCoolantWarningF = 180.0F;
+constexpr float kMaxCoolantWarningF = 250.0F;
+constexpr float kCoolantWarningStepF = 5.0F;
+// A temperature *delta*, not an absolute value - do not derive this via
+// units::celsiusFromFahrenheit(), whose -32 offset only applies to absolutes.
+constexpr float kCoolantWarningStepC = kCoolantWarningStepF * 5.0F / 9.0F;
+constexpr float kDefaultCoolantWarningF = 220.0F;
+
+constexpr float kMinLowVoltageWarningV = 9.0F;
+constexpr float kMaxLowVoltageWarningV = 13.0F;
+constexpr float kLowVoltageWarningStepV = 0.1F;
+constexpr float kDefaultLowVoltageWarningV = 11.5F;
+
+constexpr float kMinBoostMaxPsi = 10.0F;
+constexpr float kMaxBoostMaxPsi = 40.0F;
+constexpr float kBoostMaxStepPsi = 1.0F;
+constexpr float kBoostMaxStepKpa = 5.0F;
+constexpr float kDefaultBoostMaxPsi = 25.0F; // Matches the previous hardcoded gauge scale (~172 kPa).
+
+constexpr float kMinVacuumMaxInHg = 15.0F;
+constexpr float kMaxVacuumMaxInHg = 30.0F;
+constexpr float kVacuumMaxStepInHg = 1.0F;
+constexpr float kVacuumMaxStepKpa = 3.0F;
+constexpr float kDefaultVacuumMaxInHg = 30.0F; // Matches the previous hardcoded gauge scale (~101 kPa).
+
+constexpr float kMinZeroSixtyTargetMph = 40.0F;
+constexpr float kMaxZeroSixtyTargetMph = 100.0F;
+constexpr float kZeroSixtyTargetStepMph = 5.0F;
+constexpr float kZeroSixtyTargetStepKph = 5.0F;
+constexpr float kDefaultZeroSixtyTargetMph = 60.0F; // Matches the previous hardcoded 60 mph / 100 kph target.
+
+constexpr float kMinHpEstimationFactor = 0.5F;
+constexpr float kMaxHpEstimationFactor = 1.2F;
+constexpr float kHpEstimationFactorStep = 0.05F;
+constexpr float kDefaultHpEstimationFactor = 0.8F; // Matches the previous hardcoded MAF-to-HP fudge factor.
+
+constexpr float kMinFuelTrimRangePct = 10.0F;
+constexpr float kMaxFuelTrimRangePct = 50.0F;
+constexpr float kFuelTrimRangeStepPct = 5.0F;
+constexpr float kDefaultFuelTrimRangePct = 25.0F; // Matches the previous hardcoded +/-25% bar-gauge scale.
 
 // ---- Gauge Tick Marks (Page 1 RPM/Speed arc scales) ----
 constexpr float kRpmTickIntervalMinor = 500.0F;

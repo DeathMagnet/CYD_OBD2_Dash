@@ -57,3 +57,12 @@ const ThemeColors& getTheme(ThemeId id);
 void initializeThemeFonts();
 void applyValueFont(TFT_eSPI& tft, const ThemeColors& theme, uint8_t size);
 void resetValueFont(TFT_eSPI& tft);
+
+// Config-page setting labels always use a small proportional font
+// (FreeSans9pt7b - a smaller sibling of Modern Flat's FreeSans12pt7b value
+// font, chosen so the longest label strings fit their column), regardless of
+// the active theme - unlike applyValueFont(), which picks a theme-specific
+// font for gauge values. Callers must pair this with resetValueFont()
+// immediately after drawing the label, since GFX font
+// selection is sticky and every other config-page draw call assumes Font 1.
+void applyLabelFont(TFT_eSPI& tft);
