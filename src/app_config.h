@@ -173,7 +173,7 @@ constexpr float kSpeedTickIntervalMajor = 50.0F;
 constexpr uint8_t kDefaultTickMode = 3; // TickMode::InsideAndOutside (display/theme.h)
 
 // ---- SD CSV Telemetry Logging ----
-constexpr const char* kLogFilePrefix = "/mustang_log_";
+constexpr const char* kLogFilePrefix = "/obd_log_";
 constexpr const char* kLogFileSuffix = ".csv";
 constexpr uint8_t kLogFileIndexDigits = 3;
 constexpr const char* kSessionIndexNamespace = "obd_dash";

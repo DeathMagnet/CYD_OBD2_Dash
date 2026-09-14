@@ -3,15 +3,15 @@
 #include <stdint.h>
 #include <TFT_eSPI.h>
 
-// Three themes are implemented (docs/cyd-obd2-ui-cluster-guide.md): Mustang
-// S197, Neon, and Modern Flat.
+// Three themes are implemented (docs/cyd-obd2-ui-cluster-guide.md): S197,
+// Neon, and Modern Flat.
 enum class ThemeId : uint8_t {
-    MustangS197 = 0,
+    S197 = 0,
     Neon = 1,
     ModernFlat = 2,
 };
 
-// RPM/Speed gauge tick display mode (Config: UI page). Mustang S197 cannot
+// RPM/Speed gauge tick display mode (Config: UI page). S197 cannot
 // render outside ticks (ThemeColors::showOuterTicks is false), so only Off
 // and InsideOnly are valid while that theme is active.
 enum class TickMode : uint8_t {

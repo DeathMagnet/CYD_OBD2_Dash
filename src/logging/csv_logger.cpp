@@ -23,7 +23,7 @@ void formatFloatField(char* buf, size_t bufSize, const TelemetryValue& value) {
     }
 }
 
-// name may come back as "/mustang_log_007.csv" or "mustang_log_007.csv"
+// name may come back as "/obd_log_007.csv" or "obd_log_007.csv"
 // depending on the ESP32 core version; normalize to a leading-slash path.
 void buildPathFromName(const char* name, char* out, size_t outSize) {
     if (name[0] == '/') {

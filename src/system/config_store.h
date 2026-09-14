@@ -25,13 +25,13 @@ struct AppSettings {
     float hpEstimationFactor = config::kDefaultHpEstimationFactor;
     float fuelTrimRangePct = config::kDefaultFuelTrimRangePct;
     // Theme selection is persisted for forward compatibility, but only
-    // Modern Flat (2) renders today; Mustang S197 (0) and Neon (1)
+    // Modern Flat (2) renders today; S197 (0) and Neon (1)
     // are reserved until those themes are implemented.
     uint8_t themeId = 2;
     bool useMetricUnits = false; // Display units (dashboard pages, config fields)
     bool useMetricLogs = false;  // CSV logging units
-    // Page 1 RPM/Speed arc tick marks (TickMode, display/theme.h). Mustang
-    // S197 only supports Off/InsideOnly; see ConfigStore::clampTickModeForTheme.
+    // Page 1 RPM/Speed arc tick marks (TickMode, display/theme.h). S197
+    // only supports Off/InsideOnly; see ConfigStore::clampTickModeForTheme.
     uint8_t tickMode = config::kDefaultTickMode;
 
     // ELM327 Bluetooth identity, picked from config::kObdAdapterNameOptions/
@@ -98,7 +98,7 @@ private:
     bool parseLine(const char* line);
 
     // Forces tickMode down to InsideOnly if it's currently Outside/
-    // InsideAndOutside while the active theme is Mustang S197, which has no
+    // InsideAndOutside while the active theme is S197, which has no
     // room in its bezel art for outside ticks. Called after any change to
     // themeId or tickMode, and once after loading from SD.
     void clampTickModeForTheme();
