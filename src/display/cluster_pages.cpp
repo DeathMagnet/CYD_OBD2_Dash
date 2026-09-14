@@ -1409,15 +1409,17 @@ void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
             snprintf(sizeBuf, sizeof(sizeBuf), "%.1f", totalMb);
             tft_.setTextDatum(ML_DATUM);
             tft_.setTextColor(theme_.textPrimary, theme_.background);
-            tft_.setTextSize(1);
+            applyConfigValueFont(tft_);
             gaugewidgets::drawFieldText(tft_, countBuf, 12, logsRowMidY, kLogsCountSlotW, theme_.background);
+            resetValueFont(tft_);
             applyLabelFont(tft_);
             int32_t logsCommaWidth = tft_.textWidth("LOGS,");
             resetValueFont(tft_);
             int32_t logsLabelX = 12 + kLogsCountSlotW + 4;
             int32_t logsSizeX = logsLabelX + logsCommaWidth + 4;
-            tft_.setTextSize(1);
+            applyConfigValueFont(tft_);
             gaugewidgets::drawFieldText(tft_, sizeBuf, logsSizeX, logsRowMidY, kLogsSizeSlotW, theme_.background);
+            resetValueFont(tft_);
             strncpy(runtimeState_.cfgLogSummaryDrawn, buf, sizeof(runtimeState_.cfgLogSummaryDrawn) - 1);
         }
     }
