@@ -253,7 +253,7 @@ void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int
             } else {
                 // Shrank: darken the newly unlit segments.
                 for (int32_t i = litSegments; i < state.lastLitSegments; ++i) {
-                    tft.fillRect(innerX + i * kSegmentPitchPx, innerY, kSegmentWidthPx, innerH, theme.panel);
+                    tft.fillRect(innerX + i * kSegmentPitchPx, innerY, kSegmentWidthPx, innerH, theme.secondaryGaugeArc);
                 }
             }
             state.lastLitSegments = litSegments;
@@ -261,9 +261,10 @@ void drawBarGauge(TFT_eSPI& tft, BarGaugeState& state, int32_t x, int32_t y, int
         }
 
         tft.drawRect(x, y, width, height, theme.bezel);
-        tft.fillRect(innerX, innerY, innerWidth, innerH, theme.panel); // clears unlit segments + gaps in one call
-        for (int32_t i = 0; i < litSegments; ++i) {
-            tft.fillRect(innerX + i * kSegmentPitchPx, innerY, kSegmentWidthPx, innerH, fillColor);
+        tft.fillRect(innerX, innerY, innerWidth, innerH, theme.panel); // clears gaps between segments
+        for (int32_t i = 0; i < numSegments; ++i) {
+            uint16_t segColor = (i < litSegments) ? fillColor : theme.secondaryGaugeArc;
+            tft.fillRect(innerX + i * kSegmentPitchPx, innerY, kSegmentWidthPx, innerH, segColor);
         }
         state.lastLitSegments = litSegments;
         state.needsFullRedraw = false;
