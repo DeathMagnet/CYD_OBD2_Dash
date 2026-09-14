@@ -84,14 +84,14 @@ bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t now
     const AppSettings& settings = configStore_.settings();
 
     // Active theme cycle row (row 0): cycles through all three themes in
-    // order, Modern Flat -> Torque Neon -> Mustang S197 -> Modern Flat.
+    // order, Modern Flat -> Neon -> Mustang S197 -> Modern Flat.
     int32_t row0 = layout::kConfigRow0Y + layout::kConfigButtonInsetY;
     int32_t row0End = row0 + layout::kConfigButtonH;
     if (within(x, y, layout::kConfigCycleX, row0, layout::kConfigCycleX + layout::kConfigCycleW, row0End)) {
         ThemeId newTheme;
         switch (static_cast<ThemeId>(settings.themeId)) {
-            case ThemeId::ModernFlat: newTheme = ThemeId::TorqueNeon; break;
-            case ThemeId::TorqueNeon: newTheme = ThemeId::MustangS197; break;
+            case ThemeId::ModernFlat: newTheme = ThemeId::Neon; break;
+            case ThemeId::Neon: newTheme = ThemeId::MustangS197; break;
             case ThemeId::MustangS197:
             default: newTheme = ThemeId::ModernFlat; break;
         }

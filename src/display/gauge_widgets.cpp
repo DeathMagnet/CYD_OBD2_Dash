@@ -331,6 +331,13 @@ int32_t reservedValueWidth(TFT_eSPI& tft, const ThemeColors& theme, uint8_t size
     return w;
 }
 
+int32_t configValueWidth(TFT_eSPI& tft, const char* representative) {
+    applyConfigValueFont(tft);
+    int32_t w = tft.textWidth(representative);
+    resetValueFont(tft);
+    return w;
+}
+
 ValueUnitGroup centerValueUnitGroup(int32_t centerX, int32_t valueWidth, int32_t unitWidth, int32_t gapPx) {
     int32_t groupWidth = valueWidth + gapPx + unitWidth;
     int32_t groupLeft = centerX - groupWidth / 2;

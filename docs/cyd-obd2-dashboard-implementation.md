@@ -9,7 +9,7 @@ This guide describes the initial implementation boundary. The repository current
 ## Key Features
 
 - 📊 **Live OBD-II gauges** — RPM, speed, coolant temp, throttle position, battery voltage, and more
-- 🎨 **Multi-theme UI** — Mustang OEM S197, Torque Neon, and Modern Flat themes, switchable at runtime
+- 🎨 **Multi-theme UI** — Mustang OEM S197, Neon, and Modern Flat themes, switchable at runtime
 - 🐴 **Boot animation** — Optional frame-by-frame RGB666 pony sprite sequence on startup
 - 💾 **SD card logging** — Timestamped CSV telemetry logs written continuously while driving
 - 🔔 **Warning overlays** — On-screen alerts for high temp, low voltage, and check-engine conditions
@@ -140,7 +140,7 @@ src/
     local_config.example.h   # Optional: copy to local_config.h (gitignored) to override adapter name/PIN at compile time (takes priority over the Config: OBD ADAPTER page if present)
   display/
     display_manager.h/.cpp   # TFT init, backlight, boot image (pre-existing)
-    theme.h/.cpp             # ThemeColors + getTheme() - Mustang S197, Torque Neon, and Modern Flat all implemented
+    theme.h/.cpp             # ThemeColors + getTheme() - Mustang S197, Neon, and Modern Flat all implemented
     gauge_widgets.h/.cpp     # Arc gauge, bar gauge, value box, status badge, MIL indicator, NeedlePhysics
     cluster_layout.h         # Shared pixel geometry (header only) used by both drawing and touch hit-testing
     cluster_pages.h/.cpp     # Dashboard pages and config pages drawStatic()/drawDynamic()

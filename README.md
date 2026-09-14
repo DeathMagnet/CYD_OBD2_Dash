@@ -97,7 +97,7 @@ Navigate with prev/next arrows in the header; cycles within this group only.
 ### Config Group (Pages UI, GAUGES, USER VARS, LOGS, OBD ADAPTER)
 Navigate with prev/next arrows in the header; cycles within this group only. All settings persist to `/config.txt` on the SD card.
 
-- **UI**: Tap-to-cycle "Active Theme" button rotates through Modern Flat -> Torque Neon -> Mustang S197, persisting the choice and recoloring the visible page immediately.
+- **UI**: Tap-to-cycle "Active Theme" button rotates through Modern Flat -> Neon -> Mustang S197, persisting the choice and recoloring the visible page immediately.
 - **GAUGES**: Configure Shift Light RPM and Redline RPM thresholds that control the warning arcs on Page 1.
 - **USER VARS**: User-adjustable variables like Boost Baro Baseline (atmospheric pressure baseline for vacuum/boost calculation).
 - **LOGS**: Configure SD card log write interval, view live log summary (file count and size), and delete all logs.
@@ -118,6 +118,6 @@ The onboard RGB status LED provides real-time visual feedback for shift point an
 
 **Modern Flat theme**: Shift flash and MIL red are both pure red; this layout prioritizes the flash's clear on/off visibility over color distinction.
 
-**Torque Neon theme**: Shift flash is hot orange (`0xFDA0`), while MIL red remains red — giving visual separation even though the flash takes priority.
+**Neon theme**: Shift flash is hot orange (`0xFDA0`), while MIL red remains red — giving visual separation even though the flash takes priority.
 
 **Mustang S197 theme**: Its warning color (`0xF8C0`, amber-orange) quantizes down to the LED's 3 fixed on/off channels as pure red (red channel over threshold, green and blue under), so — like Modern Flat — the shift flash and steady MIL both render the same red; only the flash cadence tells them apart.
