@@ -161,116 +161,17 @@ build_flags =
 
 Both `cyd_4inch` and `cyd_4inch_sim` inherit this flag. Logging is deliberately **orthogonal** to `OBD_SIMULATION_ENABLED`: a simulated build logs to SD exactly like a live one, which makes the scripted drive cycle a dense, repeatable exercise of the writer. Never guard logging code on the simulation flag.
 
-### Module Structure with Preprocessor Wrappers (`src/logging/sd_logger.h` & `sd_logger.cpp`)
+### Module Structure (`src/logging/csv_logger.h` & `.cpp`)
 
-```cpp
-#pragma once
-#include <stdint.h>
+The as-built `CsvLogger` class differs from the sketch above (which showed a fixed row-interval constant and no capacity pruning):
 
-struct TelemetrySnapshot;
+- **Class name**: `CsvLogger` (not `SdLogger`)
+- **Row interval**: Runtime-configurable per `update()` call; passed in via `rowIntervalMs` parameter (a user-configurable value from the Logs config page, cycling through 50/100/250/500/1000 ms)
+- **Capacity pruning**: `enforceCapacity()` is called before opening a new session and on every flush; it deletes the oldest `obd_log_*.csv` if free space drops below `config::kSdMinFreeBytes` (5 MB)
+- **Log management**: `getLogSummary()` scans for file count and total bytes; `deleteAllLogs()` closes the active file, removes every session log, and opens a fresh one (with two-tap confirm on the LOGS config page)
+- **CSV header**: Dynamic; picks one of two headers based on `useMetricLogs_` (standard or metric unit schema); user can toggle via the Logs config page, but toggling **deletes all existing logs when saved** to prevent unit-mixing within rows
 
-class SdLogger {
-public:
-    bool begin();
-    void logTelemetry(const TelemetrySnapshot& data, uint32_t nowMs);
-    void flush();
-    void end();
-    bool isLoggingActive() const { return loggingActive_; }
-
-private:
-    bool loggingActive_ = false;
-    uint32_t lastFlushMs_ = 0;
-    uint32_t lastRowMs_ = 0;
-};
-```
-
-In `src/logging/sd_logger.cpp`:
-
-```cpp
-#include "logging/sd_logger.h"
-
-#ifdef SD_LOGGING_ENABLED
-#include <SD.h>
-#include <SPI.h>
-#include <Preferences.h>
-#include <stdio.h>
-
-static File logFile;
-
-bool SdLogger::begin() {
-    // Initialize SPI and SD card (VSPI: CS=5, MOSI=23, MISO=19, CLK=18)
-    if (!SD.begin(5 /* SD CS Pin - GPIO 5 */)) {
-        Serial.println("[SD] Mount failed or card not present");
-        loggingActive_ = false;
-        return false;
-    }
-
-    Preferences prefs;
-    prefs.begin("obd_dash", false);
-    uint32_t sessionIdx = prefs.getUInt("session_idx", 0) + 1;
-    prefs.putUInt("session_idx", sessionIdx);
-    prefs.end();
-
-    char path[32];
-    snprintf(path, sizeof(path), "/obd_log_%03u.csv", static_cast<unsigned int>(sessionIdx));
-
-    logFile = SD.open(path, FILE_WRITE);
-    if (!logFile) {
-        Serial.printf("[SD] Failed to open %s for writing\n", path);
-        loggingActive_ = false;
-        return false;
-    }
-
-    // Write CSV Header
-    logFile.println("timestamp_ms,rpm,speed_mph,coolant_f,throttle_pct,fuel_pct,"
-                    "voltage_v,map_kpa,iat_f,engine_load_pct,maf_gps,timing_advance_deg,"
-                    "stft_pct,ltft_pct,fuel_pressure_kpa,o2_b1s1_v,o2_b2s1_v,baro_kpa,cel_on,dtc_count");
-    logFile.flush();
-
-    loggingActive_ = true;
-    Serial.printf("[SD] Logging initialized: %s\n", path);
-    return true;
-}
-
-void SdLogger::logTelemetry(const TelemetrySnapshot& d, uint32_t nowMs) {
-    if (!loggingActive_ || !logFile) return;
-
-    if (nowMs - lastRowMs_ >= SD_LOG_ROW_INTERVAL_MS) {
-        lastRowMs_ = nowMs;
-        logFile.printf("%lu,%d,%d,%d,%d,%d,%.2f,%d,%d,%d,%.2f,%d,%d,%d,%d,%.2f,%.2f,%d,%d,%d\n",
-            nowMs, d.rpm, d.speedMph, d.coolantF, d.throttlePct, d.fuelPct,
-            d.voltageV, d.mapKpa, d.iatF, d.engineLoadPct, d.mafGps, d.timingAdvanceDeg,
-            d.stftPct, d.ltftPct, d.fuelPressureKpa, d.o2B1S1V, d.o2B2S1V, d.baroKpa,
-            d.celOn ? 1 : 0, d.dtcCount);
-    }
-
-    if (nowMs - lastFlushMs_ >= SD_FLUSH_INTERVAL_MS) {
-        lastFlushMs_ = nowMs;
-        logFile.flush();
-    }
-}
-
-void SdLogger::flush() {
-    if (loggingActive_ && logFile) logFile.flush();
-}
-
-void SdLogger::end() {
-    if (logFile) {
-        logFile.flush();
-        logFile.close();
-    }
-    loggingActive_ = false;
-}
-
-#else // !SD_LOGGING_ENABLED Stub implementations for zero overhead
-
-bool SdLogger::begin() { return false; }
-void SdLogger::logTelemetry(const TelemetrySnapshot&, uint32_t) {}
-void SdLogger::flush() {}
-void SdLogger::end() {}
-
-#endif
-```
+For a complete API reference, see [`src/logging/csv_logger.h`](../src/logging/csv_logger.h).
 
 ---
 
