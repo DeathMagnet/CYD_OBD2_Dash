@@ -127,11 +127,10 @@ Dashboard Group:                        Config Group:
 Header layout:
 ```
 +-------------------------------------------------------------------+
-|[<]  ●SD  PAGE 1: PRIMARY CLUSTER    [OBDII]  ⚙️  [>]            |
+|[<]  PAGE 1: PRIMARY CLUSTER        [OBDII]        ⚙️  [>]        |
 +-------------------------------------------------------------------+
 ```
 - `[<]` — Previous Page (within current group)
-- `●SD` — SD logging activity light (green when logging, dark green when inactive; same on every theme)
 - `PAGE TITLE` — Name of current page
 - `[OBDII]` — Connection status badge (green=Live, blue=Connecting, crimson=Error)
 - `⚙️` or `🧭` — Mode toggle button (cog when on dashboard → tap to go to config; steering wheel when on config → tap to go to dashboard)

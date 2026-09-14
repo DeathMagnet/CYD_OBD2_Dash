@@ -13,25 +13,20 @@ constexpr int32_t kScreenWidth = config::kScreenWidth;   // 480
 constexpr int32_t kScreenHeight = config::kScreenHeight; // 320
 
 // Header touch zones (docs/cyd-obd2-ui-cluster-guide.md: Touch Navigation).
-// Left to right: prev arrow, SD recording light (display-only), page title
-// (display-only), OBDII status badge (display-only), MIL/CEL zone, mode
-// toggle (dashboard/config groups), next arrow.
+// Left to right: prev arrow, page title (display-only), OBDII status badge
+// (display-only), MIL/CEL zone, mode toggle (dashboard/config groups), next
+// arrow.
 constexpr int32_t kNavPrevX0 = 0, kNavPrevX1 = 60;
 constexpr int32_t kNavNextX0 = 420, kNavNextX1 = 480;
 
-// Both edge icons (SD light, mode toggle) sit the same distance from their
-// adjacent nav arrow so the header reads as symmetric.
+// The mode toggle icon sits this far from its adjacent nav arrow.
 constexpr int32_t kHeaderIconGap = 8;
 
-constexpr int32_t kSdLightCenterX = kNavPrevX1 + kHeaderIconGap;
-constexpr int32_t kSdLightCenterY = kHeaderHeight / 2;
-constexpr int32_t kSdLightRadius = 5;
+constexpr int32_t kBadgeW = 90, kBadgeH = 22, kBadgeY = 9;
+constexpr int32_t kBadgeX = (kScreenWidth - kBadgeW) / 2;
 
-// Page title: centered between the SD light and the OBDII badge (display only).
-constexpr int32_t kNavTitleX0 = kSdLightCenterX + kSdLightRadius + 4;
-constexpr int32_t kBadgeX = 216, kBadgeY = 9, kBadgeW = 90, kBadgeH = 22;
-constexpr int32_t kNavTitleX1 = kBadgeX - 4;
-constexpr int32_t kNavTitleCenterX = (kNavTitleX0 + kNavTitleX1) / 2;
+// Page title: centered between the prev arrow and the OBDII badge (display only).
+constexpr int32_t kNavTitleCenterX = (kNavPrevX1 + kBadgeX) / 2;
 
 constexpr int32_t kMilZoneX0 = 310, kMilZoneX1 = 365;
 constexpr int32_t kMilCenterX = (kMilZoneX0 + kMilZoneX1) / 2;

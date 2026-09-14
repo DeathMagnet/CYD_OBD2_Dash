@@ -132,7 +132,6 @@ void loop() {
     if (nowMs - lastUiRefreshMs >= config::kUiRefreshIntervalMs) {
         lastUiRefreshMs = nowMs;
         ConnectionState connectionState = resolveConnectionState(snapshot, nowMs);
-        clusterPages.drawDynamic(touchHandler.currentPage(), snapshot, connectionState, csvLogger.isLoggingActive(),
-                                  nowMs);
+        clusterPages.drawDynamic(touchHandler.currentPage(), snapshot, connectionState, nowMs);
     }
 }
