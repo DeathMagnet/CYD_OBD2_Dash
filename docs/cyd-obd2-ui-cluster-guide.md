@@ -8,7 +8,7 @@ This document provides complete, technical design and implementation instruction
 
 ## ✅ Implementation Status
 
-The dashboard displays all six dashboard pages (1–4 and 6) plus five dedicated config pages (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER), with these deliberate deviations from the design above:
+The dashboard displays all five dashboard pages (1–5: Primary Cluster, Engine Load, Car-Specific, Performance, Diagnostics) plus five dedicated config pages (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER), with these deliberate deviations from the design above:
 
 - **All on-screen text is centralized.** Every label, unit, button text, page title, and status string shown in this spec is sourced from `src/labels.h` (`namespace labels`) rather than hardcoded in drawing code. The source of truth for display text is the labels constants in that header file, not the literal strings you see documented below.
 - **All three themes are implemented.** `getTheme()` (`src/display/theme.cpp`) returns the S197, Neon, or Modern Flat palette for the corresponding `ThemeId`. The UI config page's "Active Theme" row has a tap-to-cycle button (mirroring the Units row) that rotates through all three themes (Modern Flat -> Neon -> S197 -> Modern Flat), persists the choice, and immediately recolors the visible page.
@@ -19,7 +19,7 @@ The dashboard displays all six dashboard pages (1–4 and 6) plus five dedicated
 - **Onboard RGB status LED** (`StatusLed::update()` in `src/system/status_led.cpp`): Mirrors the shift/MIL indication with a three-state behavior — flashes the theme's `warningActive` color (same 200 ms cadence as the Page-1 shift-light RPM text flash) whenever RPM is at or above Shift Light RPM, taking priority over a steady-red Check Engine (MIL) indication so the flash is never visually masked; falls back to steady red for MIL alone (when RPM is below Shift Light RPM); off otherwise.
 - **Gauge tick marks** (Page 1 RPM/Speed gauges): radial tick marks drawn as two short segments flanking the arc ring — one just outside the outer edge, one just inside the inner edge — at fixed value intervals (RPM: every 500, major every 1000; Speed: every 10, major every 50). Each tick is colored `primaryGaugeArc` once the needle has passed that value and `theme.tickInactiveColor` while still short of it (a field independent of the arc's own `secondaryGaugeArc` track color, so a theme can give ticks a different "unlit" color than the track), providing an at-a-glance "how far past this mark" reference. Ticks are not drawn inside the RPM redline zone (where the arc is already solid red). The outer segment is itself gated by `theme.showOuterTicks` — S197 sets this false and shows only the inner segment, while the other two themes show both. Toggleable on the Config: UI page via a "GAUGE TICKS" ON/OFF button (default: ON).
 - **Round-gauge chrome bezel** (Page 1 RPM/Speed, Page 2 Engine Load, Page 3 Vacuum/Boost): `gaugewidgets::drawGaugeBezel()` draws a decorative ring just outside each round gauge's outer edge, gated by `theme.showGaugeBezel` — on (4px thick, chrome-colored) for S197, off for the other two themes.
-- **Page 6 DTC list shows codes only** (e.g. `P0133`), not human-readable descriptions — no DTC description database is included. A read is triggered automatically whenever Page 6 is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
+- **Diagnostics page DTC list shows codes only** (e.g. `P0133`), not human-readable descriptions — no DTC description database is included. A read is triggered automatically whenever the page is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
 - **Config pages: UI / GAUGES / USER VARS / LOGS / OBD ADAPTER.** Settings are organized into five focused pages with a shared Save button at the bottom. Each config page displays the Save button (green when any value differs from what's saved on SD, default color when everything matches); tapping it persists all settings across all config pages to `/config.txt` on the SD card and displays "SAVED!" feedback. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space. Saving the OBD ADAPTER page also forces an immediate Bluetooth reconnect using the newly saved adapter name/PIN (no reboot needed), unless `secrets/local_config.h` is present, which always takes priority over the on-device selection.
 - **Actual source layout** differs from the "Proposed" structure at the bottom of this doc — see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#proposed-source-layout) for the as-built tree.
 
@@ -99,15 +99,12 @@ struct NeedlePhysics {
 ```
 
 #### Boot Needle Sweep Sequence
-On system boot (after boot animation fade-out), all gauge needles execute a cluster gauge sweep:
-1. Interpolate needles from minimum (0%) to maximum (100% scale) in 600ms.
-2. Hold at 100% for 150ms.
-3. Return smoothly to 0% (or live OBD value) in 500ms.
-4. Transition display state to `Live`.
+
+> **As-built:** This was the original design; it was not implemented. Gauges update continuously via the spring-physics `NeedlePhysics` integration described in the section above, but there is no special boot-time sweep sequence — needles begin at their last-rendered value and interpolate smoothly to new OBD readings as they arrive.
 
 ### 2. Page Transition Animations
-- **Slide Transition**: When user swipes left/right or taps navigation arrows, draw current page to Sprite A, target page to Sprite B, and slide the offset across X (`0` to `±480` px) over 200ms using ease-out easing.
-- **Fade Transition**: Used during boot screen initialization and page switching if low RAM prevents double horizontal buffer allocation. Alpha-blend or step backlight brightness (`TFT_BL` PWM pin 27) smoothly from `0` to `255` over 300ms.
+
+> **As-built:** This was the original design; it was not implemented. Page switches redraw immediately with no slide or fade animation. The decision to omit animations was driven by the ESP32-32E's 320 KB SRAM constraint: the double-sprite buffers required for a sliding animation would exceed available memory even without the Bluetooth stack and SD buffers. No PWM backlight fade occurs at any point.
 
 ---
 
@@ -118,10 +115,10 @@ The display is divided into two page groups: **Dashboard pages** (1–4, 6) and 
 ```
 Dashboard Group:                        Config Group:
 [1] PRIMARY CLUSTER                     [UI] Active Theme
-[2] ENGINE LOAD & AIRFLOW               [GAUGES] Shift Light RPM, Redline RPM
+[2] ENGINE LOAD & AIRFLOW               [GAUGES] Shift Light RPM, Redline RPM, Max RPM, Max Speed
 [3] CAR-SPECIFIC SENSORS                [USER VARS] Boost Baro Baseline, Warnings, 0-60 Target, HP Factor
-[4] MY CAR PERFORMANCE                  [LOGS] Log Interval, Delete Logs
-[6] DIAGNOSTICS (DTC)                   [OBD ADAPTER] Adapter Name, Adapter PIN
+[4] PERFORMANCE & TELEMETRY             [LOGS] Log Interval, Delete Logs
+[5] DIAGNOSTICS (DTC)                   [OBD ADAPTER] Adapter Name, Adapter PIN
 ```
 
 Header layout:
@@ -141,8 +138,7 @@ Header layout:
   - Left region `(X: 0..60)`: Previous Page (within active group; wraps around)
   - Right region `(X: 420..480)`: Next Page (within active group; wraps around)
   - Mode toggle button `(X: 365..420)`: Switch between dashboard and config groups (remembers which page you were on in each group)
-- **Check Engine Light (MIL) Touch Zone (X: 310..365, Y: 0..40)**: Tapping the MIL icon when active (or inactive) jumps directly to **Page 6 (Diagnostics)**.
-- **Swipe Gestures**: Horizontal swipe left (>60px delta) advances page within group; horizontal swipe right returns within group.
+- **Check Engine Light (MIL) Touch Zone (X: 310..365, Y: 0..40)**: Tapping the MIL indicator when active jumps directly to the Diagnostics page.
 
 ---
 
@@ -150,19 +146,19 @@ Header layout:
 
 ### Page 1 — Primary Cluster
 - **RPM Gauge (Large, Center)**:
-  - Dial range: 0 – 7000 RPM.
-  - **OEM Mustang Redline Arc**: Exact 4.6L 3V curve with red arc gradient from 5500 RPM to 6200 RPM (`0xF800` to `0x9000`).
-  - **Shift Light**: Flashes the RPM gauge bezel bright red/white at configurable threshold (default: 5800 RPM).
+  - Dial range: 0 to the **Max RPM** setting (default 7000, configurable on GAUGES page 7000–9000).
+  - **Arc Color Zones**: Orange zone from the **Shift Light RPM** setting (default 5800) to the **Redline RPM** setting (default 6200), then solid red from Redline RPM to Max RPM.
+  - **Shift Light Flash**: The RPM text digits flash at 200 ms cadence when RPM reaches the Shift Light RPM threshold; the onboard RGB LED also flashes the active theme's warning color in sync.
   - **Tick Marks**: Radial marks at 500 RPM intervals (major at 1000) flanking the gauge ring, recolored as the needle passes each tick (configurable via Config: UI page).
   - Center digital readout for exact RPM.
-- **Speedometer**: Digital + analog scale (0–160 MPH or 0–240 KPH).
+- **Speedometer**: Digital + analog scale (0 to the **Max Speed** setting, default 200 MPH, configurable on GAUGES page 120–260 MPH or equivalent km/h).
   - **Tick Marks**: Radial marks at 10 unit intervals (major at 50) flanking the gauge ring, recolored as the needle passes each tick (configurable via Config: UI page).
-- **Coolant Temperature**: Analog/digital gauge with high-temp threshold highlight (>220 °F).
+- **Coolant Temperature**: Digital readout; turns the warning color when above the **Coolant Temp Warn** setting (default 220 °F, configurable on USER VARS page).
 - **Intake Air Temperature (IAT)**: Auxiliary digital display.
 - **Throttle Position (TPS)**: Live percentage bar graph (0–100%).
 - **Check Engine Light (MIL) Indicator**:
-  - Lit bright yellow/orange when ECU reports active Check Engine Light (`PID 01 01` / MIL flag).
-  - Acts as a touch zone: Tapping it instantly switches display to **Page 6 (Diagnostics)**.
+  - Bold **"!!!"** text in the warning color (red/crimson per the active theme) when ECU reports active Check Engine Light.
+  - Acts as a touch zone: Tapping it while active switches display to the Diagnostics page.
 - **Boot Needle Sweep**: Triggers automatically on initial display transition.
 
 ---
@@ -177,35 +173,36 @@ Focused on engine intake efficiency and fuel trim diagnostics.
 
 ---
 
-### Page 3 — Car-Specific Sensors (Mustang / Ford Focus)
-Custom PID calculations for key Ford engine parameters.
-- **Battery Voltage**: Measured via OBD PID `01 42` or ELM `ATRVR` command (9.0V – 16.0V range).
-- **Fuel Rail Pressure**: Ford specific PID `01 23` (PSI / kPa).
+### Page 3 — Car-Specific Sensors
+Custom PID readings for key engine parameters.
+- **Battery Voltage**: Control module supply voltage (9.0V – 16.0V range); turns the warning color when below the **Low Voltage Warning** setting (default 11.5 V, configurable on USER VARS page).
+- **Fuel Rail Pressure**: Fuel system pressure (PSI / kPa).
 - **MAP & Calculated Vacuum / Boost Gauge**:
-  - Uses Manifold Absolute Pressure (`PID 01 0B`) minus Barometric Baseline (configured in the USER VARS config page, default 14.7 PSI / 101.3 kPa).
-  - Displays as **Vacuum (inHg)** when MAP < Baro, and **Boost (PSI)** when MAP > Baro. The caption is stacked on two lines (name above unit) so it clears the arc inside the gauge; with no MAP reading it shows `VAC/BOOST` and a blank unit line.
-  - Vacuum range: 0 – 30 inHg; Boost range: 0 – 25 PSI.
-  - Sits centered at (240, 194) with a 70 px radius, in the gap the two bottom panels leave between x 150 and x 330. Because the range flips between 25 and 30 with the mode, the arc state is re-validated on `maxValue` change rather than assuming a fixed scale.
+  - Uses Manifold Absolute Pressure (`PID 01 0B`) compared to the **Boost Baro Baseline** setting (default 14.7 PSI, configurable on USER VARS page).
+  - Displays as **VACUUM** when MAP < Baseline, and **BOOST** when MAP > Baseline. The caption updates on the fly; with no MAP reading it shows `VAC/BOOST` centered.
+  - Vacuum range: 0 – **Vacuum Gauge Max** setting (default 30 inHg, configurable on GAUGES page 15–30); Boost range: 0 – **Boost Gauge Max** setting (default 25 PSI, configurable on GAUGES page 10–40).
+  - Located centered in the gap between the bottom panels.
 - **O2 Sensor B1S1**: Upstream Oxygen Sensor Voltage / Lambda (`PID 01 14`).
 - **O2 Sensor B2S1**: Upstream Oxygen Sensor Bank 2 Voltage (`PID 01 18`).
 
 ---
 
-### Page 4 — 'My Car' Performance & Telemetry
-Performance estimation and real-time intake graph.
+### Page 4 — Performance & Telemetry
+Performance estimation and real-time intake history.
 - **Calculated Horsepower (HP)**:
-  - Estimated from MAF sensor airflow:
-    $$\text{HP}_{\text{wheel}} \approx \text{MAF (g/s)} \times 0.8$$
+  - Estimated from MAF sensor airflow using the **HP Estimate Factor** setting (default 0.8, configurable on USER VARS page 0.5–1.2):
+    $$\text{HP} = \text{MAF (g/s)} \times \text{HP Estimate Factor}$$
 - **Calculated Torque (lb-ft)**:
   - Derived from estimated HP and engine RPM:
     $$\text{Torque (lb-ft)} = \frac{\text{HP} \times 5252}{\text{RPM}}$$
-  - Clamped when RPM < 500.
-- **0–60 MPH Timer**:
+  - Blanked (shown as 0) when RPM < 500 to avoid division artifacts.
+- **0–60 Timer**:
   - Automatic start when Speed transitions from 0 to >0 MPH.
-  - Timer stops when Speed reaches 60 MPH (displays result in seconds, e.g. `5.42 s`).
-  - Reset by tapping timer touch box.
+  - Timer stops when Speed reaches the **0-60 Target Speed** setting (default 60 MPH, configurable on USER VARS page 40–100).
+  - Reset by tapping the timer touch box.
 - **Intake Airflow Rolling Graph**:
-  - 120-pixel wide line chart showing last 60 seconds of MAF / Throttle readings.
+  - 60-second line chart showing one MAF reading per second (newest on the right).
+  - Vertical axis auto-scales to the maximum value in the current window.
 
 ---
 
@@ -223,14 +220,16 @@ Settings for display appearance and unit system.
 | **Gauge Ticks** | On, Off | On | Radial tick marks on the RPM/Speed gauge scales (every 500/1000 RPM, every 10/50 MPH or KM/H); tap-to-cycle toggle |
 
 #### Config Page: GAUGES
-Gauge calibration settings for RPM warning zones.
+Gauge calibration settings for RPM warning zones and gauge scales.
 
 | Setting Field | Options / Range | Default | Description |
 | --- | --- | --- | --- |
-| **Shift Light RPM** | 3000 – 6800 RPM (step 100) | 5800 RPM | RPM bezel flash trigger; start of warning arc |
-| **Redline RPM** | 5000 – 7000 RPM (step 100) | 6200 RPM | Redline threshold; start of danger (red) arc |
-| **Vacuum Gauge Max** | 15 – 30 inHg (step 1) | 30 inHg | Full-scale value for the Page 3 vacuum bar gauge |
-| **Boost Gauge Max** | 10 – 40 PSI (step 1) | 25 PSI | Full-scale value for the Page 3 boost bar gauge |
+| **Shift Light RPM** | 3000 – 6800 RPM (step 100) | 5800 RPM | RPM threshold; start of orange warning arc on Page 1. Shift Light text and onboard LED flash when RPM reaches this value. |
+| **Redline RPM** | 5000 – 7000 RPM (step 100) | 6200 RPM | Redline threshold; start of solid red danger arc on Page 1 (held to the end of the sweep). |
+| **Max RPM** | 7000 – 9000 RPM (step 100) | 7000 RPM | Full-scale value for the Page 1 RPM arc gauge. |
+| **Max Speed** | 120 – 260 MPH (step 10) | 200 MPH | Full-scale value for the Page 1 speed gauge (or equivalent km/h in metric mode). |
+| **Vacuum Gauge Max** | 15 – 30 inHg (step 1) | 30 inHg | Full-scale value for the Page 3 vacuum bar gauge. |
+| **Boost Gauge Max** | 10 – 40 PSI (step 1) | 25 PSI | Full-scale value for the Page 3 boost bar gauge. |
 
 #### Config Page: USER VARS
 User-adjustable variables, warning thresholds, and baselines.
@@ -266,7 +265,7 @@ Unlike other config fields, tapping SAVE TO SD on this page also forces `ObdClie
 
 ---
 
-### Page 6 — Diagnostics (DTC Reader)
+### Page 5 — Diagnostics (DTC Reader)
 Read and display OBD-II Diagnostic Trouble Codes.
 - **Check Engine Light (MIL) Status**: `MIL ACTIVE (ON)` or `MIL INACTIVE (OFF)`.
 - **DTC Decoding**:
@@ -284,18 +283,16 @@ Read and display OBD-II Diagnostic Trouble Codes.
 ## 🚀 Boot Sequence & Transitions
 
 1. **Power On / Reset**: Initialize TFT display & SPI at 20MHz.
-2. **Boot Screen (Build Option `BOOT_IMAGE_MODE`)**:
-   - `BOOT_IMAGE_MODE = 0`: Static Ford Mustang pony splash screen with 300ms **fade-in** and 300ms **fade-out**.
-   - `BOOT_IMAGE_MODE = 1`: Animated frame-by-frame RGB666 sequence at 20 FPS with fade-in/fade-out transitions.
-3. **SD Card & Config Load**: Load saved preferences from SD (`/config.json`).
-4. **Gauge Needle Sweep**: Execute 1.2-second full range gauge sweep animation on Page 1.
-5. **OBD Connection**: Display connection status badge (`CONNECTING...`) until Bluetooth ELM327 handshake completes, then transition to `LIVE`.
+2. **Boot Screen**: Display the static boot splash image (`src/assets/boot_logo_png.h`, a 480×320 PNG decoded via PNGdec). The `BOOT_IMAGE_MODE` and `BOOT_RGB666_ASSETS_AVAILABLE` flags are currently defined but not branched on in code; only the static PNG path runs regardless of their values. The original design intended to support animated RGB666 sequences here, but that remains unimplemented.
+3. **SD Card & Config Load**: Load saved preferences from SD (`/config.txt`).
+4. **Gauge Display**: Gauges interpolate smoothly to incoming OBD readings via spring-physics `NeedlePhysics` (see the "Gauge Needle Interpolation & Boot Sweep" section); there is no special boot-time sweep sequence.
+5. **OBD Connection**: Display connection status badge (starts `BOOT`, `DISPLAY READY`, then `CONNECTING` or `LIVE`) as the Bluetooth ELM327 handshake progresses.
 
 ---
 
-## 🛠️ File Structure & Code Responsibilities
+## 🛠️ File Structure & Code Responsibilities (As-Built)
 
-Add these files under `src/display/` and `src/system/`:
+The files below implement the five dashboard pages and five config pages. These are already in place under `src/display/` and `src/system/`:
 
 ```text
 src/
@@ -315,7 +312,7 @@ src/
 
 ## 🧪 Verification Checklist
 
-- [ ] All 6 dashboard pages (1–4, 6) render cleanly at 480×320 landscape resolution.
+- [ ] All 5 dashboard pages (1–5: Primary Cluster, Engine Load, Car-Specific, Performance, Diagnostics) render cleanly at 480×320 landscape resolution.
 - [ ] All 5 config pages (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER) render cleanly.
 - [ ] OBD ADAPTER page's Adapter Name/PIN tap-to-cycle buttons work, and tapping Save with a changed value forces an immediate Bluetooth reconnect without a reboot.
 - [ ] Theme switching (Modern Flat -> Neon -> S197 -> Modern Flat, via the UI page's Active Theme cycle button) immediately recolors gauges, bezels, needles, and text, and the selection survives Save + reboot.
@@ -324,7 +321,7 @@ src/
 - [ ] Needles perform a smooth full-scale sweep on boot and update continuously without jitter.
 - [ ] Sweeping a gauge up and back down leaves no seam lines in either the fill or the unlit track.
 - [ ] Readouts that lose a digit or change caption (RPM, coolant, vacuum/boost, MIL line) leave no leftover characters.
-- [ ] Tapping the MIL indicator on Page 1 switches instantly to Page 6.
+- [ ] Tapping the MIL indicator on Page 1 (while active) switches instantly to Page 5 (Diagnostics).
 - [ ] Tapping the mode toggle button (⚙️ or 🧭) in the header switches between the dashboard group and config group, remembering which page was visited in each group.
 - [ ] Prev/next navigation cycles only within the active group (dashboard or config); never crosses into the other group.
 - [ ] OBDII connection badge displays: green when Live, blue when Reconnecting/ObdConnecting/DisplayReady, crimson for Boot/SdInit/Stale/Degraded.
@@ -333,5 +330,5 @@ src/
 - [ ] Gauge ticks can be toggled ON/OFF from the Config: UI page "GAUGE TICKS" button, and the setting persists after Save + power cycle.
 - [ ] Calculated Horsepower, Torque, Vacuum/Boost, and 0-60 timer update correctly on Pages 3 & 4.
 - [ ] Config page settings save to SD card and persist after power cycle.
-- [ ] Page 6 correctly decodes and displays DTCs in `P0xxx` / `C0xxx` format.
-- [ ] Boot screen executes smooth fade-in and fade-out transitions before launching the cluster.
+- [ ] Page 5 (Diagnostics) correctly decodes and displays DTCs in `P0xxx` / `C0xxx` format.
+- [ ] Boot screen displays the static splash image and transitions cleanly to the cluster UI.
