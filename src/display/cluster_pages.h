@@ -100,6 +100,10 @@ struct ClusterPageRuntimeState {
     bool deleteLogsConfirmArmed = false;
     uint32_t deleteLogsConfirmArmedAtMs = 0;
 
+    // UI page - recalibrate-touch confirmation.
+    bool recalibrateTouchConfirmArmed = false;
+    uint32_t recalibrateTouchConfirmArmedAtMs = 0;
+
     // Shared config footer (Save button) - feedback message/timeout, shown on
     // whichever config page is active when Save is tapped.
     char configStatusMessage[32] = {0};
@@ -126,6 +130,7 @@ struct ClusterPageRuntimeState {
     char cfgThemeDrawn[24] = {0};          // UI page
     char cfgTicksDrawn[32] = {0};          // UI page
     char cfgFlipDrawn[16] = {0};           // UI page
+    int8_t cfgRecalibrateConfirmDrawn = -1; // UI page
     char cfgLogIntervalDrawn[24] = {0};    // Logs page
     char cfgLogUnitsDrawn[32] = {0};       // Logs page
     int8_t cfgDeleteConfirmDrawn = -1;     // Logs page

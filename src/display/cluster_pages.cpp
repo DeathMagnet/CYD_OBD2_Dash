@@ -775,7 +775,7 @@ void ClusterPages::drawConfigUiStatic() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
 
-    for (int i = 0; i <= 3; ++i) {
+    for (int i = 0; i <= 4; ++i) {
         int32_t y = layout::kHeaderHeight + i * layout::kConfigRowHeight;
         tft_.drawFastHLine(0, y, layout::kScreenWidth, theme_.bezel);
     }
@@ -809,14 +809,21 @@ void ClusterPages::drawConfigUiStatic() {
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow2Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
 
+    // Touch calibration row
+    tft_.setTextDatum(ML_DATUM);
+    tft_.setTextColor(theme_.textPrimary, theme_.background);
+    applyLabelFont(tft_);
+    tft_.drawString(labels::kLabelTouchCalibration, 12, layout::kConfigRow3Y + layout::kConfigRowHeight / 2);
+    resetValueFont(tft_);
+
     // Flip screen toggle row
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
     applyLabelFont(tft_);
-    tft_.drawString(labels::kLabelFlipScreen, 12, layout::kConfigRow3Y + layout::kConfigRowHeight / 2);
+    tft_.drawString(labels::kLabelFlipScreen, 12, layout::kConfigRow4Y + layout::kConfigRowHeight / 2);
     resetValueFont(tft_);
 
-    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow3Y + layout::kConfigButtonInsetY,
+    tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow4Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
 
     // Warning text, left-aligned directly under the Flip Screen label — drawn
@@ -825,17 +832,17 @@ void ClusterPages::drawConfigUiStatic() {
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.warningActive, theme_.background);
     tft_.setTextSize(1);
-    tft_.drawString(labels::kWarningFlipScreenRestarts, 12, layout::kConfigRow3Y + layout::kConfigRowHeight + 6);
+    tft_.drawString(labels::kWarningFlipScreenRestarts, 12, layout::kConfigRow4Y + layout::kConfigRowHeight + 6);
 
     // Force drawConfigUiDynamic() to repaint every region the next time it runs
     runtimeState_.cfgUnitsDrawn[0] = '\0';
     runtimeState_.cfgThemeDrawn[0] = '\0';
     runtimeState_.cfgTicksDrawn[0] = '\0';
     runtimeState_.cfgFlipDrawn[0] = '\0';
+    runtimeState_.cfgRecalibrateConfirmDrawn = -1;
 }
 
 void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
-    (void)nowMs;
     const AppSettings& settings = configStore_.settings();
     char buf[32];
 
@@ -882,13 +889,33 @@ void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
         strncpy(runtimeState_.cfgTicksDrawn, buf, sizeof(runtimeState_.cfgTicksDrawn) - 1);
     }
 
+    bool recalConfirmArmed = runtimeState_.recalibrateTouchConfirmArmed &&
+                              (nowMs - runtimeState_.recalibrateTouchConfirmArmedAtMs < 5000);
+    if (runtimeState_.recalibrateTouchConfirmArmed && !recalConfirmArmed) {
+        runtimeState_.recalibrateTouchConfirmArmed = false;
+    }
+    if (runtimeState_.cfgRecalibrateConfirmDrawn != static_cast<int8_t>(recalConfirmArmed)) {
+        uint16_t recalColor = recalConfirmArmed ? theme_.warningActive : theme_.panel;
+        tft_.fillRoundRect(layout::kConfigActionX, layout::kConfigRow3Y + layout::kConfigButtonInsetY,
+                            layout::kConfigActionW, layout::kConfigButtonH, 6, recalColor);
+        tft_.drawRoundRect(layout::kConfigActionX, layout::kConfigRow3Y + layout::kConfigButtonInsetY,
+                            layout::kConfigActionW, layout::kConfigButtonH, 6, theme_.bezel);
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextSize(1);
+        tft_.setTextColor(recalConfirmArmed ? theme_.background : theme_.textPrimary, recalColor);
+        tft_.drawString(recalConfirmArmed ? labels::kButtonTapToConfirm : labels::kButtonRecalibrateTouch,
+                         layout::kConfigActionX + layout::kConfigActionW / 2,
+                         layout::kConfigRow3Y + layout::kConfigRowHeight / 2);
+        runtimeState_.cfgRecalibrateConfirmDrawn = static_cast<int8_t>(recalConfirmArmed);
+    }
+
     snprintf(buf, sizeof(buf), "%s", settings.screenFlipped ? labels::kLabelFlipScreenFlipped : labels::kLabelFlipScreenNormal);
     if (strcmp(buf, runtimeState_.cfgFlipDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
         applyLabelFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigCycleX + layout::kConfigCycleW / 2,
-                                     layout::kConfigRow3Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
+                                     layout::kConfigRow4Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
                                      theme_.background);
         resetValueFont(tft_);
         strncpy(runtimeState_.cfgFlipDrawn, buf, sizeof(runtimeState_.cfgFlipDrawn) - 1);
@@ -1402,15 +1429,15 @@ void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
     }
     if (runtimeState_.cfgDeleteConfirmDrawn != static_cast<int8_t>(confirmArmed)) {
         uint16_t deleteColor = confirmArmed ? theme_.warningActive : theme_.panel;
-        tft_.fillRoundRect(layout::kConfigDeleteX, layout::kLogsSummaryRowY + layout::kConfigButtonInsetY,
-                            layout::kConfigDeleteW, layout::kConfigButtonH, 6, deleteColor);
-        tft_.drawRoundRect(layout::kConfigDeleteX, layout::kLogsSummaryRowY + layout::kConfigButtonInsetY,
-                            layout::kConfigDeleteW, layout::kConfigButtonH, 6, theme_.bezel);
+        tft_.fillRoundRect(layout::kConfigActionX, layout::kLogsSummaryRowY + layout::kConfigButtonInsetY,
+                            layout::kConfigActionW, layout::kConfigButtonH, 6, deleteColor);
+        tft_.drawRoundRect(layout::kConfigActionX, layout::kLogsSummaryRowY + layout::kConfigButtonInsetY,
+                            layout::kConfigActionW, layout::kConfigButtonH, 6, theme_.bezel);
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextSize(1);
         tft_.setTextColor(confirmArmed ? theme_.background : theme_.textPrimary, deleteColor);
         tft_.drawString(confirmArmed ? labels::kButtonTapToConfirm : labels::kButtonDeleteAllLogs,
-                         layout::kConfigDeleteX + layout::kConfigDeleteW / 2,
+                         layout::kConfigActionX + layout::kConfigActionW / 2,
                          layout::kLogsSummaryRowY + layout::kConfigRowHeight / 2);
         runtimeState_.cfgDeleteConfirmDrawn = static_cast<int8_t>(confirmArmed);
     }

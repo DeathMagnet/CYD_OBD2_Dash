@@ -219,6 +219,7 @@ Navigate with the prev/next arrows; cycles within the config group only. All set
 - **Units** (tap-to-toggle): `STANDARD (MPH/°F/PSI)` ↔ `METRIC (KM/H/°C/KPA)`. Affects all displayed temperatures, pressures, and distances. The displayed gauge values and axis labels update immediately, but the internal configuration never changes — only the display multipliers swap.
 - **Gauge Ticks** (tap-to-cycle): `TICS OFF` → `INSIDE TICS ONLY` → `OUTSIDE TICS ONLY` → `INSIDE AND OUTSIDE TICS` → (wraps).
   - **Constraint**: If the active theme is "S197", only the first two options are available (`OFF` ↔ `INSIDE ONLY`), because the S197 theme's bezel art lacks space for outer tick marks. Attempting to cycle past `INSIDE ONLY` wraps back to `OFF`.
+- **Touch Calibration** (tap-to-confirm): Immediately re-runs the 4-corner touch calibration routine — unlike the other UI settings, this isn't staged; it acts as soon as you confirm, independent of the Save button. First tap arms the button ("TAP TO CONFIRM", same pattern as Delete All Logs); tapping again within 5 seconds deletes the saved calibration and restarts the device, which then walks you through the calibration screen on boot.
 - **Flip Screen** (tap-to-toggle): `NORMAL` ↔ `FLIPPED 180`. Rotates the display 180° for boards mounted upside-down behind the gauge cluster.
   - **⚠️ Warning**: Changing this setting **restarts the device** when you save, and re-runs touch calibration in the new orientation (same as the first-boot calibration routine). Make sure you're ready to re-tap the 4 calibration corners after saving.
 
@@ -287,6 +288,8 @@ Appears at the bottom of every config page:
 - **For OBD Adapter credentials**: Saving new credentials triggers an immediate Bluetooth reconnection attempt in the background; no device reboot is needed.
 
 - **For Flip Screen**: Saving while this setting is dirty deletes the saved touch calibration and restarts the device so the new orientation and a fresh touch calibration both take effect together.
+
+- **Touch Calibration is the exception to "applied on save"**: it's not a persisted setting and doesn't wait for SAVE TO SD — confirming the tap-to-confirm button deletes the saved calibration and restarts the device immediately.
 
 ## Status LED Behavior
 

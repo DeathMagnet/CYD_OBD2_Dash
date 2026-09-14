@@ -83,7 +83,6 @@ bool ClusterTouchHandler::handleHeaderTap(uint16_t x, uint16_t y) {
 }
 
 bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t nowMs) {
-    (void)nowMs;
     const AppSettings& settings = configStore_.settings();
 
     // Active theme cycle row (row 0): cycles through all three themes in
@@ -138,13 +137,30 @@ bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t now
         return false;
     }
 
-    // Flip screen toggle row (row 3): stages the change only. The actual
+    // Touch calibration row (row 3): tap-to-confirm, same pattern as Delete
+    // All Logs. Acts immediately on confirm rather than staging until the
+    // page's Save button is tapped, since there's no persisted setting here.
+    int32_t row3 = layout::kConfigRow3Y + layout::kConfigButtonInsetY;
+    int32_t row3End = row3 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigActionX, row3, layout::kConfigActionX + layout::kConfigActionW, row3End)) {
+        ClusterPageRuntimeState& state = clusterPages_.runtimeState();
+        if (state.recalibrateTouchConfirmArmed && (nowMs - state.recalibrateTouchConfirmArmedAtMs < 5000)) {
+            sdManager_.deleteTouchCalibration();
+            ESP.restart();
+        } else {
+            state.recalibrateTouchConfirmArmed = true;
+            state.recalibrateTouchConfirmArmedAtMs = nowMs;
+        }
+        return false;
+    }
+
+    // Flip screen toggle row (row 4): stages the change only. The actual
     // rotation swap + touch recalibration happens on Save (see
     // handleConfigFooterTap), matching the Log Units page's stage-until-save
     // pattern.
-    int32_t row3 = layout::kConfigRow3Y + layout::kConfigButtonInsetY;
-    int32_t row3End = row3 + layout::kConfigButtonH;
-    if (within(x, y, layout::kConfigCycleX, row3, layout::kConfigCycleX + layout::kConfigCycleW, row3End)) {
+    int32_t row4 = layout::kConfigRow4Y + layout::kConfigButtonInsetY;
+    int32_t row4End = row4 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigCycleX, row4, layout::kConfigCycleX + layout::kConfigCycleW, row4End)) {
         configStore_.setScreenFlipped(!settings.screenFlipped);
         return false;
     }
@@ -342,7 +358,7 @@ bool ClusterTouchHandler::handleConfigLogsTap(uint16_t x, uint16_t y, uint32_t n
 
     int32_t summaryRow = layout::kLogsSummaryRowY + layout::kConfigButtonInsetY;
     int32_t summaryRowEnd = summaryRow + layout::kConfigButtonH;
-    if (within(x, y, layout::kConfigDeleteX, summaryRow, layout::kConfigDeleteX + layout::kConfigDeleteW,
+    if (within(x, y, layout::kConfigActionX, summaryRow, layout::kConfigActionX + layout::kConfigActionW,
                summaryRowEnd)) {
         if (state.deleteLogsConfirmArmed && (nowMs - state.deleteLogsConfirmArmedAtMs < 5000)) {
             csvLogger_.deleteAllLogs();

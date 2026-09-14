@@ -62,9 +62,13 @@ constexpr int32_t kConfigPlusX = 400, kConfigPlusW = 50;
 constexpr int32_t kConfigButtonInsetY = 4;
 constexpr int32_t kConfigButtonH = kConfigRowHeight - 2 * kConfigButtonInsetY;
 
-constexpr int32_t kConfigCycleX = 240, kConfigCycleW = 210;   // Logs row 0: tap-to-cycle log interval
-constexpr int32_t kConfigSaveX = 20, kConfigSaveW = 440;      // Footer: full-width save button
-constexpr int32_t kConfigDeleteX = 300, kConfigDeleteW = 160; // Logs: delete-all-logs button
+constexpr int32_t kConfigCycleX = 240, kConfigCycleW = 210; // Logs row 0: tap-to-cycle log interval
+constexpr int32_t kConfigSaveX = 20, kConfigSaveW = 440;     // Footer: full-width save button
+
+// A page-specific action button (Delete All Logs, Recalibrate Touch),
+// right-aligned with the cycle boxes on the rows above/below it.
+constexpr int32_t kConfigActionW = 160;
+constexpr int32_t kConfigActionX = kConfigCycleX + kConfigCycleW - kConfigActionW; // 290
 
 // Logs page only: Log Units + its warning line form a taller section than
 // the standard 40px row, so the Log Summary/Delete row that follows it is

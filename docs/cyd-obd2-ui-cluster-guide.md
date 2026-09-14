@@ -219,6 +219,7 @@ Settings for display appearance and unit system.
 | **Units** | Standard (MPH/°F/PSI), Metric (KM/H/°C/KPA) | Standard | Display units for speed, temperature, and pressure. Affects all dashboard pages and config field labels/steppers. Does not affect CSV logging (see LOGS page). |
 | **Gauge Ticks** | On, Off | On | Radial tick marks on the RPM/Speed gauge scales (every 500/1000 RPM, every 10/50 MPH or KM/H); tap-to-cycle toggle |
 | **Flip Screen** | Normal, Flipped 180 | Normal | Rotates the display 180° for boards mounted upside-down. **⚠️ CHANGING THIS RESTARTS THE DEVICE ON SAVE** (shown in red below the toggle) — the toggle stages a pending change; the device restarts and re-runs touch calibration in the new orientation only when you tap SAVE TO SD, and only if the orientation actually changed since the last save. |
+| **Touch Calibration** | — (action button) | — | Tap-to-confirm button that immediately deletes the saved touch calibration and restarts the device, which re-runs the 4-corner calibration routine on boot. Not staged like other settings — takes effect on confirm, not on SAVE TO SD. |
 
 #### Config Page: GAUGES
 Gauge calibration settings for RPM warning zones and gauge scales.
@@ -331,6 +332,7 @@ src/
 - [ ] Gauge tick marks on Page 1 (RPM and Speed) render correctly as two short segments flanking the gauge ring (just outside the outer edge and just inside the inner edge), recolor from secondary to primary as the needle passes each tick, and are absent inside the RPM redline zone.
 - [ ] Gauge ticks can be toggled ON/OFF from the Config: UI page "GAUGE TICKS" button, and the setting persists after Save + power cycle.
 - [ ] Flip Screen toggle on the Config: UI page stages a pending change only (screen does not rotate immediately) and shows the red restart warning under the row; tapping Save restarts the device, re-runs touch calibration automatically in the new orientation, boots with the display and boot logo rotated 180°, and taps land correctly afterward on every page; the setting persists after a full power cycle.
+- [ ] Touch Calibration button on the Config: UI page arms on first tap (shows red "TAP TO CONFIRM"), reverts after 5s if not confirmed, and on confirm restarts the device and re-runs the 4-corner calibration routine; touch works correctly afterward on every page.
 - [ ] Calculated Horsepower, Torque, Vacuum/Boost, and 0-60 timer update correctly on Pages 3 & 4.
 - [ ] Config page settings save to SD card and persist after power cycle.
 - [ ] Page 5 (Diagnostics) correctly decodes and displays DTCs in `P0xxx` / `C0xxx` format.

@@ -374,6 +374,7 @@ Run these checks as implementation progresses:
 - Observe display rendering and Bluetooth recovery for an extended bench session; confirm no uncontrolled memory growth, watchdog resets, or UI stalls.
 - On the Config: OBD ADAPTER page, tap-cycle the Adapter Name and PIN rows through their presets, then tap Save and confirm the status badge drops to CONNECTING and re-establishes LIVE (live reconnect with new credentials, no reboot).
 - On the Config: UI page, toggle Flip Screen and tap Save; confirm the device restarts, re-runs touch calibration automatically, and boots with the display and boot logo rotated 180° with taps landing correctly afterward. Toggle back and confirm it returns to normal, and that the setting survives a full power cycle either way.
+- On the Config: UI page, tap the Touch Calibration button twice (arm, then confirm) and verify the device restarts and re-runs the 4-corner calibration routine immediately, without needing a Save tap; confirm touch accuracy afterward.
 
 ## Safety and Scope Notes
 

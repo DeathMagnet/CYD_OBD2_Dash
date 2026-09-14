@@ -69,6 +69,8 @@ constexpr const char* kLabelFlipScreen = "FLIP SCREEN 180";
 constexpr const char* kLabelFlipScreenNormal = "NORMAL";
 constexpr const char* kLabelFlipScreenFlipped = "FLIPPED 180";
 constexpr const char* kWarningFlipScreenRestarts = "CHANGING THIS RESTARTS DEVICE ON SAVE";
+constexpr const char* kLabelTouchCalibration = "TOUCH CALIBRATION";
+constexpr const char* kButtonRecalibrateTouch = "RECALIBRATE";
 
 // ---- Config: User Vars ----
 constexpr const char* kLabelBoostBaroBaseline = "BOOST BARO BASELINE";
