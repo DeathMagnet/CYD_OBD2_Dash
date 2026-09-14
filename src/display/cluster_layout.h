@@ -72,12 +72,15 @@ constexpr int32_t kConfigDeleteX = 300, kConfigDeleteW = 160; // Logs: delete-al
 constexpr int32_t kLogsSummaryRowY = kConfigRow1Y + 58; // 138
 
 // Page 4 (Performance & Telemetry): 0-60 MPH timer tap-to-reset box.
-constexpr int32_t kPerfTimerX0 = 140, kPerfTimerY0 = 125, kPerfTimerX1 = 340, kPerfTimerY1 = 180;
+constexpr int32_t kPerfTimerX0 = 140, kPerfTimerY0 = 125, kPerfTimerX1 = 340, kPerfTimerY1 = 195;
 
 // Page 6 (Diagnostics).
 constexpr int32_t kDtcListY = 85;
-constexpr int32_t kDtcListLineHeight = 20;
-constexpr uint8_t kDtcListVisibleLines = 7;
+// Sized for the theme's tier-2 value font (see applyValueFont()), whose
+// tallest case (Modern Flat's FreeSans12pt7b) is ~29px, vs. the 20px row
+// height the plain default font used before the DTC list switched fonts.
+constexpr int32_t kDtcListLineHeight = 32;
+constexpr uint8_t kDtcListVisibleLines = 5;
 constexpr int32_t kDtcButtonY = 270;
 constexpr int32_t kDtcButtonH = 40;
 constexpr int32_t kDtcReadButtonX = 40, kDtcReadButtonW = 180;

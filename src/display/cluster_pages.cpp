@@ -181,19 +181,23 @@ void ClusterPages::drawPage1Static() {
     // with a reserved value width so the [value][unit] pair reads as
     // centered in its box instead of hugging the right edge. Must match the
     // layout in drawPage1Dynamic().
-    constexpr const char* kTempRepValue = "199"; // widest expected coolant/IAT reading
+    // "999" rather than a more "realistic" value like "199": Torque Neon's
+    // Orbitron value font is proportional, and digit '1' renders half as wide
+    // as the others, so a rep value containing '1' underestimates the true
+    // widest-digit-combo width and leaves stale fragments on repaint.
+    constexpr const char* kTempRepValue = "999"; // widest expected coolant/IAT reading
     bool metric = configStore_.settings().useMetricUnits;
     int32_t coolantColX = 4 + 0 * (kColW + kColGap);
     int32_t coolantUnitW = gaugewidgets::fixedUnitWidth(tft_, units::tempUnitLabel(metric), 2);
     int32_t coolantValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 2, kTempRepValue);
     gaugewidgets::ValueUnitGroup coolantGroup =
         gaugewidgets::centerValueUnitGroup(coolantColX + kColW / 2, coolantValueW, coolantUnitW, 4);
-    gaugewidgets::drawFixedUnit(tft_, units::tempUnitLabel(metric), coolantGroup.unitRightX, kRowY + 22, TR_DATUM, 2,
+    gaugewidgets::drawFixedUnit(tft_, units::tempUnitLabel(metric), coolantGroup.unitRightX, kRowY + 26, TR_DATUM, 2,
                                  theme_, theme_.panel);
 
-    int32_t iatColX = 4 + 1 * (kColW + kColGap);
+    int32_t iatColX = 4 + 2 * (kColW + kColGap);
     gaugewidgets::drawValueBoxStatic(tft_, iatColX, kRowY + 8, kColW, labels::kLabelIat, units::tempUnitLabel(metric),
-                                      kTempRepValue, theme_);
+                                      kTempRepValue, theme_, 1, 2, 18);
 }
 
 void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
@@ -257,7 +261,7 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     resetValueFont(tft_);
     tft_.setTextSize(2);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
-    int32_t rpmLabelY = kGaugeCy + 25 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
+    int32_t rpmLabelY = kGaugeCy + 35 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
     tft_.drawString(labels::kUnitRpm, kRpmGaugeCx, rpmLabelY);
 
     char speedBuf[8];
@@ -278,13 +282,13 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     resetValueFont(tft_);
     tft_.setTextSize(2);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
-    int32_t speedLabelY = kGaugeCy + 25 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
+    int32_t speedLabelY = kGaugeCy + 35 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
     tft_.drawString(units::speedUnitLabel(metric), kSpeedGaugeCx, speedLabelY);
 
     constexpr int32_t kRowY = 250, kColW = 154, kColGap = 5;
     char valueBuf[16];
 
-    constexpr const char* kTempRepValue = "199"; // must match drawPage1Static()
+    constexpr const char* kTempRepValue = "999"; // must match drawPage1Static()
     bool coolantHot = snapshot.coolantF.valid && snapshot.coolantF.value > config::kHighCoolantWarningF;
     float displayCoolant = units::displayTemp(snapshot.coolantF.value, metric);
     snprintf(valueBuf, sizeof(valueBuf), "%d", static_cast<int>(displayCoolant));
@@ -302,16 +306,16 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
                                   : (snapshot.coolantF.valid ? theme_.textPrimary : theme_.textSecondary),
                        theme_.panel);
     applyValueFont(tft_, theme_, 2);
-    gaugewidgets::drawFieldText(tft_, snapshot.coolantF.valid ? valueBuf : "--", coolantGroup.valueRightX, kRowY + 22,
+    gaugewidgets::drawFieldText(tft_, snapshot.coolantF.valid ? valueBuf : "--", coolantGroup.valueRightX, kRowY + 26,
                                  coolantValueW, theme_.panel);
     resetValueFont(tft_);
 
     float displayIat = units::displayTemp(snapshot.iatF.value, metric);
     snprintf(valueBuf, sizeof(valueBuf), "%d", static_cast<int>(displayIat));
-    gaugewidgets::drawValueBoxValue(tft_, 4 + 1 * (kColW + kColGap), kRowY + 8, kColW, valueBuf,
-                                     units::tempUnitLabel(metric), kTempRepValue, snapshot.iatF.valid, theme_);
+    gaugewidgets::drawValueBoxValue(tft_, 4 + 2 * (kColW + kColGap), kRowY + 8, kColW, valueBuf,
+                                     units::tempUnitLabel(metric), kTempRepValue, snapshot.iatF.valid, theme_, 2, 18);
 
-    int32_t throttleColX = 4 + 2 * (kColW + kColGap);
+    int32_t throttleColX = 4 + 1 * (kColW + kColGap);
     tft_.setTextDatum(TC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
     tft_.setTextSize(1);
@@ -536,14 +540,14 @@ void ClusterPages::drawPage3Static() {
     // in drawPage3Dynamic().
     bool metric = configStore_.settings().useMetricUnits;
     int32_t voltageUnitW = gaugewidgets::fixedUnitWidth(tft_, "V", 2);
-    int32_t voltageValueW = gaugewidgets::fixedUnitWidth(tft_, "19.99", 2);
+    int32_t voltageValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 2, "19.99");
     gaugewidgets::ValueUnitGroup voltageGroup =
         gaugewidgets::centerValueUnitGroup(122, voltageValueW, voltageUnitW, 4);
     gaugewidgets::drawFixedUnit(tft_, "V", voltageGroup.unitRightX, 80, TR_DATUM, 2, theme_, theme_.panel);
     gaugewidgets::drawValueBoxStatic(tft_, 245, 58, 225, labels::kLabelFuelRailPressure,
-                                      units::pressureUnitLabel(metric), "999", theme_);
-    gaugewidgets::drawValueBoxStatic(tft_, 10, 253, 140, labels::kLabelO2B1S1, "V", "1.27", theme_);
-    gaugewidgets::drawValueBoxStatic(tft_, 330, 253, 140, labels::kLabelO2B2S1, "V", "1.27", theme_);
+                                      units::pressureUnitLabel(metric), "999", theme_, 1, 2, 22);
+    gaugewidgets::drawValueBoxStatic(tft_, 10, 253, 140, labels::kLabelO2B1S1, "V", "8.88", theme_, 1, 2, 22);
+    gaugewidgets::drawValueBoxStatic(tft_, 330, 253, 140, labels::kLabelO2B2S1, "V", "8.88", theme_, 1, 2, 22);
 
     // Vacuum/Boost panel - fills the gap between the four corner panels above.
     // Must match the layout in drawPage3Dynamic().
@@ -563,7 +567,7 @@ void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextSize(1);
     tft_.drawString(labels::kLabelBatteryVoltage, 122, 58);
     int32_t voltageUnitW = gaugewidgets::fixedUnitWidth(tft_, "V", 2);
-    int32_t voltageValueW = gaugewidgets::fixedUnitWidth(tft_, "19.99", 2);
+    int32_t voltageValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 2, "19.99");
     gaugewidgets::ValueUnitGroup voltageGroup =
         gaugewidgets::centerValueUnitGroup(122, voltageValueW, voltageUnitW, 4);
     snprintf(buf, sizeof(buf), "%.2f", snapshot.voltageV.value);
@@ -571,14 +575,15 @@ void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextColor(lowVoltage ? theme_.warningActive
                                   : (snapshot.voltageV.valid ? theme_.textPrimary : theme_.textSecondary),
                        theme_.panel);
-    tft_.setTextSize(2);
+    applyValueFont(tft_, theme_, 2);
     gaugewidgets::drawFieldText(tft_, snapshot.voltageV.valid ? buf : "--", voltageGroup.valueRightX, 80,
                                  voltageValueW, theme_.panel);
+    resetValueFont(tft_);
 
     float displayFuelPressure = units::displayPressureFromKpa(snapshot.fuelPressureKpa.value, metric);
     snprintf(buf, sizeof(buf), "%d", static_cast<int>(displayFuelPressure));
     gaugewidgets::drawValueBoxValue(tft_, 245, 58, 225, buf, units::pressureUnitLabel(metric), "999",
-                                     snapshot.fuelPressureKpa.valid, theme_);
+                                     snapshot.fuelPressureKpa.valid, theme_, 2, 22);
 
     // Vacuum (MAP < baro baseline) or boost (MAP > baseline), per the Page 3 spec.
     float baroBaselineKpa = units::kpaFromPsi(settings.baroBaselinePsi);
@@ -644,10 +649,10 @@ void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextSize(1);
 
     snprintf(buf, sizeof(buf), "%.2f", snapshot.o2B1S1V.value);
-    gaugewidgets::drawValueBoxValue(tft_, 10, 253, 140, buf, "V", "1.27", snapshot.o2B1S1V.valid, theme_);
+    gaugewidgets::drawValueBoxValue(tft_, 10, 253, 140, buf, "V", "8.88", snapshot.o2B1S1V.valid, theme_, 2, 22);
 
     snprintf(buf, sizeof(buf), "%.2f", snapshot.o2B2S1V.value);
-    gaugewidgets::drawValueBoxValue(tft_, 330, 253, 140, buf, "V", "1.27", snapshot.o2B2S1V.valid, theme_);
+    gaugewidgets::drawValueBoxValue(tft_, 330, 253, 140, buf, "V", "8.88", snapshot.o2B2S1V.valid, theme_, 2, 22);
 }
 
 // ---------------------------------------------------------------- Page 4: Performance & Telemetry --
@@ -657,21 +662,21 @@ void ClusterPages::drawPage4Static() {
                   theme_.background);
     tft_.fillRoundRect(10, 50, 220, 65, 6, theme_.panel);
     tft_.fillRoundRect(250, 50, 220, 65, 6, theme_.panel);
-    tft_.fillRoundRect(140, 125, 200, 55, 6, theme_.panel);
-    tft_.drawRoundRect(10, 190, 460, 110, 6, theme_.bezel);
+    tft_.fillRoundRect(140, 125, 200, 70, 6, theme_.panel);
+    tft_.drawRoundRect(10, 205, 460, 110, 6, theme_.bezel);
     tft_.setTextDatum(TL_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     tft_.setTextSize(1);
-    tft_.drawString(labels::kLabelIntakeAirflow60s, 16, 196);
+    tft_.drawString(labels::kLabelIntakeAirflow60s, 16, 211);
 
     // Fixed labels/units, drawn once so they never shift or get redrawn when
     // their paired number's digit count changes; centered with a reserved
     // value width so each pair reads as centered in its box. Must match the
     // layout in drawPage4Dynamic().
-    gaugewidgets::drawValueBoxStatic(tft_, 10, 58, 220, labels::kLabelEstHorsepower, "HP", "999", theme_);
-    gaugewidgets::drawValueBoxStatic(tft_, 250, 58, 220, labels::kLabelEstTorque, "lb-ft", "999", theme_);
+    gaugewidgets::drawValueBoxStatic(tft_, 10, 58, 220, labels::kLabelEstHorsepower, "HP", "999", theme_, 1, 2, 22);
+    gaugewidgets::drawValueBoxStatic(tft_, 250, 58, 220, labels::kLabelEstTorque, "lb-ft", "999", theme_, 1, 2, 22);
     int32_t timerUnitW = gaugewidgets::fixedUnitWidth(tft_, "s", 2);
-    int32_t timerValueW = gaugewidgets::fixedUnitWidth(tft_, "99.99", 2);
+    int32_t timerValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 2, "99.99");
     gaugewidgets::ValueUnitGroup timerGroup = gaugewidgets::centerValueUnitGroup(240, timerValueW, timerUnitW, 4);
     gaugewidgets::drawFixedUnit(tft_, "s", timerGroup.unitRightX, 155, TR_DATUM, 2, theme_, theme_.panel);
 }
@@ -687,10 +692,10 @@ void ClusterPages::drawPage4Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     float torque = (haveMaf && haveRpm) ? (hp * 5252.0F / snapshot.rpm.value) : 0.0F;
 
     snprintf(buf, sizeof(buf), "%.0f", hp);
-    gaugewidgets::drawValueBoxValue(tft_, 10, 58, 220, buf, "HP", "999", haveMaf, theme_);
+    gaugewidgets::drawValueBoxValue(tft_, 10, 58, 220, buf, "HP", "999", haveMaf, theme_, 2, 22);
 
     snprintf(buf, sizeof(buf), "%.0f", torque);
-    gaugewidgets::drawValueBoxValue(tft_, 250, 58, 220, buf, "lb-ft", "999", haveMaf && haveRpm, theme_);
+    gaugewidgets::drawValueBoxValue(tft_, 250, 58, 220, buf, "lb-ft", "999", haveMaf && haveRpm, theme_, 2, 22);
 
     tft_.setTextDatum(TC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
@@ -698,9 +703,8 @@ void ClusterPages::drawPage4Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     const char* timerLabel = metric ? labels::kLabelZeroToHundredKph : labels::kLabelZeroToSixty;
     tft_.drawString(timerLabel, 240, 132);
     int32_t timerUnitW = gaugewidgets::fixedUnitWidth(tft_, "s", 2);
-    int32_t timerValueW = gaugewidgets::fixedUnitWidth(tft_, "99.99", 2);
+    int32_t timerValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 2, "99.99");
     gaugewidgets::ValueUnitGroup timerGroup = gaugewidgets::centerValueUnitGroup(240, timerValueW, timerUnitW, 4);
-    tft_.setTextSize(2);
     if (runtimeState_.zeroToSixtyRunning) {
         float elapsed = (nowMs - runtimeState_.zeroToSixtyStartMs) / 1000.0F;
         snprintf(buf, sizeof(buf), "%.2f", elapsed);
@@ -713,9 +717,11 @@ void ClusterPages::drawPage4Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
         tft_.setTextColor(theme_.textSecondary, theme_.panel);
     }
     tft_.setTextDatum(TR_DATUM);
+    applyValueFont(tft_, theme_, 2);
     gaugewidgets::drawFieldText(tft_, buf, timerGroup.valueRightX, 155, timerValueW, theme_.panel);
+    resetValueFont(tft_);
 
-    constexpr int32_t kGraphX = 12, kGraphY = 212, kGraphW = 456, kGraphH = 84;
+    constexpr int32_t kGraphX = 12, kGraphY = 227, kGraphW = 456, kGraphH = 84;
     tft_.fillRect(kGraphX, kGraphY, kGraphW, kGraphH, theme_.background);
     uint8_t count = runtimeState_.mafHistoryCount;
     if (count >= 2) {
@@ -1298,9 +1304,10 @@ void ClusterPages::drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     if (runtimeState_.dtcMilOnDrawn != static_cast<int8_t>(milOn)) {
         tft_.setTextDatum(TC_DATUM);
         tft_.setTextColor(milOn ? theme_.warningActive : theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyValueFont(tft_, theme_, 2);
         gaugewidgets::drawFieldText(tft_, milOn ? labels::kStatusMilActive : labels::kStatusMilInactive,
                                      layout::kScreenWidth / 2, 46, 300, theme_.background);
+        resetValueFont(tft_);
         runtimeState_.dtcMilOnDrawn = static_cast<int8_t>(milOn);
     }
 
@@ -1311,7 +1318,7 @@ void ClusterPages::drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     bool dtcListChanged = runtimeState_.dtcHaveResultDrawn != static_cast<int8_t>(haveResult) ||
                            (haveResult && !dtcListsEqual(dtcList, runtimeState_.dtcListDrawn));
     if (dtcListChanged) {
-        tft_.setTextSize(2);
+        applyValueFont(tft_, theme_, 2);
         // Clear the whole box every time regardless of how many lines will actually be
         // shown, so a shrinking list (fewer codes, or a fresh read) never leaves a stale
         // line from a taller previous draw.
@@ -1320,7 +1327,7 @@ void ClusterPages::drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
             tft_.fillRect(30, y, 420, layout::kDtcListLineHeight - 2, theme_.background);
         }
 
-        // Center the actual content block vertically within the box's 7-line span, and
+        // Center the actual content block vertically within the box's line span, and
         // each line horizontally on the box's x-center (matches the drawRoundRect box in
         // drawPage6Static: x 20..460).
         uint8_t contentLines = 1;
@@ -1344,6 +1351,7 @@ void ClusterPages::drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
                 tft_.drawString(dtcList.codes[line], kDtcCenterX, y);
             }
         }
+        resetValueFont(tft_);
         runtimeState_.dtcHaveResultDrawn = static_cast<int8_t>(haveResult);
         runtimeState_.dtcListDrawn = dtcList;
     }
