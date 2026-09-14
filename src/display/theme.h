@@ -4,10 +4,10 @@
 #include <TFT_eSPI.h>
 
 // Three themes are implemented (docs/cyd-obd2-ui-cluster-guide.md): Mustang
-// S197, Torque Neon, and Modern Flat.
+// S197, Neon, and Modern Flat.
 enum class ThemeId : uint8_t {
     MustangS197 = 0,
-    TorqueNeon = 1,
+    Neon = 1,
     ModernFlat = 2,
 };
 
@@ -66,3 +66,11 @@ void resetValueFont(TFT_eSPI& tft);
 // immediately after drawing the label, since GFX font
 // selection is sticky and every other config-page draw call assumes Font 1.
 void applyLabelFont(TFT_eSPI& tft);
+
+// Config-page setting *values* (numbers, not free text) use the same face and
+// size as applyLabelFont() - FreeSans9pt7b at size 1 - kept as its own named
+// function so value-widget font policy can still be tuned independently of
+// label font policy later. Like applyLabelFont(), callers must pair this with
+// resetValueFont() immediately after drawing since GFX font selection is
+// sticky and every other config-page draw call assumes Font 1.
+void applyConfigValueFont(TFT_eSPI& tft);

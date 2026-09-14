@@ -132,6 +132,13 @@ int32_t fixedUnitWidth(TFT_eSPI& tft, const char* unit, uint8_t textSize);
 // fixedUnitWidth() instead — same idea, same font.
 int32_t reservedValueWidth(TFT_eSPI& tft, const ThemeColors& theme, uint8_t sizeTier, const char* representative);
 
+// Same idea as reservedValueWidth(), for config-page numeric values that use
+// applyConfigValueFont() rather than a theme's applyValueFont() tier. Pass a
+// string representing the widest value the field realistically shows (e.g.
+// "199.9"). Leaves the active font as Font 1 afterward (matches
+// resetValueFont()).
+int32_t configValueWidth(TFT_eSPI& tft, const char* representative);
+
 // Centers a `valueWidth`-wide value slot + `gapPx` + a unit of `unitWidth` as
 // one block on `centerX`, returning the right edge of each half (for right-
 // aligned draws ending there). Neither returned edge depends on the value

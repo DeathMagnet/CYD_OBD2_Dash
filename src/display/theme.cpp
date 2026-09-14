@@ -40,10 +40,10 @@ ThemeColors kModernFlatTheme = {
     {},     // numberedFonts: not used
 };
 
-// Torque Neon: high-tech digital look inspired by the Torque Pro Android app
+// Neon: high-tech digital look inspired by the Torque Pro Android app
 // (see docs/cyd-obd2-ui-cluster-guide.md). Black background, saturated neon
 // gauge arcs, hot-orange warnings.
-ThemeColors kTorqueNeonTheme = {
+ThemeColors kNeonTheme = {
     0x0000, // background: black
     0x0862, // panel: near-black blue card surface
     0x07E0, // primaryGaugeArc: neon green
@@ -65,7 +65,7 @@ ThemeColors kTorqueNeonTheme = {
     false,  // useSevenSegmentFont
     false,  // useSegmentedBars
     false,  // useSegmentedArcs
-    labels::kThemeNameTorqueNeon,
+    labels::kThemeNameNeon,
     {},     // valueFonts: initialized via initializeThemeFonts()
     {},     // numberedFonts: not used
 };
@@ -104,7 +104,7 @@ constexpr ThemeColors kMustangS197Theme = {
 
 const ThemeColors& getTheme(ThemeId id) {
     switch (id) {
-        case ThemeId::TorqueNeon: return kTorqueNeonTheme;
+        case ThemeId::Neon: return kNeonTheme;
         case ThemeId::MustangS197: return kMustangS197Theme;
         case ThemeId::ModernFlat:
         default: return kModernFlatTheme;
@@ -154,17 +154,22 @@ void applyLabelFont(TFT_eSPI& tft) {
     tft.setTextSize(1);
 }
 
+void applyConfigValueFont(TFT_eSPI& tft) {
+    tft.setFreeFont(&FreeSans9pt7b);
+    tft.setTextSize(1);
+}
+
 void initializeThemeFonts() {
     kModernFlatTheme.valueFonts[0] = &FreeSans12pt7b;
     kModernFlatTheme.valueFonts[1] = &FreeSans18pt7b;
     kModernFlatTheme.valueFonts[2] = &FreeSans24pt7b;
 
-    kTorqueNeonTheme.valueFonts[0] = &Orbitron_Light_24_Fixed;
-    kTorqueNeonTheme.valueFonts[1] = &Orbitron_Light_24_Fixed;
-    kTorqueNeonTheme.valueFonts[2] = &Orbitron_Light_32_Fixed;
+    kNeonTheme.valueFonts[0] = &Orbitron_Light_24_Fixed;
+    kNeonTheme.valueFonts[1] = &Orbitron_Light_24_Fixed;
+    kNeonTheme.valueFonts[2] = &Orbitron_Light_32_Fixed;
 
     // Tier 5: dedicated, larger Engine Load value font (reuses the RPM/Speed
     // tier-4 font) without changing Boost/Vacuum's shared tier-3 size.
     kModernFlatTheme.valueFonts[3] = &FreeSans24pt7b;
-    kTorqueNeonTheme.valueFonts[3] = &Orbitron_Light_32_Fixed;
+    kNeonTheme.valueFonts[3] = &Orbitron_Light_32_Fixed;
 }

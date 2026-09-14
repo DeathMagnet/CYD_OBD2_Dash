@@ -175,7 +175,7 @@ void ClusterPages::drawPage1Static() {
     // with a reserved value width so the [value][unit] pair reads as
     // centered in its box instead of hugging the right edge. Must match the
     // layout in drawPage1Dynamic().
-    // "999" rather than a more "realistic" value like "199": Torque Neon's
+    // "999" rather than a more "realistic" value like "199": Neon's
     // Orbitron value font is proportional, and digit '1' renders half as wide
     // as the others, so a rep value containing '1' underestimates the true
     // widest-digit-combo width and leaves stale fragments on repaint.
@@ -794,10 +794,11 @@ void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
     if (strcmp(theme_.name, runtimeState_.cfgThemeDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(1);
+        applyLabelFont(tft_);
         gaugewidgets::drawFieldText(tft_, theme_.name, layout::kConfigCycleX + layout::kConfigCycleW / 2,
                                      layout::kConfigRow0Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgThemeDrawn, theme_.name, sizeof(runtimeState_.cfgThemeDrawn) - 1);
     }
 
@@ -805,10 +806,11 @@ void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgUnitsDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(1);
+        applyLabelFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigCycleX + layout::kConfigCycleW / 2,
                                      layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgUnitsDrawn, buf, sizeof(runtimeState_.cfgUnitsDrawn) - 1);
     }
 
@@ -824,10 +826,11 @@ void ClusterPages::drawConfigUiDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgTicksDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(1);
+        applyLabelFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigCycleX + layout::kConfigCycleW / 2,
                                      layout::kConfigRow2Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgTicksDrawn, buf, sizeof(runtimeState_.cfgTicksDrawn) - 1);
     }
 }
@@ -883,7 +886,7 @@ void ClusterPages::drawConfigUserVarsStatic() {
     // unitless and has no fixed-unit call.
     auto drawFixedUnitForRow = [&](int32_t rowY, const char* unitLabel) {
         int32_t unitW = gaugewidgets::fixedUnitWidth(tft_, unitLabel, 2);
-        int32_t valueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+        int32_t valueW = gaugewidgets::configValueWidth(tft_, "199.9");
         gaugewidgets::ValueUnitGroup group = gaugewidgets::centerValueUnitGroup(
             layout::kConfigValueX + layout::kConfigValueW / 2, valueW, unitW, 4);
         gaugewidgets::drawFixedUnit(tft_, unitLabel, group.unitRightX, rowY + layout::kConfigRowHeight / 2, MR_DATUM,
@@ -913,7 +916,7 @@ void ClusterPages::drawConfigUserVarsDynamic(uint32_t nowMs) {
 
     // Row 0: Boost Baro Baseline.
     int32_t baselineUnitW = gaugewidgets::fixedUnitWidth(tft_, units::pressureUnitLabel(metric), 2);
-    int32_t baselineValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+    int32_t baselineValueW = gaugewidgets::configValueWidth(tft_, "199.9");
     gaugewidgets::ValueUnitGroup baselineGroup = gaugewidgets::centerValueUnitGroup(
         layout::kConfigValueX + layout::kConfigValueW / 2, baselineValueW, baselineUnitW, 4);
     if (metric) {
@@ -925,16 +928,17 @@ void ClusterPages::drawConfigUserVarsDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgBaroBaselineDrawn) != 0) {
         tft_.setTextDatum(MR_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, baselineGroup.valueRightX,
                                      layout::kConfigRow0Y + layout::kConfigRowHeight / 2, baselineValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgBaroBaselineDrawn, buf, sizeof(runtimeState_.cfgBaroBaselineDrawn) - 1);
     }
 
     // Row 1: Coolant Warning Temp.
     int32_t coolantUnitW = gaugewidgets::fixedUnitWidth(tft_, units::tempUnitLabel(metric), 2);
-    int32_t coolantValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+    int32_t coolantValueW = gaugewidgets::configValueWidth(tft_, "199.9");
     gaugewidgets::ValueUnitGroup coolantGroup = gaugewidgets::centerValueUnitGroup(
         layout::kConfigValueX + layout::kConfigValueW / 2, coolantValueW, coolantUnitW, 4);
     if (metric) {
@@ -945,32 +949,34 @@ void ClusterPages::drawConfigUserVarsDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgCoolantWarningDrawn) != 0) {
         tft_.setTextDatum(MR_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, coolantGroup.valueRightX,
                                      layout::kConfigRow1Y + layout::kConfigRowHeight / 2, coolantValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgCoolantWarningDrawn, buf, sizeof(runtimeState_.cfgCoolantWarningDrawn) - 1);
     }
 
     // Row 2: Low Voltage Warning (no metric variant).
     int32_t voltUnitW = gaugewidgets::fixedUnitWidth(tft_, "V", 2);
-    int32_t voltValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+    int32_t voltValueW = gaugewidgets::configValueWidth(tft_, "199.9");
     gaugewidgets::ValueUnitGroup voltGroup = gaugewidgets::centerValueUnitGroup(
         layout::kConfigValueX + layout::kConfigValueW / 2, voltValueW, voltUnitW, 4);
     snprintf(buf, sizeof(buf), "%.1f", settings.lowVoltageWarningV);
     if (strcmp(buf, runtimeState_.cfgLowVoltageWarningDrawn) != 0) {
         tft_.setTextDatum(MR_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, voltGroup.valueRightX,
                                      layout::kConfigRow2Y + layout::kConfigRowHeight / 2, voltValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgLowVoltageWarningDrawn, buf, sizeof(runtimeState_.cfgLowVoltageWarningDrawn) - 1);
     }
 
     // Row 3: 0-60 Target Speed.
     int32_t targetUnitW = gaugewidgets::fixedUnitWidth(tft_, units::speedUnitLabel(metric), 2);
-    int32_t targetValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+    int32_t targetValueW = gaugewidgets::configValueWidth(tft_, "199.9");
     gaugewidgets::ValueUnitGroup targetGroup = gaugewidgets::centerValueUnitGroup(
         layout::kConfigValueX + layout::kConfigValueW / 2, targetValueW, targetUnitW, 4);
     if (metric) {
@@ -981,10 +987,11 @@ void ClusterPages::drawConfigUserVarsDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgZeroSixtyTargetDrawn) != 0) {
         tft_.setTextDatum(MR_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, targetGroup.valueRightX,
                                      layout::kConfigRow3Y + layout::kConfigRowHeight / 2, targetValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgZeroSixtyTargetDrawn, buf, sizeof(runtimeState_.cfgZeroSixtyTargetDrawn) - 1);
     }
 
@@ -993,26 +1000,28 @@ void ClusterPages::drawConfigUserVarsDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgHpFactorDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
                                      layout::kConfigRow4Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgHpFactorDrawn, buf, sizeof(runtimeState_.cfgHpFactorDrawn) - 1);
     }
 
     // Row 5: Fuel Trim Display Range (no metric variant).
     int32_t trimUnitW = gaugewidgets::fixedUnitWidth(tft_, "%", 2);
-    int32_t trimValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+    int32_t trimValueW = gaugewidgets::configValueWidth(tft_, "199.9");
     gaugewidgets::ValueUnitGroup trimGroup = gaugewidgets::centerValueUnitGroup(
         layout::kConfigValueX + layout::kConfigValueW / 2, trimValueW, trimUnitW, 4);
     snprintf(buf, sizeof(buf), "%.0f", settings.fuelTrimRangePct);
     if (strcmp(buf, runtimeState_.cfgFuelTrimRangeDrawn) != 0) {
         tft_.setTextDatum(MR_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, trimGroup.valueRightX,
                                      layout::kConfigRow5Y + layout::kConfigRowHeight / 2, trimValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgFuelTrimRangeDrawn, buf, sizeof(runtimeState_.cfgFuelTrimRangeDrawn) - 1);
     }
 }
@@ -1065,7 +1074,7 @@ void ClusterPages::drawConfigGaugesStatic() {
     // above have no unit suffix.
     auto drawFixedUnitForRow = [&](int32_t rowY, const char* unitLabel) {
         int32_t unitW = gaugewidgets::fixedUnitWidth(tft_, unitLabel, 2);
-        int32_t valueW = gaugewidgets::fixedUnitWidth(tft_, "999", 2);
+        int32_t valueW = gaugewidgets::configValueWidth(tft_, "999");
         gaugewidgets::ValueUnitGroup group = gaugewidgets::centerValueUnitGroup(
             layout::kConfigValueX + layout::kConfigValueW / 2, valueW, unitW, 4);
         gaugewidgets::drawFixedUnit(tft_, unitLabel, group.unitRightX, rowY + layout::kConfigRowHeight / 2, MR_DATUM,
@@ -1093,10 +1102,11 @@ void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgShiftLightRpmDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
                                      layout::kConfigRow0Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgShiftLightRpmDrawn, buf, sizeof(runtimeState_.cfgShiftLightRpmDrawn) - 1);
     }
 
@@ -1104,10 +1114,11 @@ void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgRedlineRpmDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
                                      layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgRedlineRpmDrawn, buf, sizeof(runtimeState_.cfgRedlineRpmDrawn) - 1);
     }
 
@@ -1115,10 +1126,11 @@ void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgMaxRpmDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
                                      layout::kConfigRow2Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgMaxRpmDrawn, buf, sizeof(runtimeState_.cfgMaxRpmDrawn) - 1);
     }
 
@@ -1131,16 +1143,17 @@ void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgMaxSpeedDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
                                      layout::kConfigRow3Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgMaxSpeedDrawn, buf, sizeof(runtimeState_.cfgMaxSpeedDrawn) - 1);
     }
 
     // Row 4: Vacuum Gauge Max.
     int32_t vacUnitW = gaugewidgets::fixedUnitWidth(tft_, metric ? labels::kUnitKpa : labels::kUnitInHg, 2);
-    int32_t vacValueW = gaugewidgets::fixedUnitWidth(tft_, "999", 2);
+    int32_t vacValueW = gaugewidgets::configValueWidth(tft_, "999");
     gaugewidgets::ValueUnitGroup vacGroup = gaugewidgets::centerValueUnitGroup(
         layout::kConfigValueX + layout::kConfigValueW / 2, vacValueW, vacUnitW, 4);
     if (metric) {
@@ -1151,16 +1164,17 @@ void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgVacuumMaxDrawn) != 0) {
         tft_.setTextDatum(MR_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, vacGroup.valueRightX,
                                      layout::kConfigRow4Y + layout::kConfigRowHeight / 2, vacValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgVacuumMaxDrawn, buf, sizeof(runtimeState_.cfgVacuumMaxDrawn) - 1);
     }
 
     // Row 5: Boost Gauge Max.
     int32_t boostUnitW = gaugewidgets::fixedUnitWidth(tft_, units::pressureUnitLabel(metric), 2);
-    int32_t boostValueW = gaugewidgets::fixedUnitWidth(tft_, "999", 2);
+    int32_t boostValueW = gaugewidgets::configValueWidth(tft_, "999");
     gaugewidgets::ValueUnitGroup boostGroup = gaugewidgets::centerValueUnitGroup(
         layout::kConfigValueX + layout::kConfigValueW / 2, boostValueW, boostUnitW, 4);
     if (metric) {
@@ -1171,10 +1185,11 @@ void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgBoostMaxDrawn) != 0) {
         tft_.setTextDatum(MR_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, boostGroup.valueRightX,
                                      layout::kConfigRow5Y + layout::kConfigRowHeight / 2, boostValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgBoostMaxDrawn, buf, sizeof(runtimeState_.cfgBoostMaxDrawn) - 1);
     }
 }
@@ -1207,7 +1222,7 @@ void ClusterPages::drawConfigLogsStatic() {
     // so the pair reads as centered instead of hugging the edge. Must match
     // drawConfigLogsDynamic().
     int32_t intervalUnitW = gaugewidgets::fixedUnitWidth(tft_, "ms", 2);
-    int32_t intervalValueW = gaugewidgets::fixedUnitWidth(tft_, "99999", 2);
+    int32_t intervalValueW = gaugewidgets::configValueWidth(tft_, "99999");
     gaugewidgets::ValueUnitGroup intervalGroup = gaugewidgets::centerValueUnitGroup(
         layout::kConfigCycleX + layout::kConfigCycleW / 2, intervalValueW, intervalUnitW, 4);
     gaugewidgets::drawFixedUnit(tft_, "ms", intervalGroup.unitRightX,
@@ -1223,12 +1238,12 @@ void ClusterPages::drawConfigLogsStatic() {
     int32_t logsRowMidY = layout::kLogsSummaryRowY + layout::kConfigRowHeight / 2;
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(1);
-    tft_.setTextFont(1);
+    applyLabelFont(tft_);
     int32_t logsLabelX = 12 + kLogsCountSlotW + 4;
     tft_.drawString("LOGS,", logsLabelX, logsRowMidY);
     int32_t logsSizeX = logsLabelX + tft_.textWidth("LOGS,") + 4;
     tft_.drawString("MB", logsSizeX + kLogsSizeSlotW + 4, logsRowMidY);
+    resetValueFont(tft_);
 
     // Log Units row (row 1), with the warning drawn directly below it
     applyLabelFont(tft_);
@@ -1260,15 +1275,16 @@ void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
     snprintf(buf, sizeof(buf), "%lu", static_cast<unsigned long>(settings.logIntervalMs));
     if (strcmp(buf, runtimeState_.cfgLogIntervalDrawn) != 0) {
         int32_t intervalUnitW = gaugewidgets::fixedUnitWidth(tft_, "ms", 2);
-        int32_t intervalValueW = gaugewidgets::fixedUnitWidth(tft_, "99999", 2);
+        int32_t intervalValueW = gaugewidgets::configValueWidth(tft_, "99999");
         gaugewidgets::ValueUnitGroup intervalGroup = gaugewidgets::centerValueUnitGroup(
             layout::kConfigCycleX + layout::kConfigCycleW / 2, intervalValueW, intervalUnitW, 4);
         tft_.setTextDatum(MR_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyConfigValueFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, intervalGroup.valueRightX,
                                      layout::kConfigRow0Y + layout::kConfigRowHeight / 2, intervalValueW,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgLogIntervalDrawn, buf, sizeof(runtimeState_.cfgLogIntervalDrawn) - 1);
     }
 
@@ -1277,10 +1293,11 @@ void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
     if (strcmp(buf, runtimeState_.cfgLogUnitsDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(1);
+        applyLabelFont(tft_);
         gaugewidgets::drawFieldText(tft_, buf, layout::kConfigCycleX + layout::kConfigCycleW / 2,
                                      layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgLogUnitsDrawn, buf, sizeof(runtimeState_.cfgLogUnitsDrawn) - 1);
     }
 
@@ -1307,8 +1324,12 @@ void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
             tft_.setTextColor(theme_.textPrimary, theme_.background);
             tft_.setTextSize(1);
             gaugewidgets::drawFieldText(tft_, countBuf, 12, logsRowMidY, kLogsCountSlotW, theme_.background);
+            applyLabelFont(tft_);
+            int32_t logsCommaWidth = tft_.textWidth("LOGS,");
+            resetValueFont(tft_);
             int32_t logsLabelX = 12 + kLogsCountSlotW + 4;
-            int32_t logsSizeX = logsLabelX + tft_.textWidth("LOGS,") + 4;
+            int32_t logsSizeX = logsLabelX + logsCommaWidth + 4;
+            tft_.setTextSize(1);
             gaugewidgets::drawFieldText(tft_, sizeBuf, logsSizeX, logsRowMidY, kLogsSizeSlotW, theme_.background);
             strncpy(runtimeState_.cfgLogSummaryDrawn, buf, sizeof(runtimeState_.cfgLogSummaryDrawn) - 1);
         }
@@ -1376,10 +1397,11 @@ void ClusterPages::drawConfigObdDynamic(uint32_t nowMs) {
     if (strcmp(settings.obdAdapterName, runtimeState_.cfgObdAdapterNameDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyLabelFont(tft_);
         gaugewidgets::drawFieldText(tft_, settings.obdAdapterName, layout::kConfigCycleX + layout::kConfigCycleW / 2,
                                      layout::kConfigRow0Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgObdAdapterNameDrawn, settings.obdAdapterName,
                 sizeof(runtimeState_.cfgObdAdapterNameDrawn) - 1);
     }
@@ -1387,10 +1409,11 @@ void ClusterPages::drawConfigObdDynamic(uint32_t nowMs) {
     if (strcmp(settings.obdAdapterPin, runtimeState_.cfgObdAdapterPinDrawn) != 0) {
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextColor(theme_.textPrimary, theme_.background);
-        tft_.setTextSize(2);
+        applyLabelFont(tft_);
         gaugewidgets::drawFieldText(tft_, settings.obdAdapterPin, layout::kConfigCycleX + layout::kConfigCycleW / 2,
                                      layout::kConfigRow1Y + layout::kConfigRowHeight / 2, layout::kConfigCycleW - 8,
                                      theme_.background);
+        resetValueFont(tft_);
         strncpy(runtimeState_.cfgObdAdapterPinDrawn, settings.obdAdapterPin,
                 sizeof(runtimeState_.cfgObdAdapterPinDrawn) - 1);
     }

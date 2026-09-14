@@ -122,7 +122,7 @@ constexpr const char* kStatusUnknown = "UNKNOWN";
 
 // ---- Theme ----
 constexpr const char* kThemeNameModernFlat = "Modern Flat";
-constexpr const char* kThemeNameTorqueNeon = "Torque Neon";
+constexpr const char* kThemeNameNeon = "Neon";
 constexpr const char* kThemeNameMustangS197 = "Mustang S197";
 
 } // namespace labels
