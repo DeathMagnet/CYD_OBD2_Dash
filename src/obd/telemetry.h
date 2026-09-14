@@ -19,7 +19,10 @@ inline bool isFresh(const TelemetryValue& telemetryValue, uint32_t nowMs, uint32
 }
 
 // Latest known readings for a 2006 Ford Mustang GT (4.6L 3V), covering every
-// PID this project polls. Units match the CSV logging schema (Imperial).
+// PID this project polls. Most fields use the CSV logging schema's Imperial
+// units natively (rpm, mph, °F, %, V); the three pressure fields (mapKpa,
+// fuelPressureKpa, baroKpa) are stored in kPa and converted to PSI by
+// csv_logger.cpp only when writing the non-metric log.
 struct TelemetrySnapshot {
     TelemetryValue rpm;              // rpm
     TelemetryValue speedMph;         // mph

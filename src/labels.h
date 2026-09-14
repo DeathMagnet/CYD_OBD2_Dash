@@ -101,7 +101,7 @@ constexpr const char* kButtonDeleteAllLogs = "DELETE ALL LOGS";
 constexpr const char* kButtonSaved = "SAVED!";
 constexpr const char* kButtonSaveToSd = "SAVE TO SD";
 
-// ---- Page 6: Diagnostics ----
+// ---- Page 5: Diagnostics ----
 constexpr const char* kButtonRefreshCodes = "REFRESH CODES";
 constexpr const char* kStatusMilActive = "MIL: ACTIVE (ON)";
 constexpr const char* kStatusMilInactive = "MIL: INACTIVE (OFF)";

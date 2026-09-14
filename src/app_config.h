@@ -172,6 +172,9 @@ constexpr float kSpeedTickIntervalMinor = 10.0F;
 constexpr float kSpeedTickIntervalMajor = 50.0F;
 constexpr uint8_t kDefaultTickMode = 3; // TickMode::InsideAndOutside (display/theme.h)
 
+// ---- Theme Selection ----
+constexpr uint8_t kDefaultThemeId = 0; // ThemeId::S197 (display/theme.h)
+
 // ---- SD CSV Telemetry Logging ----
 constexpr const char* kLogFilePrefix = "/obd_log_";
 constexpr const char* kLogFileSuffix = ".csv";

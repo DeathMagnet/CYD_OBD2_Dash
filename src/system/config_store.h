@@ -7,9 +7,9 @@
 
 // User-adjustable dashboard settings, persisted to /config.txt on the SD
 // card as plain "key=value" lines (see docs/cyd-obd2-ui-cluster-guide.md,
-// Page 5). Kept as flat key=value text rather than a JSON library: this is a
-// handful of scalars, and the coding standards prefer plain direct code over
-// pulling in a parsing dependency for a problem this small.
+// "Config Pages" section). Kept as flat key=value text rather than a JSON
+// library: this is a handful of scalars, and the coding standards prefer plain
+// direct code over pulling in a parsing dependency for a problem this small.
 struct AppSettings {
     uint16_t shiftLightRpm = config::kDefaultShiftLightRpm;
     uint16_t redlineRpm = config::kDefaultRedlineRpm;
@@ -24,10 +24,9 @@ struct AppSettings {
     float zeroSixtyTargetMph = config::kDefaultZeroSixtyTargetMph;
     float hpEstimationFactor = config::kDefaultHpEstimationFactor;
     float fuelTrimRangePct = config::kDefaultFuelTrimRangePct;
-    // Theme selection is persisted for forward compatibility, but only
-    // Modern Flat (2) renders today; S197 (0) and Neon (1)
-    // are reserved until those themes are implemented.
-    uint8_t themeId = 2;
+    // Theme selection is persisted to /config.txt; see display/theme.h for
+    // the ThemeId values (S197=0, Neon=1, ModernFlat=2).
+    uint8_t themeId = config::kDefaultThemeId;
     bool useMetricUnits = false; // Display units (dashboard pages, config fields)
     bool useMetricLogs = false;  // CSV logging units
     // Page 1 RPM/Speed arc tick marks (TickMode, display/theme.h). S197

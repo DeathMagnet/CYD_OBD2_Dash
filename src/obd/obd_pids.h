@@ -21,7 +21,7 @@ enum class ObdPid : uint8_t {
     Throttle,             // 01 11 - throttle position
     O2B1S1,               // 01 14 - O2 sensor bank 1 sensor 1 voltage
     O2B2S1,               // 01 18 - O2 sensor bank 2 sensor 1 voltage
-    FuelRailPressure,     // 01 23 - Ford fuel rail pressure
+    FuelRailPressure,     // 01 23 - fuel rail gauge pressure
     FuelLevel,            // 01 2F - fuel tank level
     Baro,                 // 01 33 - barometric pressure
     ControlModuleVoltage, // 01 42

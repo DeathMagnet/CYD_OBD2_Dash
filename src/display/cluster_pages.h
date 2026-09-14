@@ -21,8 +21,8 @@ enum class ClusterPage : uint8_t {
     EngineLoadAirflow,    // Page 2 - dashboard
     CarSpecificSensors,   // Page 3 - dashboard
     PerformanceTelemetry, // Page 4 - dashboard
-    Diagnostics,          // Page 6 - dashboard (last in group)
-    ConfigUi,             // Page 5 - first config-group page ("UI")
+    Diagnostics,          // Page 5 - dashboard (last in group)
+    ConfigUi,             // first config-group page ("UI")
     ConfigGauges,         // config-group page ("GAUGES")
     ConfigUserVars,       // config-group page ("USER VARS")
     ConfigLogs,           // config-group page ("LOGS")
@@ -56,16 +56,16 @@ struct ClusterPageRuntimeState {
     uint32_t lastMafSampleMs = 0;
     float mafPeakGps = 0.0F;
 
-    // Page 6 - DTC clear confirmation and status feedback.
+    // Page 5 - DTC clear confirmation and status feedback.
     bool clearCodesConfirmArmed = false;
     uint32_t clearCodesConfirmArmedAtMs = 0;
     char statusMessage[48] = {0};
     uint32_t statusMessageSetAtMs = 0;
 
-    // Page 6 - last-drawn state, so drawPage6Dynamic() only repaints regions
+    // Page 5 - last-drawn state, so drawPage5Dynamic() only repaints regions
     // whose content actually changed instead of every UI refresh tick.
     // -1 means "not drawn yet" and forces a redraw the first time; reset
-    // whenever drawPage6Static() reopens the page.
+    // whenever drawPage5Static() reopens the page.
     int8_t dtcMilOnDrawn = -1;
     int8_t dtcHaveResultDrawn = -1;
     DtcList dtcListDrawn;
@@ -228,8 +228,8 @@ private:
     void drawConfigObdDynamic(uint32_t nowMs);
     void drawConfigFooterStatic();
     void drawConfigFooterDynamic(uint32_t nowMs);
-    void drawPage6Static();
-    void drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs);
+    void drawPage5Static();
+    void drawPage5Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs);
 
     TFT_eSPI& tft_;
     ConfigStore& configStore_;

@@ -69,7 +69,7 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
 // straddling the arc's outer edge (tickLen px inside and outside). Ticks at
 // multiples of majorInterval are drawn longer ("a little bigger"). A tick is
 // painted in theme.primaryGaugeArc once value >= that tick's location, and
-// theme.secondaryGaugeArc while value < that location. Ticks at or above
+// theme.tickInactiveColor while value < that location. Ticks at or above
 // excludeFromValue are skipped entirely (pass >= maxValue to disable exclusion,
 // matching drawArcGauge's convention for gauges with no warning zone).
 // tickMode selects which segment(s) get drawn (Off is a no-op); the outer
@@ -204,7 +204,7 @@ void drawFieldText(TFT_eSPI& tft, const char* text, int32_t x, int32_t y,
 void drawStatusBadge(TFT_eSPI& tft, int32_t x, int32_t y, int32_t width, int32_t height,
                       const char* text, uint16_t badgeColor, uint16_t textColor);
 
-// MIL (check engine light) indicator; also the Page 6 touch zone glyph.
+// MIL (check engine light) indicator; also the Page 5 touch zone glyph.
 void drawMilIndicator(TFT_eSPI& tft, int32_t centerX, int32_t centerY, bool milOn, const ThemeColors& theme);
 
 // Dashboard/config-group mode toggle glyph: a gear while `showGear` is true

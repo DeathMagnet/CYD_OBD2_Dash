@@ -44,8 +44,8 @@ public:
     // Scans the SD root for all session log files.
     LogSummary getLogSummary() const;
 
-    // Closes the active file, deletes every session log file, then opens a
-    // fresh session file so logging keeps working. Returns files deleted.
+    // Closes the active file, deletes every session log file, then reopens a
+    // fresh session file only if logging was already active. Returns files deleted.
     uint32_t deleteAllLogs();
 
     // Sets whether CSV logging should use metric or standard units

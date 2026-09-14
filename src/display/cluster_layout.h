@@ -33,8 +33,8 @@ constexpr int32_t kMilCenterX = (kMilZoneX0 + kMilZoneX1) / 2;
 constexpr int32_t kMilCenterY = kHeaderHeight / 2;
 
 // Mode toggle touch zone stays between the MIL zone and the next arrow, but
-// the icon itself is drawn kHeaderIconGap from the next arrow (mirroring the
-// SD light's offset from the prev arrow) rather than at the zone's midpoint.
+// the icon itself is drawn kHeaderIconGap from the next arrow rather than at
+// the zone's midpoint.
 constexpr int32_t kModeToggleX0 = 365, kModeToggleX1 = 420;
 constexpr int32_t kModeToggleCenterX = kNavNextX0 - kHeaderIconGap;
 constexpr int32_t kModeToggleCenterY = kHeaderHeight / 2;
@@ -50,7 +50,7 @@ constexpr int32_t kConfigRow2Y = kConfigRow1Y + kConfigRowHeight;
 constexpr int32_t kConfigRow3Y = kConfigRow2Y + kConfigRowHeight;
 // Rows 4-5: the row grid stops here rather than continuing indefinitely
 // because this is exactly where it hits the shared Save footer below - only
-// GAUGES (6 rows) currently reaches this far.
+// GAUGES and USER VARS (6 rows each) currently reach this far.
 constexpr int32_t kConfigRow4Y = kConfigRow3Y + kConfigRowHeight;
 constexpr int32_t kConfigRow5Y = kConfigRow4Y + kConfigRowHeight;
 
@@ -74,7 +74,7 @@ constexpr int32_t kLogsSummaryRowY = kConfigRow1Y + 58; // 138
 // Page 4 (Performance & Telemetry): 0-60 MPH timer tap-to-reset box.
 constexpr int32_t kPerfTimerX0 = 140, kPerfTimerY0 = 125, kPerfTimerX1 = 340, kPerfTimerY1 = 195;
 
-// Page 6 (Diagnostics).
+// Page 5 (Diagnostics).
 constexpr int32_t kDtcListY = 85;
 // Sized for the theme's tier-2 value font (see applyValueFont()), whose
 // tallest case (Modern Flat's FreeSans12pt7b) is ~29px, vs. the 20px row

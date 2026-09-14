@@ -280,7 +280,7 @@ void ObdClient::performClearCodes() {
         dtcResult_ = DtcList();
         xSemaphoreGive(mutex_);
     }
-    dtcResultReady_.store(false); // Force a fresh read next time Page 6 asks.
+    dtcResultReady_.store(false); // Force a fresh read next time Page 5 asks.
 }
 
 void ObdClient::updateAdapterCredentials(const char* adapterName, const char* adapterPin) {

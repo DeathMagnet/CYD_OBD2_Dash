@@ -101,7 +101,7 @@ bool ConfigStore::parseLine(const char* line) {
         settings_.fuelTrimRangePct = clampF(static_cast<float>(atof(valueStr)), config::kMinFuelTrimRangePct, config::kMaxFuelTrimRangePct);
     } else if (strcmp(key, "theme") == 0) {
         long theme = atol(valueStr);
-        settings_.themeId = (theme >= 0 && theme <= 2) ? static_cast<uint8_t>(theme) : 2;
+        settings_.themeId = (theme >= 0 && theme <= 2) ? static_cast<uint8_t>(theme) : config::kDefaultThemeId;
     } else if (strcmp(key, "units") == 0) {
         settings_.useMetricUnits = (atol(valueStr) != 0);
     } else if (strcmp(key, "log_units") == 0) {
@@ -125,6 +125,7 @@ bool ConfigStore::parseLine(const char* line) {
 
 void ConfigStore::begin() {
     settings_ = AppSettings();
+    clampTickModeForTheme();
 
     if (!sdManager_.isMounted() || !SD.exists(config::kConfigFilePath)) {
         Serial.println("[Config] No /config.txt found; using defaults.");
@@ -224,7 +225,7 @@ void ConfigStore::setFuelTrimRangePct(float pct) {
 }
 
 void ConfigStore::setThemeId(uint8_t id) {
-    settings_.themeId = (id <= 2) ? id : 2;
+    settings_.themeId = (id <= 2) ? id : config::kDefaultThemeId;
     clampTickModeForTheme();
 }
 

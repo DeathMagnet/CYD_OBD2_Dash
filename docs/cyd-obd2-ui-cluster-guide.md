@@ -215,7 +215,7 @@ Settings for display appearance and unit system.
 
 | Setting Field | Options / Range | Default | Description |
 | --- | --- | --- | --- |
-| **Active Theme** | Modern Flat, Neon, S197 | Modern Flat | UI visual style; tap-to-cycle button rotates through all three themes |
+| **Active Theme** | Modern Flat, Neon, S197 | S197 | UI visual style; tap-to-cycle button rotates through all three themes |
 | **Units** | Standard (MPH/°F/PSI), Metric (KM/H/°C/KPA) | Standard | Display units for speed, temperature, and pressure. Affects all dashboard pages and config field labels/steppers. Does not affect CSV logging (see LOGS page). |
 | **Gauge Ticks** | On, Off | On | Radial tick marks on the RPM/Speed gauge scales (every 500/1000 RPM, every 10/50 MPH or KM/H); tap-to-cycle toggle |
 

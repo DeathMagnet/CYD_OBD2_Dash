@@ -86,7 +86,7 @@ void ClusterPages::drawStatic(ClusterPage page, const TelemetrySnapshot& snapsho
         case ClusterPage::ConfigUserVars: drawConfigUserVarsStatic(); break;
         case ClusterPage::ConfigLogs: drawConfigLogsStatic(); break;
         case ClusterPage::ConfigObd: drawConfigObdStatic(); break;
-        case ClusterPage::Diagnostics: drawPage6Static(); break;
+        case ClusterPage::Diagnostics: drawPage5Static(); break;
         default: break;
     }
     if (isConfigPage(page)) {
@@ -116,7 +116,7 @@ void ClusterPages::drawDynamic(ClusterPage page, const TelemetrySnapshot& snapsh
         case ClusterPage::ConfigUserVars: drawConfigUserVarsDynamic(nowMs); break;
         case ClusterPage::ConfigLogs: drawConfigLogsDynamic(nowMs); break;
         case ClusterPage::ConfigObd: drawConfigObdDynamic(nowMs); break;
-        case ClusterPage::Diagnostics: drawPage6Dynamic(snapshot, nowMs); break;
+        case ClusterPage::Diagnostics: drawPage5Dynamic(snapshot, nowMs); break;
         default: break;
     }
     if (isConfigPage(page)) {
@@ -218,8 +218,8 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     speedNeedle_.update(targetSpeed, dt);
     lastFrameMs_ = nowMs;
 
-    // Orange from Shift Light RPM (Page 5) up to Redline RPM, then solid red
-    // from Redline RPM out to the end of the sweep.
+    // Orange from Shift Light RPM (GAUGES config page) up to Redline RPM, then
+    // solid red from Redline RPM out to the end of the sweep.
     gaugewidgets::drawArcGauge(tft_, rpmArc_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue, kRpmMax,
                                 static_cast<float>(settings.shiftLightRpm),
                                 static_cast<float>(settings.redlineRpm), theme_.background, theme_);
@@ -1482,7 +1482,7 @@ void ClusterPages::drawConfigFooterDynamic(uint32_t nowMs) {
     }
 }
 
-// ---------------------------------------------------------------- Page 6: Diagnostics --
+// ---------------------------------------------------------------- Page 5: Diagnostics --
 
 namespace {
 
@@ -1500,14 +1500,14 @@ bool dtcListsEqual(const DtcList& a, const DtcList& b) {
 
 } // namespace
 
-void ClusterPages::drawPage6Static() {
+void ClusterPages::drawPage5Static() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
     tft_.drawRoundRect(20, layout::kDtcListY - 10, 440,
                         layout::kDtcListLineHeight * layout::kDtcListVisibleLines + 20, 6, theme_.bezel);
 
     // REFRESH CODES never changes appearance, so it only needs to be drawn
-    // once here rather than every drawPage6Dynamic() tick.
+    // once here rather than every drawPage5Dynamic() tick.
     tft_.fillRoundRect(layout::kDtcReadButtonX, layout::kDtcButtonY, layout::kDtcReadButtonW, layout::kDtcButtonH, 6,
                         theme_.primaryGaugeArc);
     tft_.setTextDatum(MC_DATUM);
@@ -1516,7 +1516,7 @@ void ClusterPages::drawPage6Static() {
     tft_.drawString(labels::kButtonRefreshCodes, layout::kDtcReadButtonX + layout::kDtcReadButtonW / 2,
                      layout::kDtcButtonY + layout::kDtcButtonH / 2);
 
-    // Force drawPage6Dynamic() to repaint every region the next time it
+    // Force drawPage5Dynamic() to repaint every region the next time it
     // runs, since the static redraw above just wiped them all.
     runtimeState_.dtcMilOnDrawn = -1;
     runtimeState_.dtcHaveResultDrawn = -1;
@@ -1527,7 +1527,7 @@ void ClusterPages::drawPage6Static() {
     obdClient_.requestDtcRead();
 }
 
-void ClusterPages::drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
+void ClusterPages::drawPage5Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
     bool milOn = snapshot.milOn.valid && snapshot.milOn.value != 0.0F;
     if (runtimeState_.dtcMilOnDrawn != static_cast<int8_t>(milOn)) {
         tft_.setTextDatum(TC_DATUM);
@@ -1557,7 +1557,7 @@ void ClusterPages::drawPage6Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
 
         // Center the actual content block vertically within the box's line span, and
         // each line horizontally on the box's x-center (matches the drawRoundRect box in
-        // drawPage6Static: x 20..460).
+        // drawPage5Static: x 20..460).
         uint8_t contentLines = 1;
         if (haveResult && dtcList.count > 0) {
             contentLines = dtcList.count < layout::kDtcListVisibleLines ? dtcList.count : layout::kDtcListVisibleLines;

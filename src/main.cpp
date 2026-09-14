@@ -53,7 +53,7 @@ void setup() {
     // Initialize onboard RGB LED (Check Engine / shift-light indicator)
     statusLed.begin();
 
-    // 2. Render Static Boot Screen from native RGB565 PROGMEM array
+    // 2. Render Static Boot Screen (PNG decoded via PNGdec into RGB565)
     Serial.println("[Boot] Displaying static boot image...");
     displayManager.drawBootImage();
     delay(config::kBootScreenDurationMs);
@@ -64,8 +64,8 @@ void setup() {
     // 4. Initialize Touch & Run Calibration if missing from SD
     touchManager.begin();
 
-    // 5. Load persisted settings (Page 5), falling back to defaults if the
-    // SD card or /config.txt is unavailable.
+    // 5. Load persisted settings (Config: UI/Gauges/User Vars/Logs/OBD Adapter
+    // pages), falling back to defaults if the SD card or /config.txt is unavailable.
     configStore.begin();
     clusterPages.applyTheme(static_cast<ThemeId>(configStore.settings().themeId));
 

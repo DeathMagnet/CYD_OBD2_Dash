@@ -27,10 +27,11 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
     float valueAngle = kGaugeStartAngle + valueFraction * (kGaugeEndAngle - kGaugeStartAngle);
     int32_t innerRadius = radius - kArcThicknessPx;
 
-    // dangerStart may exceed maxValue if a user-configured redline (Page 5)
-    // sits above the gauge's fixed max; clamp so the danger zone never runs
-    // past the arc. cautionStart (Shift Light RPM) is likewise clamped so it
-    // can never sit past dangerStart, which would invert the caution zone.
+    // dangerStart may exceed maxValue if a user-configured redline (GAUGES
+    // config page) sits above the gauge's fixed max; clamp so the danger zone
+    // never runs past the arc. cautionStart (Shift Light RPM) is likewise
+    // clamped so it can never sit past dangerStart, which would invert the
+    // caution zone.
     float clampedDangerStart = dangerStart > maxValue ? maxValue : dangerStart;
     float clampedCautionStart = cautionStart > clampedDangerStart ? clampedDangerStart : cautionStart;
     bool hasCaution = clampedCautionStart < clampedDangerStart;

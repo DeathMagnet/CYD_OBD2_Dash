@@ -62,11 +62,11 @@ public:
     // Reconnecting, or Live; main.cpp derives Stale/Degraded/Boot itself.
     ConnectionState getConnectionState() const { return connectionState_.load(); }
 
-    // Queues an on-demand Mode 03 + Mode 07 DTC read (Page 6). Safe to call
+    // Queues an on-demand Mode 03 + Mode 07 DTC read (Page 5). Safe to call
     // repeatedly; the background task clears the request once it runs it.
     void requestDtcRead() { dtcReadRequested_.store(true); }
 
-    // Queues a Mode 04 "clear codes" command (Page 6).
+    // Queues a Mode 04 "clear codes" command (Page 5).
     void requestClearCodes() { clearCodesRequested_.store(true); }
 
     // Thread-safe copy of the most recent completed DTC read result.
