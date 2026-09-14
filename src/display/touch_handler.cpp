@@ -146,6 +146,16 @@ bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t now
         ClusterPageRuntimeState& state = clusterPages_.runtimeState();
         if (state.recalibrateTouchConfirmArmed && (nowMs - state.recalibrateTouchConfirmArmedAtMs < 5000)) {
             sdManager_.deleteTouchCalibration();
+            // Same "show feedback, then restart" pattern as the Flip Screen
+            // save path below: without this, the screen goes instantly black
+            // and straight into the corner-tap calibration prompt, which is
+            // easy to mistake for a hang and invites a startled, rushed
+            // recalibration.
+            strncpy(state.configStatusMessage, "RECALIBRATING - RESTARTING", sizeof(state.configStatusMessage) - 1);
+            state.configStatusMessage[sizeof(state.configStatusMessage) - 1] = '\0';
+            state.configStatusMessageSetAtMs = nowMs;
+            clusterPages_.drawSavedFeedback(nowMs);
+            delay(1200);
             ESP.restart();
         } else {
             state.recalibrateTouchConfirmArmed = true;

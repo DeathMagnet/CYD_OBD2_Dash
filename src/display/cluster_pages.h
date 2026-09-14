@@ -142,9 +142,11 @@ struct ClusterPageRuntimeState {
     int8_t cfgSaveButtonDrawn = -1;
 
     // Logs page - log summary (file count/size) is expensive to compute (it
-    // scans the SD card directory), so it's only rescanned periodically
-    // rather than on every UI refresh tick. Setting cfgLogSummaryNextScanMs
-    // to 0 forces an immediate rescan on the next drawConfigLogsDynamic() call.
+    // scans the SD card directory and blocks loop(), including touch
+    // polling), so it's only rescanned when something can have changed it
+    // rather than on a timer. Setting cfgLogSummaryNextScanMs to 0 forces an
+    // immediate rescan on the next drawConfigLogsDynamic() call; it's parked
+    // at UINT32_MAX after each scan until something forces it back to 0.
     char cfgLogSummaryDrawn[32] = {0};
     uint32_t cfgLogSummaryNextScanMs = 0;
 };

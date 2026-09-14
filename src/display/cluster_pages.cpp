@@ -1388,11 +1388,15 @@ void ClusterPages::drawConfigLogsDynamic(uint32_t nowMs) {
         strncpy(runtimeState_.cfgLogUnitsDrawn, buf, sizeof(runtimeState_.cfgLogUnitsDrawn) - 1);
     }
 
-    // getLogSummary() scans the SD card's log directory, so it's only
-    // rescanned periodically rather than on every UI refresh tick.
+    // getLogSummary() scans the SD card's log directory, which blocks the
+    // single-threaded loop() (and therefore touch polling) for as long as
+    // the scan takes. Only run it when something can actually have changed
+    // the result: page entry and "Delete All Logs" both force this back to
+    // 0. Parking it at UINT32_MAX afterward (instead of re-arming on a
+    // timer) avoids a recurring blocking rescan while the page just sits
+    // open, which was stalling touch input specifically on this page.
     if (nowMs >= runtimeState_.cfgLogSummaryNextScanMs) {
-        constexpr uint32_t kLogSummaryScanIntervalMs = 2000;
-        runtimeState_.cfgLogSummaryNextScanMs = nowMs + kLogSummaryScanIntervalMs;
+        runtimeState_.cfgLogSummaryNextScanMs = UINT32_MAX;
 
         LogSummary summary = csvLogger_.getLogSummary();
         float totalMb = static_cast<float>(summary.totalBytes) / (1024.0F * 1024.0F);
