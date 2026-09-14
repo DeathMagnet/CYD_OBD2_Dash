@@ -31,7 +31,7 @@ void ClusterPages::drawHeader(ClusterPage page, bool milOn) {
                                         !isConfigPage(page), theme_);
 }
 
-void ClusterPages::drawStatusStrip(ConnectionState connectionState, bool sdLoggingActive) {
+void ClusterPages::drawStatusStrip(ConnectionState connectionState) {
     const char* label = toString(connectionState);
     uint16_t color;
     switch (connectionState) {
@@ -53,11 +53,6 @@ void ClusterPages::drawStatusStrip(ConnectionState connectionState, bool sdLoggi
 
     gaugewidgets::drawStatusBadge(tft_, layout::kBadgeX, layout::kBadgeY, layout::kBadgeW, layout::kBadgeH, label,
                                    color, theme_.background);
-
-    constexpr uint16_t kSdActiveColor = 0x07E0;   // green: SD logging active
-    constexpr uint16_t kSdInactiveColor = 0x0320; // dark green: SD logging inactive
-    uint16_t sdColor = sdLoggingActive ? kSdActiveColor : kSdInactiveColor;
-    tft_.fillCircle(layout::kSdLightCenterX, layout::kSdLightCenterY, layout::kSdLightRadius, sdColor);
 }
 
 void ClusterPages::beginLargeText(uint8_t size) {
@@ -99,13 +94,13 @@ void ClusterPages::drawStatic(ClusterPage page, const TelemetrySnapshot& snapsho
 }
 
 void ClusterPages::drawDynamic(ClusterPage page, const TelemetrySnapshot& snapshot,
-                                ConnectionState connectionState, bool sdLoggingActive, uint32_t nowMs) {
+                                ConnectionState connectionState, uint32_t nowMs) {
     bool milOn = snapshot.milOn.valid && snapshot.milOn.value != 0.0F;
     if (runtimeState_.headerMilOnDrawn != static_cast<int8_t>(milOn)) {
         gaugewidgets::drawMilIndicator(tft_, layout::kMilCenterX, layout::kMilCenterY, milOn, theme_);
         runtimeState_.headerMilOnDrawn = static_cast<int8_t>(milOn);
     }
-    drawStatusStrip(connectionState, sdLoggingActive);
+    drawStatusStrip(connectionState);
 
     switch (page) {
         case ClusterPage::PrimaryCluster: drawPage1Dynamic(snapshot, nowMs); break;

@@ -134,7 +134,7 @@ public:
     // Redraws only the values that change frame to frame. Call at a
     // throttled UI cadence (see main.cpp; not every loop() iteration).
     void drawDynamic(ClusterPage page, const TelemetrySnapshot& snapshot,
-                      ConnectionState connectionState, bool sdLoggingActive, uint32_t nowMs);
+                      ConnectionState connectionState, uint32_t nowMs);
 
     // Samples telemetry for the 0-60 timer and MAF rolling graph every tick
     // regardless of which page is visible, matching the doc's "automatic
@@ -149,7 +149,7 @@ public:
 
 private:
     void drawHeader(ClusterPage page, bool milOn);
-    void drawStatusStrip(ConnectionState connectionState, bool sdLoggingActive);
+    void drawStatusStrip(ConnectionState connectionState);
 
     // Applies the given "large text" size for a readout that would otherwise use
     // setTextSize(3+) on the default font. Under a theme with useSevenSegmentFont,
