@@ -68,6 +68,13 @@ constexpr const char* kLabelTickModeInsideAndOutside = "INSIDE AND OUTSIDE TICS"
 
 // ---- Config: User Vars ----
 constexpr const char* kLabelBoostBaroBaseline = "BOOST BARO BASELINE";
+constexpr const char* kLabelCoolantWarningTemp = "COOLANT TEMP WARN";
+constexpr const char* kLabelLowVoltageWarning = "LOW VOLTAGE WARNING";
+constexpr const char* kLabelBoostGaugeMax = "BOOST GAUGE MAX";
+constexpr const char* kLabelVacuumGaugeMax = "VACUUM GAUGE MAX";
+constexpr const char* kLabelZeroSixtyTarget = "0-60 TARGET SPEED";
+constexpr const char* kLabelHpEstimationFactor = "HP ESTIMATE FACTOR";
+constexpr const char* kLabelFuelTrimRange = "FUEL TRIM RANGE";
 
 // ---- Config: Gauges ----
 constexpr const char* kLabelShiftLightRpm = "SHIFT LIGHT RPM";

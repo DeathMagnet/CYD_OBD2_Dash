@@ -33,6 +33,10 @@ inline float inHgFromKpa(float kpa) {
     return kpa * kInHgPerKpa;
 }
 
+inline float kpaFromInHg(float inHg) {
+    return inHg / kInHgPerKpa;
+}
+
 // Snapshot/settings store speed in mph and temp in °F natively; pressure
 // natively in kPa. These convert to whichever unit system `metric` selects and
 // return the matching label, so call sites never hardcode a unit string.

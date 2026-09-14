@@ -3,6 +3,7 @@
 #include "display/fonts/Orbitron_Light_24.h"
 #include "display/fonts/Orbitron_Light_32.h"
 
+extern const GFXfont FreeSans9pt7b;
 extern const GFXfont FreeSans12pt7b;
 extern const GFXfont FreeSans18pt7b;
 extern const GFXfont FreeSans24pt7b;
@@ -146,6 +147,11 @@ void applyValueFont(TFT_eSPI& tft, const ThemeColors& theme, uint8_t size) {
 
 void resetValueFont(TFT_eSPI& tft) {
     tft.setTextFont(1);
+}
+
+void applyLabelFont(TFT_eSPI& tft) {
+    tft.setFreeFont(&FreeSans9pt7b);
+    tft.setTextSize(1);
 }
 
 void initializeThemeFonts() {

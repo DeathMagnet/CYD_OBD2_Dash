@@ -128,8 +128,7 @@ void ClusterPages::drawDynamic(ClusterPage page, const TelemetrySnapshot& snapsh
 void ClusterPages::updateBackgroundTelemetry(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
     if (snapshot.speedMph.valid) {
         float speed = snapshot.speedMph.value;
-        bool metric = configStore_.settings().useMetricUnits;
-        float threshold = metric ? units::mphFromKph(100.0F) : 60.0F;
+        float threshold = configStore_.settings().zeroSixtyTargetMph;
         if (!runtimeState_.zeroToSixtyRunning && runtimeState_.lastSpeedMphForTimer <= 0.0F && speed > 0.0F) {
             runtimeState_.zeroToSixtyRunning = true;
             runtimeState_.zeroToSixtyStartMs = nowMs;
@@ -289,7 +288,7 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     char valueBuf[16];
 
     constexpr const char* kTempRepValue = "999"; // must match drawPage1Static()
-    bool coolantHot = snapshot.coolantF.valid && snapshot.coolantF.value > config::kHighCoolantWarningF;
+    bool coolantHot = snapshot.coolantF.valid && snapshot.coolantF.value > settings.coolantWarningF;
     float displayCoolant = units::displayTemp(snapshot.coolantF.value, metric);
     snprintf(valueBuf, sizeof(valueBuf), "%d", static_cast<int>(displayCoolant));
     int32_t coolantColX = 4 + 0 * (kColW + kColGap);
@@ -424,6 +423,7 @@ void ClusterPages::drawPage2Static() {
 
 void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t nowMs) {
     (void)nowMs;
+    const AppSettings& settings = configStore_.settings();
     constexpr int32_t kGaugeCx = 130, kGaugeCy = 130, kGaugeRadius = 78;
     char buf[24];
 
@@ -479,8 +479,9 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     int32_t trimUnitW = gaugewidgets::fixedUnitWidth(tft_, "%", 1);
     int32_t trimValueW = gaugewidgets::fixedUnitWidth(tft_, "-25.0", 1);
 
-    // Map -25%..+25% onto the 0-100% bar widget so the fill visually centers.
-    float stftCentered = snapshot.stftPct.valid ? (snapshot.stftPct.value + 25.0F) * 2.0F : 0.0F;
+    // Map -range..+range onto the 0-100% bar widget so the fill visually centers.
+    float stftCentered =
+        snapshot.stftPct.valid ? (snapshot.stftPct.value + settings.fuelTrimRangePct) * (50.0F / settings.fuelTrimRangePct) : 0.0F;
     gaugewidgets::drawBarGauge(tft_, stftBar_, 30, 250, 190, 30, stftCentered, theme_.primaryGaugeArc, theme_);
     gaugewidgets::ValueUnitGroup stftGroup = gaugewidgets::centerValueUnitGroup(125, trimValueW, trimUnitW, 4);
     snprintf(buf, sizeof(buf), "%.1f", snapshot.stftPct.value);
@@ -490,7 +491,8 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     gaugewidgets::drawFieldText(tft_, snapshot.stftPct.valid ? buf : "--", stftGroup.valueRightX, 288, trimValueW,
                                  theme_.panel);
 
-    float ltftCentered = snapshot.ltftPct.valid ? (snapshot.ltftPct.value + 25.0F) * 2.0F : 0.0F;
+    float ltftCentered =
+        snapshot.ltftPct.valid ? (snapshot.ltftPct.value + settings.fuelTrimRangePct) * (50.0F / settings.fuelTrimRangePct) : 0.0F;
     gaugewidgets::drawBarGauge(tft_, ltftBar_, 260, 250, 190, 30, ltftCentered, theme_.primaryGaugeArc, theme_);
     gaugewidgets::ValueUnitGroup ltftGroup = gaugewidgets::centerValueUnitGroup(355, trimValueW, trimUnitW, 4);
     snprintf(buf, sizeof(buf), "%.1f", snapshot.ltftPct.value);
@@ -561,7 +563,7 @@ void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     bool metric = settings.useMetricUnits;
     char buf[20];
 
-    bool lowVoltage = snapshot.voltageV.valid && snapshot.voltageV.value < config::kLowVoltageWarningV;
+    bool lowVoltage = snapshot.voltageV.valid && snapshot.voltageV.value < settings.lowVoltageWarningV;
     tft_.setTextDatum(TC_DATUM);
     tft_.setTextColor(theme_.textSecondary, theme_.panel);
     tft_.setTextSize(1);
@@ -597,20 +599,20 @@ void ClusterPages::drawPage3Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
         if (isBoost) {
             if (metric) {
                 gaugeValue = mapKpa - baroBaselineKpa;
-                gaugeMax = 172.0F; // ~25 psi equivalent in kPa
+                gaugeMax = units::kpaFromPsi(settings.boostMaxPsi);
             } else {
                 gaugeValue = units::psiFromKpa(mapKpa - baroBaselineKpa);
-                gaugeMax = 25.0F;
+                gaugeMax = settings.boostMaxPsi;
             }
             gaugeLabel = labels::kLabelBoost;
             gaugeUnit = metric ? labels::kUnitKpa : labels::kUnitPsi;
         } else {
             if (metric) {
                 gaugeValue = baroBaselineKpa - mapKpa;
-                gaugeMax = 101.0F; // ~30 inHg equivalent in kPa
+                gaugeMax = units::kpaFromInHg(settings.vacuumMaxInHg);
             } else {
                 gaugeValue = units::inHgFromKpa(baroBaselineKpa - mapKpa);
-                gaugeMax = 30.0F;
+                gaugeMax = settings.vacuumMaxInHg;
             }
             gaugeLabel = labels::kLabelVacuum;
             gaugeUnit = metric ? labels::kUnitKpa : labels::kUnitInHg;
@@ -688,7 +690,7 @@ void ClusterPages::drawPage4Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
 
     bool haveMaf = snapshot.mafGps.valid;
     bool haveRpm = snapshot.rpm.valid && snapshot.rpm.value >= 500.0F;
-    float hp = haveMaf ? snapshot.mafGps.value * 0.8F : 0.0F;
+    float hp = haveMaf ? snapshot.mafGps.value * settings.hpEstimationFactor : 0.0F;
     float torque = (haveMaf && haveRpm) ? (hp * 5252.0F / snapshot.rpm.value) : 0.0F;
 
     snprintf(buf, sizeof(buf), "%.0f", hp);
@@ -756,8 +758,9 @@ void ClusterPages::drawConfigUiStatic() {
 
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(1);
+    applyLabelFont(tft_);
     tft_.drawString(labels::kLabelActiveTheme, 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+    resetValueFont(tft_);
 
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
@@ -765,8 +768,9 @@ void ClusterPages::drawConfigUiStatic() {
     // Units row
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(1);
+    applyLabelFont(tft_);
     tft_.drawString(labels::kLabelUnits, 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
+    resetValueFont(tft_);
 
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow1Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
@@ -774,8 +778,9 @@ void ClusterPages::drawConfigUiStatic() {
     // Gauge ticks toggle row
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(1);
+    applyLabelFont(tft_);
     tft_.drawString(labels::kLabelGaugeTicks, 12, layout::kConfigRow2Y + layout::kConfigRowHeight / 2);
+    resetValueFont(tft_);
 
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow2Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
@@ -838,44 +843,71 @@ void ClusterPages::drawConfigUserVarsStatic() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
 
-    for (int i = 0; i <= 1; ++i) {
+    for (int i = 0; i <= 6; ++i) {
         int32_t y = layout::kHeaderHeight + i * layout::kConfigRowHeight;
         tft_.drawFastHLine(0, y, layout::kScreenWidth, theme_.bezel);
     }
 
+    bool metric = configStore_.settings().useMetricUnits;
+
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(1);
+    applyLabelFont(tft_);
     tft_.drawString(labels::kLabelBoostBaroBaseline, 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+    tft_.drawString(labels::kLabelCoolantWarningTemp, 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
+    tft_.drawString(labels::kLabelLowVoltageWarning, 12, layout::kConfigRow2Y + layout::kConfigRowHeight / 2);
+    tft_.drawString(labels::kLabelZeroSixtyTarget, 12, layout::kConfigRow3Y + layout::kConfigRowHeight / 2);
+    tft_.drawString(labels::kLabelHpEstimationFactor, 12, layout::kConfigRow4Y + layout::kConfigRowHeight / 2);
+    tft_.drawString(labels::kLabelFuelTrimRange, 12, layout::kConfigRow5Y + layout::kConfigRowHeight / 2);
+    resetValueFont(tft_);
 
-    tft_.drawRoundRect(layout::kConfigMinusX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
-                        layout::kConfigMinusW, layout::kConfigButtonH, 4, theme_.bezel);
-    tft_.drawRoundRect(layout::kConfigPlusX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
-                        layout::kConfigPlusW, layout::kConfigButtonH, 4, theme_.bezel);
-    tft_.setTextDatum(MC_DATUM);
-    tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(2);
-    tft_.drawString(labels::kStepperMinus, layout::kConfigMinusX + layout::kConfigMinusW / 2,
-                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
-    tft_.drawString(labels::kStepperPlus, layout::kConfigPlusX + layout::kConfigPlusW / 2,
-                     layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+    auto drawMinusPlusChrome = [&](int32_t rowY) {
+        tft_.drawRoundRect(layout::kConfigMinusX, rowY + layout::kConfigButtonInsetY, layout::kConfigMinusW,
+                            layout::kConfigButtonH, 4, theme_.bezel);
+        tft_.drawRoundRect(layout::kConfigPlusX, rowY + layout::kConfigButtonInsetY, layout::kConfigPlusW,
+                            layout::kConfigButtonH, 4, theme_.bezel);
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        tft_.drawString(labels::kStepperMinus, layout::kConfigMinusX + layout::kConfigMinusW / 2,
+                         rowY + layout::kConfigRowHeight / 2);
+        tft_.drawString(labels::kStepperPlus, layout::kConfigPlusX + layout::kConfigPlusW / 2,
+                         rowY + layout::kConfigRowHeight / 2);
+    };
+    drawMinusPlusChrome(layout::kConfigRow0Y);
+    drawMinusPlusChrome(layout::kConfigRow1Y);
+    drawMinusPlusChrome(layout::kConfigRow2Y);
+    drawMinusPlusChrome(layout::kConfigRow3Y);
+    drawMinusPlusChrome(layout::kConfigRow4Y);
+    drawMinusPlusChrome(layout::kConfigRow5Y);
 
-    // Fixed unit, drawn once so it never shifts or gets redrawn when the
-    // baseline's digit count changes; centered with a reserved value width
-    // so the pair reads as centered instead of hugging the edge. Must match
-    // the layout in drawConfigUserVarsDynamic().
-    bool metric = configStore_.settings().useMetricUnits;
-    int32_t baselineUnitW = gaugewidgets::fixedUnitWidth(tft_, units::pressureUnitLabel(metric), 2);
-    int32_t baselineValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
-    gaugewidgets::ValueUnitGroup baselineGroup = gaugewidgets::centerValueUnitGroup(
-        layout::kConfigValueX + layout::kConfigValueW / 2, baselineValueW, baselineUnitW, 4);
-    gaugewidgets::drawFixedUnit(tft_, units::pressureUnitLabel(metric), baselineGroup.unitRightX,
-                                 layout::kConfigRow0Y + layout::kConfigRowHeight / 2, MR_DATUM, 2, theme_,
-                                 theme_.background);
+    // Fixed units, drawn once so they never shift or get redrawn when a
+    // value's digit count changes; centered with a reserved value width so
+    // each pair reads as centered instead of hugging the edge. Must match
+    // the layout in drawConfigUserVarsDynamic(). HP factor (row4) is
+    // unitless and has no fixed-unit call.
+    auto drawFixedUnitForRow = [&](int32_t rowY, const char* unitLabel) {
+        int32_t unitW = gaugewidgets::fixedUnitWidth(tft_, unitLabel, 2);
+        int32_t valueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+        gaugewidgets::ValueUnitGroup group = gaugewidgets::centerValueUnitGroup(
+            layout::kConfigValueX + layout::kConfigValueW / 2, valueW, unitW, 4);
+        gaugewidgets::drawFixedUnit(tft_, unitLabel, group.unitRightX, rowY + layout::kConfigRowHeight / 2, MR_DATUM,
+                                     2, theme_, theme_.background);
+    };
+    drawFixedUnitForRow(layout::kConfigRow0Y, units::pressureUnitLabel(metric));
+    drawFixedUnitForRow(layout::kConfigRow1Y, units::tempUnitLabel(metric));
+    drawFixedUnitForRow(layout::kConfigRow2Y, "V");
+    drawFixedUnitForRow(layout::kConfigRow3Y, units::speedUnitLabel(metric));
+    drawFixedUnitForRow(layout::kConfigRow5Y, "%");
 
     // Force drawConfigUserVarsDynamic() to repaint every region the next time
     // it runs, since the static redraw above just wiped them all.
     runtimeState_.cfgBaroBaselineDrawn[0] = '\0';
+    runtimeState_.cfgCoolantWarningDrawn[0] = '\0';
+    runtimeState_.cfgLowVoltageWarningDrawn[0] = '\0';
+    runtimeState_.cfgZeroSixtyTargetDrawn[0] = '\0';
+    runtimeState_.cfgHpFactorDrawn[0] = '\0';
+    runtimeState_.cfgFuelTrimRangeDrawn[0] = '\0';
 }
 
 void ClusterPages::drawConfigUserVarsDynamic(uint32_t nowMs) {
@@ -884,6 +916,7 @@ void ClusterPages::drawConfigUserVarsDynamic(uint32_t nowMs) {
     bool metric = settings.useMetricUnits;
     char buf[24];
 
+    // Row 0: Boost Baro Baseline.
     int32_t baselineUnitW = gaugewidgets::fixedUnitWidth(tft_, units::pressureUnitLabel(metric), 2);
     int32_t baselineValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
     gaugewidgets::ValueUnitGroup baselineGroup = gaugewidgets::centerValueUnitGroup(
@@ -903,6 +936,90 @@ void ClusterPages::drawConfigUserVarsDynamic(uint32_t nowMs) {
                                      theme_.background);
         strncpy(runtimeState_.cfgBaroBaselineDrawn, buf, sizeof(runtimeState_.cfgBaroBaselineDrawn) - 1);
     }
+
+    // Row 1: Coolant Warning Temp.
+    int32_t coolantUnitW = gaugewidgets::fixedUnitWidth(tft_, units::tempUnitLabel(metric), 2);
+    int32_t coolantValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+    gaugewidgets::ValueUnitGroup coolantGroup = gaugewidgets::centerValueUnitGroup(
+        layout::kConfigValueX + layout::kConfigValueW / 2, coolantValueW, coolantUnitW, 4);
+    if (metric) {
+        snprintf(buf, sizeof(buf), "%.1f", units::celsiusFromFahrenheit(settings.coolantWarningF));
+    } else {
+        snprintf(buf, sizeof(buf), "%.0f", settings.coolantWarningF);
+    }
+    if (strcmp(buf, runtimeState_.cfgCoolantWarningDrawn) != 0) {
+        tft_.setTextDatum(MR_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, coolantGroup.valueRightX,
+                                     layout::kConfigRow1Y + layout::kConfigRowHeight / 2, coolantValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgCoolantWarningDrawn, buf, sizeof(runtimeState_.cfgCoolantWarningDrawn) - 1);
+    }
+
+    // Row 2: Low Voltage Warning (no metric variant).
+    int32_t voltUnitW = gaugewidgets::fixedUnitWidth(tft_, "V", 2);
+    int32_t voltValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+    gaugewidgets::ValueUnitGroup voltGroup = gaugewidgets::centerValueUnitGroup(
+        layout::kConfigValueX + layout::kConfigValueW / 2, voltValueW, voltUnitW, 4);
+    snprintf(buf, sizeof(buf), "%.1f", settings.lowVoltageWarningV);
+    if (strcmp(buf, runtimeState_.cfgLowVoltageWarningDrawn) != 0) {
+        tft_.setTextDatum(MR_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, voltGroup.valueRightX,
+                                     layout::kConfigRow2Y + layout::kConfigRowHeight / 2, voltValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgLowVoltageWarningDrawn, buf, sizeof(runtimeState_.cfgLowVoltageWarningDrawn) - 1);
+    }
+
+    // Row 3: 0-60 Target Speed.
+    int32_t targetUnitW = gaugewidgets::fixedUnitWidth(tft_, units::speedUnitLabel(metric), 2);
+    int32_t targetValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+    gaugewidgets::ValueUnitGroup targetGroup = gaugewidgets::centerValueUnitGroup(
+        layout::kConfigValueX + layout::kConfigValueW / 2, targetValueW, targetUnitW, 4);
+    if (metric) {
+        snprintf(buf, sizeof(buf), "%.0f", units::kphFromMph(settings.zeroSixtyTargetMph));
+    } else {
+        snprintf(buf, sizeof(buf), "%.0f", settings.zeroSixtyTargetMph);
+    }
+    if (strcmp(buf, runtimeState_.cfgZeroSixtyTargetDrawn) != 0) {
+        tft_.setTextDatum(MR_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, targetGroup.valueRightX,
+                                     layout::kConfigRow3Y + layout::kConfigRowHeight / 2, targetValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgZeroSixtyTargetDrawn, buf, sizeof(runtimeState_.cfgZeroSixtyTargetDrawn) - 1);
+    }
+
+    // Row 4: HP Estimation Factor (unitless - plain centered value, no unit suffix).
+    snprintf(buf, sizeof(buf), "%.2f", settings.hpEstimationFactor);
+    if (strcmp(buf, runtimeState_.cfgHpFactorDrawn) != 0) {
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, layout::kConfigValueX + layout::kConfigValueW / 2,
+                                     layout::kConfigRow4Y + layout::kConfigRowHeight / 2, layout::kConfigValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgHpFactorDrawn, buf, sizeof(runtimeState_.cfgHpFactorDrawn) - 1);
+    }
+
+    // Row 5: Fuel Trim Display Range (no metric variant).
+    int32_t trimUnitW = gaugewidgets::fixedUnitWidth(tft_, "%", 2);
+    int32_t trimValueW = gaugewidgets::fixedUnitWidth(tft_, "199.9", 2);
+    gaugewidgets::ValueUnitGroup trimGroup = gaugewidgets::centerValueUnitGroup(
+        layout::kConfigValueX + layout::kConfigValueW / 2, trimValueW, trimUnitW, 4);
+    snprintf(buf, sizeof(buf), "%.0f", settings.fuelTrimRangePct);
+    if (strcmp(buf, runtimeState_.cfgFuelTrimRangeDrawn) != 0) {
+        tft_.setTextDatum(MR_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, trimGroup.valueRightX,
+                                     layout::kConfigRow5Y + layout::kConfigRowHeight / 2, trimValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgFuelTrimRangeDrawn, buf, sizeof(runtimeState_.cfgFuelTrimRangeDrawn) - 1);
+    }
 }
 
 // ---------------------------------------------------------------- Config: Gauges --
@@ -911,7 +1028,7 @@ void ClusterPages::drawConfigGaugesStatic() {
     tft_.fillRect(0, layout::kHeaderHeight, layout::kScreenWidth, layout::kScreenHeight - layout::kHeaderHeight,
                   theme_.background);
 
-    for (int i = 0; i <= 4; ++i) {
+    for (int i = 0; i <= 6; ++i) {
         int32_t y = layout::kHeaderHeight + i * layout::kConfigRowHeight;
         tft_.drawFastHLine(0, y, layout::kScreenWidth, theme_.bezel);
     }
@@ -921,12 +1038,15 @@ void ClusterPages::drawConfigGaugesStatic() {
 
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(1);
+    applyLabelFont(tft_);
     tft_.drawString(labels::kLabelShiftLightRpm, 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
     tft_.drawString(labels::kLabelRedlineRpm, 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
     tft_.drawString(labels::kLabelMaxRpm, 12, layout::kConfigRow2Y + layout::kConfigRowHeight / 2);
     const char* maxSpeedLabel = metric ? labels::kLabelMaxSpeedKph : labels::kLabelMaxSpeedMph;
     tft_.drawString(maxSpeedLabel, 12, layout::kConfigRow3Y + layout::kConfigRowHeight / 2);
+    tft_.drawString(labels::kLabelVacuumGaugeMax, 12, layout::kConfigRow4Y + layout::kConfigRowHeight / 2);
+    tft_.drawString(labels::kLabelBoostGaugeMax, 12, layout::kConfigRow5Y + layout::kConfigRowHeight / 2);
+    resetValueFont(tft_);
 
     auto drawMinusPlusChrome = [&](int32_t rowY) {
         tft_.drawRoundRect(layout::kConfigMinusX, rowY + layout::kConfigButtonInsetY, layout::kConfigMinusW,
@@ -943,6 +1063,21 @@ void ClusterPages::drawConfigGaugesStatic() {
     drawMinusPlusChrome(layout::kConfigRow1Y);
     drawMinusPlusChrome(layout::kConfigRow2Y);
     drawMinusPlusChrome(layout::kConfigRow3Y);
+    drawMinusPlusChrome(layout::kConfigRow4Y);
+    drawMinusPlusChrome(layout::kConfigRow5Y);
+
+    // Fixed units for the two new gauge-max rows; the four RPM/speed rows
+    // above have no unit suffix.
+    auto drawFixedUnitForRow = [&](int32_t rowY, const char* unitLabel) {
+        int32_t unitW = gaugewidgets::fixedUnitWidth(tft_, unitLabel, 2);
+        int32_t valueW = gaugewidgets::fixedUnitWidth(tft_, "999", 2);
+        gaugewidgets::ValueUnitGroup group = gaugewidgets::centerValueUnitGroup(
+            layout::kConfigValueX + layout::kConfigValueW / 2, valueW, unitW, 4);
+        gaugewidgets::drawFixedUnit(tft_, unitLabel, group.unitRightX, rowY + layout::kConfigRowHeight / 2, MR_DATUM,
+                                     2, theme_, theme_.background);
+    };
+    drawFixedUnitForRow(layout::kConfigRow4Y, metric ? labels::kUnitKpa : labels::kUnitInHg);
+    drawFixedUnitForRow(layout::kConfigRow5Y, units::pressureUnitLabel(metric));
 
     // Force drawConfigGaugesDynamic() to repaint every region the next time
     // it runs, since the static redraw above just wiped them all.
@@ -950,6 +1085,8 @@ void ClusterPages::drawConfigGaugesStatic() {
     runtimeState_.cfgRedlineRpmDrawn[0] = '\0';
     runtimeState_.cfgMaxRpmDrawn[0] = '\0';
     runtimeState_.cfgMaxSpeedDrawn[0] = '\0';
+    runtimeState_.cfgBoostMaxDrawn[0] = '\0';
+    runtimeState_.cfgVacuumMaxDrawn[0] = '\0';
 }
 
 void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
@@ -1005,6 +1142,46 @@ void ClusterPages::drawConfigGaugesDynamic(uint32_t nowMs) {
                                      theme_.background);
         strncpy(runtimeState_.cfgMaxSpeedDrawn, buf, sizeof(runtimeState_.cfgMaxSpeedDrawn) - 1);
     }
+
+    // Row 4: Vacuum Gauge Max.
+    int32_t vacUnitW = gaugewidgets::fixedUnitWidth(tft_, metric ? labels::kUnitKpa : labels::kUnitInHg, 2);
+    int32_t vacValueW = gaugewidgets::fixedUnitWidth(tft_, "999", 2);
+    gaugewidgets::ValueUnitGroup vacGroup = gaugewidgets::centerValueUnitGroup(
+        layout::kConfigValueX + layout::kConfigValueW / 2, vacValueW, vacUnitW, 4);
+    if (metric) {
+        snprintf(buf, sizeof(buf), "%.0f", units::kpaFromInHg(settings.vacuumMaxInHg));
+    } else {
+        snprintf(buf, sizeof(buf), "%.0f", settings.vacuumMaxInHg);
+    }
+    if (strcmp(buf, runtimeState_.cfgVacuumMaxDrawn) != 0) {
+        tft_.setTextDatum(MR_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, vacGroup.valueRightX,
+                                     layout::kConfigRow4Y + layout::kConfigRowHeight / 2, vacValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgVacuumMaxDrawn, buf, sizeof(runtimeState_.cfgVacuumMaxDrawn) - 1);
+    }
+
+    // Row 5: Boost Gauge Max.
+    int32_t boostUnitW = gaugewidgets::fixedUnitWidth(tft_, units::pressureUnitLabel(metric), 2);
+    int32_t boostValueW = gaugewidgets::fixedUnitWidth(tft_, "999", 2);
+    gaugewidgets::ValueUnitGroup boostGroup = gaugewidgets::centerValueUnitGroup(
+        layout::kConfigValueX + layout::kConfigValueW / 2, boostValueW, boostUnitW, 4);
+    if (metric) {
+        snprintf(buf, sizeof(buf), "%.0f", units::kpaFromPsi(settings.boostMaxPsi));
+    } else {
+        snprintf(buf, sizeof(buf), "%.0f", settings.boostMaxPsi);
+    }
+    if (strcmp(buf, runtimeState_.cfgBoostMaxDrawn) != 0) {
+        tft_.setTextDatum(MR_DATUM);
+        tft_.setTextColor(theme_.textPrimary, theme_.background);
+        tft_.setTextSize(2);
+        gaugewidgets::drawFieldText(tft_, buf, boostGroup.valueRightX,
+                                     layout::kConfigRow5Y + layout::kConfigRowHeight / 2, boostValueW,
+                                     theme_.background);
+        strncpy(runtimeState_.cfgBoostMaxDrawn, buf, sizeof(runtimeState_.cfgBoostMaxDrawn) - 1);
+    }
 }
 
 // ---------------------------------------------------------------- Config: Logs --
@@ -1023,8 +1200,9 @@ void ClusterPages::drawConfigLogsStatic() {
 
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(1);
+    applyLabelFont(tft_);
     tft_.drawString(labels::kLabelLogInterval, 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
+    resetValueFont(tft_);
 
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
@@ -1058,7 +1236,9 @@ void ClusterPages::drawConfigLogsStatic() {
     tft_.drawString("MB", logsSizeX + kLogsSizeSlotW + 4, logsRowMidY);
 
     // Log Units row (row 1), with the warning drawn directly below it
+    applyLabelFont(tft_);
     tft_.drawString(labels::kLabelLogUnits, 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
+    resetValueFont(tft_);
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow1Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);
 
@@ -1172,9 +1352,10 @@ void ClusterPages::drawConfigObdStatic() {
 
     tft_.setTextDatum(ML_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
-    tft_.setTextSize(1);
+    applyLabelFont(tft_);
     tft_.drawString(labels::kLabelObdAdapterName, 12, layout::kConfigRow0Y + layout::kConfigRowHeight / 2);
     tft_.drawString(labels::kLabelObdAdapterPin, 12, layout::kConfigRow1Y + layout::kConfigRowHeight / 2);
+    resetValueFont(tft_);
 
     tft_.drawRoundRect(layout::kConfigCycleX, layout::kConfigRow0Y + layout::kConfigButtonInsetY,
                         layout::kConfigCycleW, layout::kConfigButtonH, 4, theme_.bezel);

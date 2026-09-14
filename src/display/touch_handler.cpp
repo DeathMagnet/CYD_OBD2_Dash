@@ -145,16 +145,73 @@ bool ClusterTouchHandler::handleConfigUserVarsTap(uint16_t x, uint16_t y, uint32
 
     int32_t row0 = layout::kConfigRow0Y + layout::kConfigButtonInsetY;
     int32_t row0End = row0 + layout::kConfigButtonH;
-    float step = config::kBaroBaselineStepPsi;
+    float baselineStep = config::kBaroBaselineStepPsi;
     if (metric) {
-        step = units::psiFromKpa(config::kBaroBaselineStepKpa);
+        baselineStep = units::psiFromKpa(config::kBaroBaselineStepKpa);
     }
     if (within(x, y, layout::kConfigMinusX, row0, layout::kConfigMinusX + layout::kConfigMinusW, row0End)) {
-        configStore_.setBaroBaselinePsi(settings.baroBaselinePsi - step);
+        configStore_.setBaroBaselinePsi(settings.baroBaselinePsi - baselineStep);
         return false;
     }
     if (within(x, y, layout::kConfigPlusX, row0, layout::kConfigPlusX + layout::kConfigPlusW, row0End)) {
-        configStore_.setBaroBaselinePsi(settings.baroBaselinePsi + step);
+        configStore_.setBaroBaselinePsi(settings.baroBaselinePsi + baselineStep);
+        return false;
+    }
+
+    int32_t row1 = layout::kConfigRow1Y + layout::kConfigButtonInsetY;
+    int32_t row1End = row1 + layout::kConfigButtonH;
+    float coolantStep = metric ? config::kCoolantWarningStepC : config::kCoolantWarningStepF;
+    if (within(x, y, layout::kConfigMinusX, row1, layout::kConfigMinusX + layout::kConfigMinusW, row1End)) {
+        configStore_.setCoolantWarningF(settings.coolantWarningF - coolantStep);
+        return false;
+    }
+    if (within(x, y, layout::kConfigPlusX, row1, layout::kConfigPlusX + layout::kConfigPlusW, row1End)) {
+        configStore_.setCoolantWarningF(settings.coolantWarningF + coolantStep);
+        return false;
+    }
+
+    int32_t row2 = layout::kConfigRow2Y + layout::kConfigButtonInsetY;
+    int32_t row2End = row2 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigMinusX, row2, layout::kConfigMinusX + layout::kConfigMinusW, row2End)) {
+        configStore_.setLowVoltageWarningV(settings.lowVoltageWarningV - config::kLowVoltageWarningStepV);
+        return false;
+    }
+    if (within(x, y, layout::kConfigPlusX, row2, layout::kConfigPlusX + layout::kConfigPlusW, row2End)) {
+        configStore_.setLowVoltageWarningV(settings.lowVoltageWarningV + config::kLowVoltageWarningStepV);
+        return false;
+    }
+
+    int32_t row3 = layout::kConfigRow3Y + layout::kConfigButtonInsetY;
+    int32_t row3End = row3 + layout::kConfigButtonH;
+    float targetStep = metric ? units::mphFromKph(config::kZeroSixtyTargetStepKph) : config::kZeroSixtyTargetStepMph;
+    if (within(x, y, layout::kConfigMinusX, row3, layout::kConfigMinusX + layout::kConfigMinusW, row3End)) {
+        configStore_.setZeroSixtyTargetMph(settings.zeroSixtyTargetMph - targetStep);
+        return false;
+    }
+    if (within(x, y, layout::kConfigPlusX, row3, layout::kConfigPlusX + layout::kConfigPlusW, row3End)) {
+        configStore_.setZeroSixtyTargetMph(settings.zeroSixtyTargetMph + targetStep);
+        return false;
+    }
+
+    int32_t row4 = layout::kConfigRow4Y + layout::kConfigButtonInsetY;
+    int32_t row4End = row4 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigMinusX, row4, layout::kConfigMinusX + layout::kConfigMinusW, row4End)) {
+        configStore_.setHpEstimationFactor(settings.hpEstimationFactor - config::kHpEstimationFactorStep);
+        return false;
+    }
+    if (within(x, y, layout::kConfigPlusX, row4, layout::kConfigPlusX + layout::kConfigPlusW, row4End)) {
+        configStore_.setHpEstimationFactor(settings.hpEstimationFactor + config::kHpEstimationFactorStep);
+        return false;
+    }
+
+    int32_t row5 = layout::kConfigRow5Y + layout::kConfigButtonInsetY;
+    int32_t row5End = row5 + layout::kConfigButtonH;
+    if (within(x, y, layout::kConfigMinusX, row5, layout::kConfigMinusX + layout::kConfigMinusW, row5End)) {
+        configStore_.setFuelTrimRangePct(settings.fuelTrimRangePct - config::kFuelTrimRangeStepPct);
+        return false;
+    }
+    if (within(x, y, layout::kConfigPlusX, row5, layout::kConfigPlusX + layout::kConfigPlusW, row5End)) {
+        configStore_.setFuelTrimRangePct(settings.fuelTrimRangePct + config::kFuelTrimRangeStepPct);
         return false;
     }
 
@@ -211,6 +268,30 @@ bool ClusterTouchHandler::handleConfigGaugesTap(uint16_t x, uint16_t y, uint32_t
     }
     if (within(x, y, layout::kConfigPlusX, row3, layout::kConfigPlusX + layout::kConfigPlusW, row3End)) {
         configStore_.setMaxSpeedMph(settings.maxSpeedMph + step);
+        return false;
+    }
+
+    int32_t row4 = layout::kConfigRow4Y + layout::kConfigButtonInsetY;
+    int32_t row4End = row4 + layout::kConfigButtonH;
+    float vacuumStep = metric ? units::inHgFromKpa(config::kVacuumMaxStepKpa) : config::kVacuumMaxStepInHg;
+    if (within(x, y, layout::kConfigMinusX, row4, layout::kConfigMinusX + layout::kConfigMinusW, row4End)) {
+        configStore_.setVacuumMaxInHg(settings.vacuumMaxInHg - vacuumStep);
+        return false;
+    }
+    if (within(x, y, layout::kConfigPlusX, row4, layout::kConfigPlusX + layout::kConfigPlusW, row4End)) {
+        configStore_.setVacuumMaxInHg(settings.vacuumMaxInHg + vacuumStep);
+        return false;
+    }
+
+    int32_t row5 = layout::kConfigRow5Y + layout::kConfigButtonInsetY;
+    int32_t row5End = row5 + layout::kConfigButtonH;
+    float boostStep = metric ? units::psiFromKpa(config::kBoostMaxStepKpa) : config::kBoostMaxStepPsi;
+    if (within(x, y, layout::kConfigMinusX, row5, layout::kConfigMinusX + layout::kConfigMinusW, row5End)) {
+        configStore_.setBoostMaxPsi(settings.boostMaxPsi - boostStep);
+        return false;
+    }
+    if (within(x, y, layout::kConfigPlusX, row5, layout::kConfigPlusX + layout::kConfigPlusW, row5End)) {
+        configStore_.setBoostMaxPsi(settings.boostMaxPsi + boostStep);
         return false;
     }
 

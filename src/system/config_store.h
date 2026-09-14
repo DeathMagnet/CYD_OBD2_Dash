@@ -17,6 +17,13 @@ struct AppSettings {
     uint16_t maxSpeedMph = config::kDefaultMaxSpeedMph;
     uint32_t logIntervalMs = config::kDefaultLogRowIntervalMs;
     float baroBaselinePsi = config::kDefaultBaroBaselinePsi;
+    float coolantWarningF = config::kDefaultCoolantWarningF;
+    float lowVoltageWarningV = config::kDefaultLowVoltageWarningV;
+    float boostMaxPsi = config::kDefaultBoostMaxPsi;
+    float vacuumMaxInHg = config::kDefaultVacuumMaxInHg;
+    float zeroSixtyTargetMph = config::kDefaultZeroSixtyTargetMph;
+    float hpEstimationFactor = config::kDefaultHpEstimationFactor;
+    float fuelTrimRangePct = config::kDefaultFuelTrimRangePct;
     // Theme selection is persisted for forward compatibility, but only
     // Modern Flat (2) renders today; Mustang S197 (0) and Torque Neon (1)
     // are reserved until those themes are implemented.
@@ -53,6 +60,13 @@ public:
     void setMaxSpeedMph(uint16_t mph);
     void setLogIntervalMs(uint32_t intervalMs);
     void setBaroBaselinePsi(float psi);
+    void setCoolantWarningF(float f);
+    void setLowVoltageWarningV(float v);
+    void setBoostMaxPsi(float psi);
+    void setVacuumMaxInHg(float inHg);
+    void setZeroSixtyTargetMph(float mph);
+    void setHpEstimationFactor(float factor);
+    void setFuelTrimRangePct(float pct);
     void setThemeId(uint8_t id);
     void setUseMetricUnits(bool metric);
     void setUseMetricLogs(bool metric);
