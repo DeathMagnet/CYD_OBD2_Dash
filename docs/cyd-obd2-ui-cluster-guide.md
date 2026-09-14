@@ -218,6 +218,7 @@ Settings for display appearance and unit system.
 | **Active Theme** | Modern Flat, Neon, S197 | S197 | UI visual style; tap-to-cycle button rotates through all three themes |
 | **Units** | Standard (MPH/°F/PSI), Metric (KM/H/°C/KPA) | Standard | Display units for speed, temperature, and pressure. Affects all dashboard pages and config field labels/steppers. Does not affect CSV logging (see LOGS page). |
 | **Gauge Ticks** | On, Off | On | Radial tick marks on the RPM/Speed gauge scales (every 500/1000 RPM, every 10/50 MPH or KM/H); tap-to-cycle toggle |
+| **Flip Screen** | Normal, Flipped 180 | Normal | Rotates the display 180° for boards mounted upside-down. **⚠️ CHANGING THIS RESTARTS THE DEVICE ON SAVE** (shown in red below the toggle) — the toggle stages a pending change; the device restarts and re-runs touch calibration in the new orientation only when you tap SAVE TO SD, and only if the orientation actually changed since the last save. |
 
 #### Config Page: GAUGES
 Gauge calibration settings for RPM warning zones and gauge scales.
@@ -282,11 +283,12 @@ Read and display OBD-II Diagnostic Trouble Codes.
 
 ## 🚀 Boot Sequence & Transitions
 
-1. **Power On / Reset**: Initialize TFT display & SPI at 20MHz.
-2. **Boot Screen**: Display the static boot splash image (`src/assets/boot_logo_png.h`, a 480×320 PNG decoded via PNGdec). The `BOOT_IMAGE_MODE` and `BOOT_RGB666_ASSETS_AVAILABLE` flags are currently defined but not branched on in code; only the static PNG path runs regardless of their values. The original design intended to support animated RGB666 sequences here, but that remains unimplemented.
-3. **SD Card & Config Load**: Load saved preferences from SD (`/config.txt`).
-4. **Gauge Display**: Gauges interpolate smoothly to incoming OBD readings via spring-physics `NeedlePhysics` (see the "Gauge Needle Interpolation & Boot Sweep" section); there is no special boot-time sweep sequence.
-5. **OBD Connection**: Display connection status badge (starts `BOOT`, `DISPLAY READY`, then `CONNECTING` or `LIVE`) as the Bluetooth ELM327 handshake progresses.
+1. **SD Card & Config Load**: Mount the SD card and load saved preferences (`/config.txt`), including the display's persisted orientation (Flip Screen). Loaded first so the display and touch subsystems below can initialize directly in the correct, final orientation rather than needing a second correction pass.
+2. **Power On / Reset**: Initialize TFT display & SPI at 20MHz, in the loaded orientation.
+3. **Boot Screen**: Display the static boot splash image (`src/assets/boot_logo_png.h`, a 480×320 PNG decoded via PNGdec). The `BOOT_IMAGE_MODE` and `BOOT_RGB666_ASSETS_AVAILABLE` flags are currently defined but not branched on in code; only the static PNG path runs regardless of their values. The original design intended to support animated RGB666 sequences here, but that remains unimplemented.
+4. **Touch Calibration**: Load saved touch calibration from SD, or run the 4-corner calibration routine if it's missing (e.g. right after a Flip Screen save deletes it) — always in the display's final orientation from step 2.
+5. **Gauge Display**: Gauges interpolate smoothly to incoming OBD readings via spring-physics `NeedlePhysics` (see the "Gauge Needle Interpolation & Boot Sweep" section); there is no special boot-time sweep sequence.
+6. **OBD Connection**: Display connection status badge (starts `BOOT`, `DISPLAY READY`, then `CONNECTING` or `LIVE`) as the Bluetooth ELM327 handshake progresses.
 
 ---
 
@@ -328,6 +330,7 @@ src/
 - [ ] Save button on config pages is green when any value differs from saved, default color when all match saved values.
 - [ ] Gauge tick marks on Page 1 (RPM and Speed) render correctly as two short segments flanking the gauge ring (just outside the outer edge and just inside the inner edge), recolor from secondary to primary as the needle passes each tick, and are absent inside the RPM redline zone.
 - [ ] Gauge ticks can be toggled ON/OFF from the Config: UI page "GAUGE TICKS" button, and the setting persists after Save + power cycle.
+- [ ] Flip Screen toggle on the Config: UI page stages a pending change only (screen does not rotate immediately) and shows the red restart warning under the row; tapping Save restarts the device, re-runs touch calibration automatically in the new orientation, boots with the display and boot logo rotated 180°, and taps land correctly afterward on every page; the setting persists after a full power cycle.
 - [ ] Calculated Horsepower, Torque, Vacuum/Boost, and 0-60 timer update correctly on Pages 3 & 4.
 - [ ] Config page settings save to SD card and persist after power cycle.
 - [ ] Page 5 (Diagnostics) correctly decodes and displays DTCs in `P0xxx` / `C0xxx` format.

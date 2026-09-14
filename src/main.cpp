@@ -21,7 +21,7 @@ static ConfigStore configStore(sdManager);
 static CsvLogger csvLogger(sdManager);
 static ObdClient obdClient;
 static ClusterPages clusterPages(displayManager.getTft(), configStore, csvLogger, obdClient);
-static ClusterTouchHandler touchHandler(clusterPages, configStore, csvLogger, obdClient);
+static ClusterTouchHandler touchHandler(clusterPages, configStore, csvLogger, obdClient, sdManager);
 static StatusLed statusLed;
 
 // State variables
@@ -47,27 +47,31 @@ void setup() {
 
     initializeThemeFonts();
 
-    // 1. Initialize Display & Backlight
-    displayManager.begin();
+    // 1. Initialize SD Card over VSPI
+    sdManager.begin();
+
+    // 2. Load persisted settings (Config: UI/Gauges/User Vars/Logs/OBD Adapter
+    // pages), falling back to defaults if the SD card or /config.txt is
+    // unavailable. Loaded before display/touch init below so the persisted
+    // Flip Screen orientation is already known for both the boot logo and
+    // touch calibration, rather than being corrected after the fact.
+    configStore.begin();
+    clusterPages.applyTheme(static_cast<ThemeId>(configStore.settings().themeId));
+
+    // 3. Initialize Display & Backlight, in the persisted orientation
+    displayManager.begin(configStore.settings().screenFlipped);
 
     // Initialize onboard RGB LED (Check Engine / shift-light indicator)
     statusLed.begin();
 
-    // 2. Render Static Boot Screen (PNG decoded via PNGdec into RGB565)
+    // 4. Render Static Boot Screen (PNG decoded via PNGdec into RGB565)
     Serial.println("[Boot] Displaying static boot image...");
     displayManager.drawBootImage();
     delay(config::kBootScreenDurationMs);
 
-    // 3. Initialize SD Card over VSPI
-    sdManager.begin();
-
-    // 4. Initialize Touch & Run Calibration if missing from SD
+    // 5. Initialize Touch & Run Calibration if missing from SD (now runs in
+    // the correct orientation, since display rotation is already final)
     touchManager.begin();
-
-    // 5. Load persisted settings (Config: UI/Gauges/User Vars/Logs/OBD Adapter
-    // pages), falling back to defaults if the SD card or /config.txt is unavailable.
-    configStore.begin();
-    clusterPages.applyTheme(static_cast<ThemeId>(configStore.settings().themeId));
 
     // 6. Start SD CSV logging (pruning old sessions first if needed). No-ops
     // safely when SD_LOGGING_ENABLED is unset or the card is missing.

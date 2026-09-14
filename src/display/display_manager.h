@@ -14,7 +14,7 @@ public:
     DisplayManager(const DisplayManager&) = delete;
     DisplayManager& operator=(const DisplayManager&) = delete;
 
-    bool begin();
+    bool begin(bool flipped);
     void setBacklight(uint8_t brightness);
     void clear(uint16_t color = TFT_BLACK);
 

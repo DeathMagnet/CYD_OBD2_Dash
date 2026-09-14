@@ -40,7 +40,7 @@ Use the existing `env:cyd_4inch` environment. The current configuration is autho
 | Board | `esp32dev` |
 | Display controller | ST7796S via TFT_eSPI (HSPI) |
 | Physical panel | 320 x 480 pixels |
-| Render orientation | 480 x 320 landscape |
+| Render orientation | 480 x 320 landscape, runtime-flippable 180° via the Config: UI page's Flip Screen setting (persisted to SD, applied on the restart Save triggers) |
 | TFT SPI pins | MISO 12, MOSI 13, SCLK 14, CS 15, DC 2 |
 | Display reset | Not connected (`TFT_RST=-1`) |
 | Backlight | GPIO 27 |
@@ -207,19 +207,20 @@ The reconnect blip is scheduled from real `millis()`, never `kSimTimeScale`, so 
 Implement the lifecycle as an explicit state machine rather than a sequence of delays:
 
 ```text
-Boot -> DisplayReady -> BootAsset -> SdInit -> ObdConnecting -> Live
-                                      |              |             |
-                                      v              v             v
-                                   Degraded <---- Reconnecting <- Stale
+Boot -> SdInit -> DisplayReady -> BootAsset -> ObdConnecting -> Live
+                                       |              |             |
+                                       v              v             v
+                                    Degraded <---- Reconnecting <- Stale
 ```
 
 1. Initialize serial output at the monitor speed configured by PlatformIO (`115200`).
-2. Initialize the display, set landscape rotation, clear the screen, and draw a minimal status screen.
-3. Play the selected boot asset. Enforce a finite duration; the user must reach a connecting/status screen even if an animation asset is corrupt or absent.
-4. Attempt to mount the SD card only when `SD_LOGGING_ENABLED` is defined. A failed mount must disable logging while retaining all dashboard functionality.
-5. Start Bluetooth and attempt the configured ELM327 connection.
-6. Poll supported PIDs on a schedule, publish complete telemetry snapshots, and enter `Live` only after valid engine data arrives.
-7. On timeout or disconnect, retain the last value only as stale data, render the stale/disconnected state clearly, and retry with bounded backoff.
+2. Mount the SD card and load persisted settings (`/config.txt`) - including the saved display orientation - before the display initializes below, so orientation is correct from the first frame instead of needing a second correction pass. A failed mount falls back to defaults; this early mount is independent of `SD_LOGGING_ENABLED` (see step 4).
+3. Initialize the display in the persisted orientation, set landscape rotation, clear the screen, and draw a minimal status screen.
+4. Play the selected boot asset. Enforce a finite duration; the user must reach a connecting/status screen even if an animation asset is corrupt or absent.
+5. Start SD CSV logging (using the card already mounted in step 2) only when `SD_LOGGING_ENABLED` is defined. Unavailable logging must not affect dashboard functionality.
+6. Start Bluetooth and attempt the configured ELM327 connection.
+7. Poll supported PIDs on a schedule, publish complete telemetry snapshots, and enter `Live` only after valid engine data arrives.
+8. On timeout or disconnect, retain the last value only as stale data, render the stale/disconnected state clearly, and retry with bounded backoff.
 
 Do not use long `delay()` calls for connection retries, boot frames, PID polling, gauge animation, or SD writes. Schedule work using `millis()` and independently track each subsystem's next due time.
 
@@ -372,6 +373,7 @@ Run these checks as implementation progresses:
 - Repeat without an SD card and confirm the dashboard stays functional while reporting logging unavailable.
 - Observe display rendering and Bluetooth recovery for an extended bench session; confirm no uncontrolled memory growth, watchdog resets, or UI stalls.
 - On the Config: OBD ADAPTER page, tap-cycle the Adapter Name and PIN rows through their presets, then tap Save and confirm the status badge drops to CONNECTING and re-establishes LIVE (live reconnect with new credentials, no reboot).
+- On the Config: UI page, toggle Flip Screen and tap Save; confirm the device restarts, re-runs touch calibration automatically, and boots with the display and boot logo rotated 180° with taps landing correctly afterward. Toggle back and confirm it returns to normal, and that the setting survives a full power cycle either way.
 
 ## Safety and Scope Notes
 

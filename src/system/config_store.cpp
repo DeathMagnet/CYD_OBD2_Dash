@@ -106,6 +106,8 @@ bool ConfigStore::parseLine(const char* line) {
         settings_.useMetricUnits = (atol(valueStr) != 0);
     } else if (strcmp(key, "log_units") == 0) {
         settings_.useMetricLogs = (atol(valueStr) != 0);
+    } else if (strcmp(key, "screen_flip") == 0) {
+        settings_.screenFlipped = (atol(valueStr) != 0);
     } else if (strcmp(key, "tick_mode") == 0) {
         long mode = atol(valueStr);
         settings_.tickMode = (mode >= 0 && mode <= 3) ? static_cast<uint8_t>(mode) : config::kDefaultTickMode;
@@ -237,6 +239,10 @@ void ConfigStore::setUseMetricLogs(bool metric) {
     settings_.useMetricLogs = metric;
 }
 
+void ConfigStore::setScreenFlipped(bool flipped) {
+    settings_.screenFlipped = flipped;
+}
+
 void ConfigStore::setTickMode(uint8_t mode) {
     settings_.tickMode = (mode <= 3) ? mode : config::kDefaultTickMode;
     clampTickModeForTheme();
@@ -285,6 +291,7 @@ bool ConfigStore::isDirty() const {
            settings_.themeId != savedSettings_.themeId ||
            settings_.useMetricUnits != savedSettings_.useMetricUnits ||
            settings_.useMetricLogs != savedSettings_.useMetricLogs ||
+           settings_.screenFlipped != savedSettings_.screenFlipped ||
            settings_.tickMode != savedSettings_.tickMode ||
            strcmp(settings_.obdAdapterName, savedSettings_.obdAdapterName) != 0 ||
            strcmp(settings_.obdAdapterPin, savedSettings_.obdAdapterPin) != 0;
@@ -292,6 +299,10 @@ bool ConfigStore::isDirty() const {
 
 bool ConfigStore::isLogUnitsDirty() const {
     return settings_.useMetricLogs != savedSettings_.useMetricLogs;
+}
+
+bool ConfigStore::isScreenFlipDirty() const {
+    return settings_.screenFlipped != savedSettings_.screenFlipped;
 }
 
 bool ConfigStore::isObdCredentialsDirty() const {
@@ -333,6 +344,7 @@ bool ConfigStore::save() {
     file.printf("fuel_trim_range_pct=%.1f\n", settings_.fuelTrimRangePct);
     file.printf("units=%u\n", settings_.useMetricUnits ? 1 : 0);
     file.printf("log_units=%u\n", settings_.useMetricLogs ? 1 : 0);
+    file.printf("screen_flip=%u\n", settings_.screenFlipped ? 1 : 0);
     file.printf("tick_mode=%u\n", settings_.tickMode);
     file.printf("obd_adapter_name=%s\n", settings_.obdAdapterName);
     file.printf("obd_adapter_pin=%s\n", settings_.obdAdapterPin);
