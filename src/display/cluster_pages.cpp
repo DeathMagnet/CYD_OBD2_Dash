@@ -263,7 +263,7 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     }
     // Reserve the field width from the widest expected reading (RPM can reach
     // 4 digits, e.g. up to kMaxMaxRpm = 9000) rather than a guessed constant:
-    // Mustang S197's 7-segment font is wider per digit than other themes'
+    // S197's 7-segment font is wider per digit than other themes'
     // fonts, so a fixed 120px field left part of a 4-digit value undrawn by
     // the clear rect, leaving stale segments once the value dropped back to
     // 3 digits.

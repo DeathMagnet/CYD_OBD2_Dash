@@ -13,7 +13,7 @@ When an SD card is present and `SD_LOGGING_ENABLED` is defined, the system autom
 The class that ships in `src/logging/csv_logger.h/.cpp` is named `CsvLogger` (not `SdLogger` as sketched below) and extends the design in three ways:
 
 - **Row interval is user-configurable at runtime**, not a fixed `SD_LOG_ROW_INTERVAL_MS` constant. The LOGS config page cycles through `config::kLogRowIntervalOptionsMs` (50/100/250/500/1000 ms), persisted via `ConfigStore` to `/config.txt`; `main.cpp` passes `configStore.settings().logIntervalMs` into `CsvLogger::update()` every call.
-- **Automatic capacity pruning.** Before opening a new session file, and again on every flush cycle, `CsvLogger::enforceCapacity()` compares `SD.totalBytes() - SD.usedBytes()` against `config::kSdMinFreeBytes` (5 MB). If free space is short, it repeatedly deletes the single oldest `mustang_log_*.csv` (by parsed session index, never the file currently being written) until there's headroom again or no prunable file remains.
+- **Automatic capacity pruning.** Before opening a new session file, and again on every flush cycle, `CsvLogger::enforceCapacity()` compares `SD.totalBytes() - SD.usedBytes()` against `config::kSdMinFreeBytes` (5 MB). If free space is short, it repeatedly deletes the single oldest `obd_log_*.csv` (by parsed session index, never the file currently being written) until there's headroom again or no prunable file remains.
 - **Log management on LOGS config page.** `CsvLogger::getLogSummary()` scans the SD root for a file count and total byte size, rendered on the LOGS config page alongside a "DELETE ALL LOGS" button (`CsvLogger::deleteAllLogs()`, tap-to-confirm within 5 seconds) that closes the active file, removes every session log, and immediately opens a fresh one — but only resumes writing if logging was actually active beforehand, so tapping it with `SD_LOGGING_ENABLED` unset can't silently start a session.
 
 The 20-column schema, NVS session-index scheme, and buffered-flush strategy below are otherwise implemented as designed.
@@ -27,11 +27,11 @@ The 20-column schema, NVS session-index scheme, and buffered-flush strategy belo
 Log files are stored at the root directory of the SD card (`/SD/` or card root `/`) using a 3-digit zero-padded session index:
 
 ```text
-/SD/mustang_log_001.csv
-/SD/mustang_log_002.csv
-/SD/mustang_log_003.csv
+/SD/obd_log_001.csv
+/SD/obd_log_002.csv
+/SD/obd_log_003.csv
 ...
-/SD/mustang_log_999.csv
+/SD/obd_log_999.csv
 ```
 
 ### NVS (Non-Volatile Storage) Key
@@ -53,7 +53,7 @@ uint32_t getNextSessionIndex() {
 }
 
 void buildLogFilePath(char* buffer, size_t bufferSize, uint32_t sessionIdx) {
-    snprintf(buffer, bufferSize, "/mustang_log_%03u.csv", static_cast<unsigned int>(sessionIdx));
+    snprintf(buffer, bufferSize, "/obd_log_%03u.csv", static_cast<unsigned int>(sessionIdx));
 }
 ```
 
@@ -212,7 +212,7 @@ bool SdLogger::begin() {
     prefs.end();
 
     char path[32];
-    snprintf(path, sizeof(path), "/mustang_log_%03u.csv", static_cast<unsigned int>(sessionIdx));
+    snprintf(path, sizeof(path), "/obd_log_%03u.csv", static_cast<unsigned int>(sessionIdx));
 
     logFile = SD.open(path, FILE_WRITE);
     if (!logFile) {
@@ -278,12 +278,12 @@ void SdLogger::end() {}
 
 - [ ] Firmware builds cleanly with `-D SD_LOGGING_ENABLED` active in `platformio.ini`.
 - [ ] Firmware builds cleanly with `; -D SD_LOGGING_ENABLED` commented out (zero SD dependencies linked).
-- [ ] On boot with SD card inserted, `/mustang_log_001.csv` is created with the exact 20-column header (Standard units by default).
-- [ ] Rebooting increments NVS index and creates `/mustang_log_002.csv`.
+- [ ] On boot with SD card inserted, `/obd_log_001.csv` is created with the exact 20-column header (Standard units by default).
+- [ ] Rebooting increments NVS index and creates `/obd_log_002.csv`.
 - [ ] Removing SD card during operation degrades state gracefully to `SD OFFLINE` without crashing the display loop.
 - [ ] Display needle updates remain at 30 FPS without stutter during periodic 500ms SD flushes.
 - [ ] Inspected CSV file on host PC contains valid, uncorrupted, comma-separated numeric rows.
 - [ ] On LOGS config page, tapping "LOG UNITS" to toggle the setting does not immediately delete any log files (button label updates, but Save button turns green to show pending change).
 - [ ] Tapping "LOG UNITS" twice (e.g. Standard → Metric → Standard) before hitting Save leaves all log files intact, since the net setting didn't actually change.
-- [ ] After toggling Log Units to a new value and tapping SAVE TO SD, the previous session file closes, all existing `mustang_log_*.csv` files are deleted, and a fresh session file opens with the new unit schema (metric column names: `speed_kph`, `coolant_c`, `map_kpa`, `fuel_pressure_kpa`, `baro_kpa`).
+- [ ] After toggling Log Units to a new value and tapping SAVE TO SD, the previous session file closes, all existing `obd_log_*.csv` files are deleted, and a fresh session file opens with the new unit schema (metric column names: `speed_kph`, `coolant_c`, `map_kpa`, `fuel_pressure_kpa`, `baro_kpa`).
 - [ ] Log Units setting is independent of the display Units setting (on UI config page) — you can view the dashboard in one unit system while logging in another.

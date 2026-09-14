@@ -84,15 +84,15 @@ bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t now
     const AppSettings& settings = configStore_.settings();
 
     // Active theme cycle row (row 0): cycles through all three themes in
-    // order, Modern Flat -> Neon -> Mustang S197 -> Modern Flat.
+    // order, Modern Flat -> Neon -> S197 -> Modern Flat.
     int32_t row0 = layout::kConfigRow0Y + layout::kConfigButtonInsetY;
     int32_t row0End = row0 + layout::kConfigButtonH;
     if (within(x, y, layout::kConfigCycleX, row0, layout::kConfigCycleX + layout::kConfigCycleW, row0End)) {
         ThemeId newTheme;
         switch (static_cast<ThemeId>(settings.themeId)) {
             case ThemeId::ModernFlat: newTheme = ThemeId::Neon; break;
-            case ThemeId::Neon: newTheme = ThemeId::MustangS197; break;
-            case ThemeId::MustangS197:
+            case ThemeId::Neon: newTheme = ThemeId::S197; break;
+            case ThemeId::S197:
             default: newTheme = ThemeId::ModernFlat; break;
         }
         configStore_.setThemeId(static_cast<uint8_t>(newTheme));
@@ -112,7 +112,7 @@ bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t now
     }
 
     // Gauge tick mode cycle row (row 2): cycles Off -> Inside -> Outside ->
-    // Inside+Outside -> Off, except Mustang S197 (no outside-tick art) which
+    // Inside+Outside -> Off, except S197 (no outside-tick art) which
     // only toggles Off <-> Inside.
     int32_t row2 = layout::kConfigRow2Y + layout::kConfigButtonInsetY;
     int32_t row2End = row2 + layout::kConfigButtonH;
@@ -120,7 +120,7 @@ bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t now
         ThemeId activeTheme = static_cast<ThemeId>(settings.themeId);
         TickMode current = static_cast<TickMode>(settings.tickMode);
         TickMode next;
-        if (activeTheme == ThemeId::MustangS197) {
+        if (activeTheme == ThemeId::S197) {
             next = (current == TickMode::Off) ? TickMode::InsideOnly : TickMode::Off;
         } else {
             switch (current) {

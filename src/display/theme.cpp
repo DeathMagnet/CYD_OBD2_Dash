@@ -70,14 +70,14 @@ ThemeColors kNeonTheme = {
     {},     // numberedFonts: not used
 };
 
-// Mustang S197: OEM 2005-2010 Ford Mustang instrument cluster look (see
+// S197: OEM 2005-2010 Ford Mustang instrument cluster look (see
 // docs/cyd-obd2-ui-cluster-guide.md). Deep midnight background, LED-green
 // gauge arcs and text, chrome bezels, vibrant red needle.
-constexpr ThemeColors kMustangS197Theme = {
+constexpr ThemeColors kS197Theme = {
     0x0821, // background: deep midnight navy
     0x10A5, // panel: slightly lighter navy card surface
     0x001F, // primaryGaugeArc: LED blue
-    0x0000, // secondaryGaugeArc: black
+    0x39C7, // secondaryGaugeArc: dark grey
     0xC618, // tickInactiveColor: silver (lights up LED blue once the needle passes)
     0xF800, // needle: vibrant red
     0xC618, // needleCap: chrome hub
@@ -95,7 +95,7 @@ constexpr ThemeColors kMustangS197Theme = {
     true,   // useSevenSegmentFont: TFT_eSPI Font 7 for large readouts
     true,   // useSegmentedBars: OEM-style segmented LED bar look
     true,   // useSegmentedArcs: OEM-style segmented LED ring look
-    labels::kThemeNameMustangS197,
+    labels::kThemeNameS197,
     {},     // valueFonts: nullptr array (use default GLCD font)
     {0, 7, 7}, // numberedFonts: Font 7 (7-segment LCD) for tiers 3/4 (boost/vacuum and RPM/Speed); tier 2 (drawValueBox) stays on default
 };
@@ -105,7 +105,7 @@ constexpr ThemeColors kMustangS197Theme = {
 const ThemeColors& getTheme(ThemeId id) {
     switch (id) {
         case ThemeId::Neon: return kNeonTheme;
-        case ThemeId::MustangS197: return kMustangS197Theme;
+        case ThemeId::S197: return kS197Theme;
         case ThemeId::ModernFlat:
         default: return kModernFlatTheme;
     }
@@ -134,7 +134,7 @@ void applyValueFont(TFT_eSPI& tft, const ThemeColors& theme, uint8_t size) {
     }
 
     if (size == 5) {
-        // No dedicated tier-5 override for this theme (e.g. Mustang S197): fall back
+        // No dedicated tier-5 override for this theme (e.g. S197): fall back
         // to tier 3 instead of an oversized default GLCD font.
         applyValueFont(tft, theme, 3);
         return;

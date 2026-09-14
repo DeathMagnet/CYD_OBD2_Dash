@@ -242,7 +242,7 @@ void ConfigStore::setTickMode(uint8_t mode) {
 }
 
 void ConfigStore::clampTickModeForTheme() {
-    if (static_cast<ThemeId>(settings_.themeId) != ThemeId::MustangS197) {
+    if (static_cast<ThemeId>(settings_.themeId) != ThemeId::S197) {
         return;
     }
     if (settings_.tickMode == static_cast<uint8_t>(TickMode::OutsideOnly) ||
