@@ -74,14 +74,28 @@ To change credentials later, re-edit `/obd_config.txt` on the card (on a compute
 
 ### SD Card Contents
 
-The dashboard reads/writes these files at the SD card root:
+The dashboard reads/writes these files:
 
 | File | Purpose |
 | --- | --- |
-| `/obd_config.txt` | OBD-II adapter identity (`mac`/`id`/`password`), read once at boot. See above. |
-| `/config.txt` | Dashboard settings (theme, gauge ranges, units, etc.), written by the Config pages' Save button. |
-| `/touch_cal.dat` | Touch calibration data, written by the calibration routine. |
-| `/obd_log_*.csv` | CSV telemetry logs (one file per session), written when `SD_LOGGING_ENABLED` is set. |
+| `/obd_config.txt` | OBD-II adapter identity (`mac`/`id`/`password`), read once at boot. See above. (Root directory.) |
+| `/config.txt` | Dashboard settings (theme, gauge ranges, units, etc.), written by the Config pages' Save button. (Root directory.) |
+| `/touch_cal.dat` | Touch calibration data, written by the calibration routine. (Root directory.) |
+| `/logs/obd_log_*.csv` | CSV telemetry logs (one file per session), written when `SD_LOGGING_ENABLED` is set. (Stored in `/logs` folder.) |
+
+### CSV Telemetry Logs
+
+Each log file is a comma-separated table with 20 columns of OBD-II telemetry, one row per logging interval. Log files are stored in the `/logs` folder on the SD card and are named with a 3-digit zero-padded auto-incrementing session index (e.g., `/logs/obd_log_001.csv`, `/logs/obd_log_002.csv`, ..., `/logs/obd_log_999.csv`). The session index persists across reboots in the ESP32's NVS (non-volatile storage), so a new log file is created on every boot.
+
+**Columns (20 total):** `timestamp_ms`, `rpm`, `speed_mph` / `speed_kph`, `coolant_f` / `coolant_c`, `throttle_pct`, `fuel_pct`, `voltage_v`, `map_psi` / `map_kpa`, `iat_f` / `iat_c`, `engine_load_pct`, `maf_gps`, `timing_advance_deg`, `stft_pct`, `ltft_pct`, `fuel_pressure_psi` / `fuel_pressure_kpa`, `o2_b1s1_v`, `o2_b2s1_v`, `baro_psi` / `baro_kpa`, `cel_on`, `dtc_count`.
+
+The speed, coolant, MAP, IAT, fuel pressure, and barometric pressure columns rename and change units depending on the **Log Units** setting configured on the **LOGS** config page:
+- **Standard units:** speed_`mph`, coolant_`f`, map_`psi`, iat_`f`, fuel_pressure_`psi`, baro_`psi`.
+- **Metric units:** speed_`kph`, coolant_`c`, map_`kpa`, iat_`c`, fuel_pressure_`kpa`, baro_`kpa`.
+
+**⚠️ Important:** Changing the Log Units setting on the LOGS config page and then tapping **SAVE TO SD** will delete all existing log files and start a fresh session. This is by design — CSV files never mix unit systems within their rows. Toggle the setting back before saving if you want to keep your logs.
+
+**Row interval** (configurable 50–1000 ms) and **automatic pruning** (oldest file deleted when SD card free space drops below 5 MB) are managed on the LOGS config page. For full column definitions and sample CSV output, see [docs/cyd-obd2-sd-logging-guide.md](docs/cyd-obd2-sd-logging-guide.md).
 
 ## Build Environments
 

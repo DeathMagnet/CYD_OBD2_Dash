@@ -23,15 +23,13 @@ void formatFloatField(char* buf, size_t bufSize, const TelemetryValue& value) {
     }
 }
 
-// name may come back as "/obd_log_007.csv" or "obd_log_007.csv"
-// depending on the ESP32 core version; normalize to a leading-slash path.
+// name may come back as "/logs/obd_log_007.csv", "obd_log_007.csv", or other
+// variations depending on the ESP32 core version; normalize to the basename
+// joined with the log directory.
 void buildPathFromName(const char* name, char* out, size_t outSize) {
-    if (name[0] == '/') {
-        strncpy(out, name, outSize - 1);
-    } else {
-        snprintf(out, outSize, "/%s", name);
-    }
-    out[outSize - 1] = '\0';
+    const char* base = strrchr(name, '/');
+    base = (base != nullptr) ? base + 1 : name;
+    snprintf(out, outSize, "%s/%s", config::kLogDirPath, base);
 }
 
 bool parseSessionIndexFromName(const char* name, uint32_t& indexOut) {
@@ -108,7 +106,7 @@ void deleteVisitor(void* context, const char* path, uint32_t /*sessionIndex*/, s
 CsvLogger::CsvLogger(SdManager& sdManager) : sdManager_(sdManager) {}
 
 void CsvLogger::forEachLogFile(LogFileVisitor visitor, void* context) const {
-    File root = SD.open("/");
+    File root = SD.open(config::kLogDirPath);
     if (!root) {
         return;
     }
@@ -205,6 +203,10 @@ bool CsvLogger::begin() {
         Serial.println("[Log] SD not mounted; logging disabled.");
         loggingActive_ = false;
         return false;
+    }
+
+    if (!SD.exists(config::kLogDirPath)) {
+        SD.mkdir(config::kLogDirPath);
     }
 
     enforceCapacity();
