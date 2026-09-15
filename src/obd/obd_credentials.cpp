@@ -124,3 +124,32 @@ bool loadObdCredentials(SdManager& sdManager, ObdCredentials& out) {
     Serial.printf("[OBD] Loaded adapter identity from %s: id=%s\n", config::kObdConfigFilePath, out.id);
     return true;
 }
+
+bool saveObdCredentials(SdManager& sdManager, const ObdCredentials& creds) {
+    if (!sdManager.isMounted()) {
+        Serial.println("[OBD] Cannot save: SD not mounted.");
+        return false;
+    }
+
+    // FILE_WRITE on this SD implementation seeks to end-of-file rather than
+    // truncating, so remove any previous version before writing a fresh one
+    // (same pattern as ConfigStore::save()).
+    if (SD.exists(config::kObdConfigFilePath)) {
+        SD.remove(config::kObdConfigFilePath);
+    }
+
+    File file = SD.open(config::kObdConfigFilePath, FILE_WRITE);
+    if (!file) {
+        Serial.printf("[OBD] Failed to open %s for writing.\n", config::kObdConfigFilePath);
+        return false;
+    }
+
+    file.printf("mac=%02X:%02X:%02X:%02X:%02X:%02X\n", creds.mac[0], creds.mac[1], creds.mac[2],
+                creds.mac[3], creds.mac[4], creds.mac[5]);
+    file.printf("id=%s\n", creds.id);
+    file.printf("password=%s\n", creds.password);
+    file.close();
+
+    Serial.printf("[OBD] Saved adapter identity to %s: id=%s\n", config::kObdConfigFilePath, creds.id);
+    return true;
+}

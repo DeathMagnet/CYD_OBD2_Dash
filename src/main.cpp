@@ -10,6 +10,7 @@
 #include "logging/connection_logger.h"
 #include "obd/obd_client.h"
 #include "obd/obd_credentials.h"
+#include "obd/obd_pairing.h"
 #include "obd/telemetry.h"
 #include "display/cluster_pages.h"
 #include "display/touch_handler.h"
@@ -68,35 +69,45 @@ void setup() {
     // Initialize onboard RGB LED (Check Engine / shift-light indicator)
     statusLed.begin();
 
-    // 4. Load the OBD adapter identity from /obd_config.txt (mac/id/password
+    // 4. Initialize Touch & Run Calibration if missing from SD (moved ahead
+    // of the OBD credentials step below so the Bluetooth pairing screen has
+    // working, calibrated touch if it's needed). Runs in the correct
+    // orientation, since display rotation is already final.
+    touchManager.begin();
+
+    // 5. Load the OBD adapter identity from /obd_config.txt (mac/id/password
     // are all mandatory; there is no fallback). Checked this early - right
-    // after display init, before the boot animation/touch calibration/SD
-    // logging below - so a doomed boot fails fast with a clear on-screen
-    // error instead of running through several seconds of setup first.
+    // after display/touch init, before the boot animation/SD logging below -
+    // so a doomed boot recovers (or fails fast) before running through
+    // several seconds of setup first. A missing/invalid file, or stored
+    // credentials that fail to connect kPreflightMaxAttempts times in a row,
+    // falls into the on-device Bluetooth pairing/recovery screen
+    // (obd_pairing::run()) instead of halting - see obd/obd_pairing.h.
     // Skipped entirely in OBD_SIMULATION_ENABLED builds: the scripted drive
     // cycle never touches these credentials, and requiring a real adapter's
     // mac/id/password just to boot the demo would defeat its "no adapter, no
     // vehicle, no Bluetooth pairing" purpose (see obd_simulator.h).
     ObdCredentials obdCredentials;
 #if !OBD_SIMULATION_ENABLED
-    if (!loadObdCredentials(sdManager, obdCredentials)) {
-        Serial.println("[OBD] Fatal: /obd_config.txt missing or invalid on SD card (mac/id/password all required).");
-        connection_log::write(sdManager, "Fatal: /obd_config.txt missing or invalid (mac/id/password required)");
-        displayManager.showFatalError("OBD CONFIG ERROR", "/obd_config.txt missing or invalid on SD card.",
-                                       "Set mac=, id=, and password=, then reboot.");
-        for (;;) {
-            delay(1000); // Halt here; never reaches the dashboard. delay() yields, so the watchdog stays happy.
-        }
+    bool needsPairing = !loadObdCredentials(sdManager, obdCredentials);
+    if (!needsPairing && !obd_pairing::preflight(obdCredentials)) {
+        Serial.println("[OBD] Stored credentials failed to connect; falling back to the pairing screen.");
+        connection_log::write(sdManager, "Stored credentials failed preflight; entering pairing screen");
+        needsPairing = true;
+    }
+    if (needsPairing) {
+        const ThemeColors& pairingTheme = getTheme(static_cast<ThemeId>(configStore.settings().themeId));
+        obd_pairing::run(displayManager, touchManager, sdManager, pairingTheme, obdCredentials);
     }
     connection_log::writef(sdManager, "Credentials loaded: id=%s", obdCredentials.id);
 #endif
 
-    // 5b. Start the ELM327 Bluetooth client on its own task (using the
-    // credentials validated in step 4) early, before the boot screen delay,
-    // so connection progress is visible during the boot logo display.
+    // 6. Start the ELM327 Bluetooth client on its own task (using the
+    // credentials validated/paired in step 5) early, before the boot screen
+    // delay, so connection progress is visible during the boot logo display.
     obdClient.begin(obdCredentials, sdManager);
 
-    // 5. Render Static Boot Screen (PNG decoded via PNGdec into RGB565)
+    // 7. Render Static Boot Screen (PNG decoded via PNGdec into RGB565)
     // and wait for OBD connection or timeout while showing status updates.
     Serial.println("[Boot] Displaying static boot image...");
     displayManager.drawBootImage();
@@ -118,11 +129,7 @@ void setup() {
         delay(config::kBootScreenDurationMs - (millis() - bootStartMs)); // Keep the logo up for its original minimum branding time even on a fast connect
     }
 
-    // 6. Initialize Touch & Run Calibration if missing from SD (now runs in
-    // the correct orientation, since display rotation is already final)
-    touchManager.begin();
-
-    // 7. Start SD CSV logging (pruning old sessions first if needed). No-ops
+    // 8. Start SD CSV logging (pruning old sessions first if needed). No-ops
     // safely when SD_LOGGING_ENABLED is unset or the card is missing.
 #ifdef SD_LOGGING_ENABLED
     csvLogger.setUnitsMetric(configStore.settings().useMetricLogs);

@@ -120,6 +120,17 @@ constexpr const char* kStatusReconnecting = "RECONNECTING";
 constexpr const char* kStatusDegraded = "NO OBD";
 constexpr const char* kStatusUnknown = "UNKNOWN";
 
+// ---- Bluetooth Pairing Screen (boot-time only, see obd/obd_pairing.h) ----
+constexpr const char* kPairingTitle = "PAIR OBD-II ADAPTER";
+constexpr const char* kPairingDevicePrefix = "DEVICE: ";
+constexpr const char* kPairingDeviceEmpty = "DEVICE: (tap to scan)";
+constexpr const char* kPairingPasswordPrefix = "PASSWORD: ";
+constexpr const char* kButtonConnect = "CONNECT";
+constexpr const char* kStatusConnecting = "CONNECTING...";
+constexpr const char* kStatusPairingScanning = "Scanning for adapters...";
+constexpr const char* kStatusPairingScanEmpty = "No devices found - tap DEVICE to retry.";
+constexpr const char* kStatusPairingTapDeviceFirst = "Scan first - tap DEVICE.";
+
 // ---- Theme ----
 constexpr const char* kThemeNameModernFlat = "Modern Flat";
 constexpr const char* kThemeNameNeon = "Neon";

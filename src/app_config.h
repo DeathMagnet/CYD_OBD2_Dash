@@ -56,6 +56,21 @@ constexpr int8_t kObdTaskCore = 0;                     // Keep Bluetooth I/O off
 constexpr uint32_t kObdSecondaryPidIntervalMs = 40;    // Pace between queued command sends
 constexpr uint32_t kTelemetryStaleThresholdMs = 3000;  // No fresh update within this window -> STALE badge
 
+// ---- Bluetooth Pairing UI (boot-time only; see src/obd/obd_pairing.h) ----
+// Shown when /obd_config.txt is missing/invalid, or when the stored
+// mac/password fail to connect kPreflightMaxAttempts times in a row at boot.
+// Never shown once the dashboard is running (a dropped connection there just
+// keeps retrying in the background via ObdClient, as today).
+constexpr uint8_t kPairingMaxDevices = 10;             // Cap on discovered/filtered device list size
+constexpr uint32_t kPairingScanTimeoutMs = 10000;      // Passed to BluetoothSerial::discover(); its own default (~61s) is too long for a boot screen
+constexpr uint8_t kPairingMaxAttempts = 5;             // Connect-button failures before the pairing screen resets and re-scans
+constexpr uint8_t kPreflightMaxAttempts = 5;           // Stored-credential connect attempts before the pairing screen triggers
+constexpr uint32_t kPairingStatusFlashMs = 1500;       // How long a "FAILED (n/5)" status stays up before rescanning, once attempts are exhausted
+constexpr const char* kPairingPasswordOptions[] = {"0000", "1111", "1234", "6789"};
+constexpr size_t kPairingPasswordOptionCount = 4;
+constexpr const char* kPairingKnownAdapterPatterns[] = {"OBDII", "OBDLink", "Vgate", "VEEPEAK", "OBD2"};
+constexpr size_t kPairingKnownAdapterPatternCount = 5;
+
 // ---- OBD-II Simulation (only used by OBD_SIMULATION_ENABLED builds) ----
 // Multiplies the scripted drive cycle's clock so a full lap can be swept faster
 // during manual UI checks. Override per-build with -D SIM_TIME_SCALE=2.0F.
