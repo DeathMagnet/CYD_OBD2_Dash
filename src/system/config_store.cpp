@@ -27,32 +27,9 @@ bool isValidLogIntervalMs(uint32_t intervalMs) {
     return false;
 }
 
-bool isValidObdAdapterName(const char* name) {
-    for (size_t i = 0; i < config::kObdAdapterNameOptionCount; ++i) {
-        if (strcmp(config::kObdAdapterNameOptions[i], name) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool isValidObdAdapterPin(const char* pin) {
-    for (size_t i = 0; i < config::kObdAdapterPinOptionCount; ++i) {
-        if (strcmp(config::kObdAdapterPinOptions[i], pin) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
 } // namespace
 
-AppSettings::AppSettings() {
-    strncpy(obdAdapterName, config::kObdDefaultAdapterName, sizeof(obdAdapterName) - 1);
-    obdAdapterName[sizeof(obdAdapterName) - 1] = '\0';
-    strncpy(obdAdapterPin, config::kObdDefaultAdapterPin, sizeof(obdAdapterPin) - 1);
-    obdAdapterPin[sizeof(obdAdapterPin) - 1] = '\0';
-}
+AppSettings::AppSettings() = default;
 
 ConfigStore::ConfigStore(SdManager& sdManager) : sdManager_(sdManager) {}
 
@@ -111,14 +88,6 @@ bool ConfigStore::parseLine(const char* line) {
     } else if (strcmp(key, "tick_mode") == 0) {
         long mode = atol(valueStr);
         settings_.tickMode = (mode >= 0 && mode <= 3) ? static_cast<uint8_t>(mode) : config::kDefaultTickMode;
-    } else if (strcmp(key, "obd_adapter_name") == 0) {
-        const char* name = isValidObdAdapterName(valueStr) ? valueStr : config::kObdAdapterNameOptions[0];
-        strncpy(settings_.obdAdapterName, name, sizeof(settings_.obdAdapterName) - 1);
-        settings_.obdAdapterName[sizeof(settings_.obdAdapterName) - 1] = '\0';
-    } else if (strcmp(key, "obd_adapter_pin") == 0) {
-        const char* pin = isValidObdAdapterPin(valueStr) ? valueStr : config::kObdAdapterPinOptions[0];
-        strncpy(settings_.obdAdapterPin, pin, sizeof(settings_.obdAdapterPin) - 1);
-        settings_.obdAdapterPin[sizeof(settings_.obdAdapterPin) - 1] = '\0';
     } else {
         return false;
     }
@@ -258,22 +227,6 @@ void ConfigStore::clampTickModeForTheme() {
     }
 }
 
-void ConfigStore::setObdAdapterName(const char* name) {
-    if (!isValidObdAdapterName(name)) {
-        return;
-    }
-    strncpy(settings_.obdAdapterName, name, sizeof(settings_.obdAdapterName) - 1);
-    settings_.obdAdapterName[sizeof(settings_.obdAdapterName) - 1] = '\0';
-}
-
-void ConfigStore::setObdAdapterPin(const char* pin) {
-    if (!isValidObdAdapterPin(pin)) {
-        return;
-    }
-    strncpy(settings_.obdAdapterPin, pin, sizeof(settings_.obdAdapterPin) - 1);
-    settings_.obdAdapterPin[sizeof(settings_.obdAdapterPin) - 1] = '\0';
-}
-
 bool ConfigStore::isDirty() const {
     return settings_.shiftLightRpm != savedSettings_.shiftLightRpm ||
            settings_.redlineRpm != savedSettings_.redlineRpm ||
@@ -292,9 +245,7 @@ bool ConfigStore::isDirty() const {
            settings_.useMetricUnits != savedSettings_.useMetricUnits ||
            settings_.useMetricLogs != savedSettings_.useMetricLogs ||
            settings_.screenFlipped != savedSettings_.screenFlipped ||
-           settings_.tickMode != savedSettings_.tickMode ||
-           strcmp(settings_.obdAdapterName, savedSettings_.obdAdapterName) != 0 ||
-           strcmp(settings_.obdAdapterPin, savedSettings_.obdAdapterPin) != 0;
+           settings_.tickMode != savedSettings_.tickMode;
 }
 
 bool ConfigStore::isLogUnitsDirty() const {
@@ -303,11 +254,6 @@ bool ConfigStore::isLogUnitsDirty() const {
 
 bool ConfigStore::isScreenFlipDirty() const {
     return settings_.screenFlipped != savedSettings_.screenFlipped;
-}
-
-bool ConfigStore::isObdCredentialsDirty() const {
-    return strcmp(settings_.obdAdapterName, savedSettings_.obdAdapterName) != 0 ||
-           strcmp(settings_.obdAdapterPin, savedSettings_.obdAdapterPin) != 0;
 }
 
 bool ConfigStore::save() {
@@ -346,8 +292,6 @@ bool ConfigStore::save() {
     file.printf("log_units=%u\n", settings_.useMetricLogs ? 1 : 0);
     file.printf("screen_flip=%u\n", settings_.screenFlipped ? 1 : 0);
     file.printf("tick_mode=%u\n", settings_.tickMode);
-    file.printf("obd_adapter_name=%s\n", settings_.obdAdapterName);
-    file.printf("obd_adapter_pin=%s\n", settings_.obdAdapterPin);
     file.flush();
     file.close();
 

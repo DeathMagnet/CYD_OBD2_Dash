@@ -3,6 +3,3 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
-
-# Machine-specific OBD adapter identity (see src/secrets/local_config.example.h)
-src/secrets/local_config.h

@@ -52,6 +52,37 @@ Vehicle OBD-II Port
                                       12V→5V USB adapter (from OBD port pin 16)
 ```
 
+## OBD-II Adapter Setup
+
+The ELM327 adapter's Bluetooth identity is **not** configured on-device — there's no config page for it. Instead, it's required to be present on the SD card and is read once at boot from a plain-text file. **All three fields are mandatory** — there is no fallback default for any of them:
+
+1. Copy [docs/sd_card_templates/obd_config.example.txt](docs/sd_card_templates/obd_config.example.txt) to the **root of the SD card** and rename it to `obd_config.txt` (the path must be exactly `/obd_config.txt`).
+2. Edit it with your adapter's details — `mac`, `id`, and `password` must all be set:
+   ```
+   mac=AA:BB:CC:DD:EE:FF
+   id=OBDII
+   password=1234
+   ```
+   - `mac` (**required**): your adapter's Bluetooth MAC address (colon-, dash-, or un-separated hex all work). The dashboard always connects by address, never by scanning for a device name, since it's more reliable.
+   - `id` (**required**): the Bluetooth SPP device name, used for identification/logging (common values: `OBDII`, `OBDLink`, `Vgate`, `VEEPEAK`, `OBD2`).
+   - `password` (**required**): the legacy numeric Bluetooth pairing PIN (common values: `1234`, `0000`).
+3. Re-insert the card and power on. **If the file is missing, unreadable, or any of the three fields is blank/invalid, the device shows a red on-screen error ("OBD CONFIG ERROR") and halts boot** — it never reaches the dashboard, touch calibration, or SD logging. Fix the file and reboot.
+
+To change credentials later, re-edit `/obd_config.txt` on the card (on a computer, or in-place) and reboot — there's no live reconnect from the UI.
+
+**Exception**: the `cyd_4inch_sim` bench/demo build (see [Build Environments](#build-environments)) skips this requirement entirely, since it never connects to a real adapter.
+
+### SD Card Contents
+
+The dashboard reads/writes these files at the SD card root:
+
+| File | Purpose |
+| --- | --- |
+| `/obd_config.txt` | OBD-II adapter identity (`mac`/`id`/`password`), read once at boot. See above. |
+| `/config.txt` | Dashboard settings (theme, gauge ranges, units, etc.), written by the Config pages' Save button. |
+| `/touch_cal.dat` | Touch calibration data, written by the calibration routine. |
+| `/obd_log_*.csv` | CSV telemetry logs (one file per session), written when `SD_LOGGING_ENABLED` is set. |
+
 ## Build Environments
 
 | Environment | Purpose |
@@ -209,7 +240,7 @@ Read, interpret, and clear OBD-II Diagnostic Trouble Codes (DTCs):
 - **REFRESH CODES**: Re-read the code list from the adapter immediately.
 - **CLEAR CODES**: Two-tap confirm pattern. First tap arms the button (it highlights in the warning color and changes its label to "TAP TO CONFIRM"); tapping again within 5 seconds sends OBD Mode 04 (clear DTCs) to the adapter. The confirmation times out after 5 seconds if not confirmed.
 
-### Config Group (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER)
+### Config Group (UI, GAUGES, USER VARS, LOGS)
 
 Navigate with the prev/next arrows; cycles within the config group only. All settings persist to `/config.txt` on the SD card and are applied immediately on save (no reboot required unless otherwise noted).
 
@@ -266,14 +297,6 @@ Configuration for SD-card CSV logging and log management.
 
 - **Delete All Logs**: Two-tap confirm button (same pattern as "Clear Codes" on the Diagnostics page). First tap highlights the button in the warning color and changes the label to "TAP TO CONFIRM"; tap again within 5 seconds to actually delete all CSV log files. Confirmation times out after 5 seconds.
 
-#### OBD ADAPTER Page
-
-Configure the Bluetooth adapter identity and pairing credentials.
-
-- **Adapter Name** (tap-to-cycle): `{OBDII, OBDLink, Vgate, VEEPEAK, OBD2}`, default `OBDII`. Selects which Bluetooth device name to search for when pairing.
-- **Adapter PIN** (tap-to-cycle): `{1234, 0000, 1111, 6789}`, default `1234`. The PIN code to use during Bluetooth pairing.
-- **Note**: If a build-time `src/secrets/local_config.h` is present at compile time, its hardcoded adapter credentials always win and on-device UI changes are ignored (the UI still appears to change, but the device uses the local-config values). This is useful for CI/CD builds or pre-configured deployments.
-
 #### Shared Save Button
 
 Appears at the bottom of every config page:
@@ -283,9 +306,7 @@ Appears at the bottom of every config page:
   - **Green**, label "SAVE TO SD": One or more settings differ from `/config.txt`. Tap to commit them.
   - **Default color**, label "SAVED!": Just after you tap Save, the page shows this feedback for 1.5 seconds, then reverts to the clean state.
 
-- **Behavior**: Tapping Save while any setting is dirty (different from `/config.txt`) writes all 19 keys to `/config.txt` in `key=value` format, line by line. If any setting is out of range or invalid (e.g., from a hand-edited config file), it is silently clamped to the valid range before saving—an out-of-range value can never persist.
-
-- **For OBD Adapter credentials**: Saving new credentials triggers an immediate Bluetooth reconnection attempt in the background; no device reboot is needed.
+- **Behavior**: Tapping Save while any setting is dirty (different from `/config.txt`) writes all 17 keys to `/config.txt` in `key=value` format, line by line. If any setting is out of range or invalid (e.g., from a hand-edited config file), it is silently clamped to the valid range before saving—an out-of-range value can never persist.
 
 - **For Flip Screen**: Saving while this setting is dirty deletes the saved touch calibration and restarts the device so the new orientation and a fresh touch calibration both take effect together.
 

@@ -138,8 +138,6 @@ src/
   main.cpp
   app_config.h
   labels.h                   # Centralized UI label/status/button strings (namespace labels)
-  secrets/
-    local_config.example.h   # Optional: copy to local_config.h (gitignored) to override adapter name/PIN at compile time (takes priority over the Config: OBD ADAPTER page if present)
   display/
     display_manager.h/.cpp   # TFT init, backlight, boot image (pre-existing)
     theme.h/.cpp             # ThemeColors + getTheme() - S197, Neon, and Modern Flat all implemented
@@ -152,6 +150,7 @@ src/
   obd/
     telemetry.h              # TelemetryValue / TelemetrySnapshot (header only)
     obd_pids.h/.cpp          # PID table, decode formulas, response-line parser
+    obd_credentials.h/.cpp   # Loads mac/id/password from /obd_config.txt on SD at boot
     obd_client.h/.cpp        # ELM327 Bluetooth client (see below)
     obd_simulator.h/.cpp     # Scripted drive-cycle generator (OBD_SIMULATION_ENABLED builds only)
   logging/
@@ -274,7 +273,7 @@ This split design keeps OBD decode logic simple (no dual-path conversions) while
 
 Treat the snapshot as the renderer and logger boundary. The OBD client updates it only after parsing a response; the renderer must not perform Bluetooth I/O. Poll high-priority values such as RPM and speed more frequently than secondary PIDs, while avoiding adapter overload. Start with measured refresh behavior and tune using serial timing data rather than hard-coded optimistic intervals.
 
-**As built**, `ObdClient` polls the full set of standard Mode 01 PIDs a 2006 Mustang GT (4.6L 3V) exposes over generic OBD-II — RPM and speed every cycle, plus one of the remaining 16 PIDs round-robined per cycle (monitor status/MIL+DTC count, engine load, coolant, STFT/LTFT bank 1, MAP, timing advance, IAT, MAF, throttle, O2 B1S1/B2S1, fuel rail pressure, fuel level, barometric pressure, and control module voltage — see `src/obd/obd_pids.cpp` for the exact PID bytes and decode formulas). Mode 03/07 (DTC read) and Mode 04 (clear codes) are issued on demand from the Diagnostics page, not on the polling cycle. The adapter's Bluetooth SPP device name and legacy PIN default to `"OBDII"`/`"1234"` (`config::kObdDefaultAdapterName/Pin`). Most users configure these at runtime via the Config: OBD ADAPTER page, where they can pick from preset lists (OBDII/OBDLink/Vgate/VEEPEAK/OBD2 and 1234/0000/1111/6789) and save to persist and reconnect immediately with no reboot. For adapters outside these presets, override the defaults per-device by copying `src/secrets/local_config.example.h` to `src/secrets/local_config.h` (gitignored); this compile-time override always takes priority over the Config page.
+**As built**, `ObdClient` polls the full set of standard Mode 01 PIDs a 2006 Mustang GT (4.6L 3V) exposes over generic OBD-II — RPM and speed every cycle, plus one of the remaining 16 PIDs round-robined per cycle (monitor status/MIL+DTC count, engine load, coolant, STFT/LTFT bank 1, MAP, timing advance, IAT, MAF, throttle, O2 B1S1/B2S1, fuel rail pressure, fuel level, barometric pressure, and control module voltage — see `src/obd/obd_pids.cpp` for the exact PID bytes and decode formulas). Mode 03/07 (DTC read) and Mode 04 (clear codes) are issued on demand from the Diagnostics page, not on the polling cycle. The adapter's identity is not configured on-device — there is no config page for it. Instead, `loadObdCredentials()` (`src/obd/obd_credentials.h/.cpp`) reads `mac`/`id`/`password` from `/obd_config.txt` on the SD card once at boot (see `docs/sd_card_templates/obd_config.example.txt` for the install-time template). **All three fields are mandatory — there is no fallback default.** `main.cpp` calls `loadObdCredentials()` immediately after display init (before the boot animation, touch calibration, or SD logging start) and, if it returns `false` (SD not mounted, file missing/unreadable, or any of `mac`/`id`/`password` blank or invalid), calls `DisplayManager::showFatalError()` to show a red "OBD CONFIG ERROR" screen and then halts in an infinite `delay()` loop — `loop()` is never entered, and `ObdClient::begin()` is never called. This mandatory check is skipped only for `OBD_SIMULATION_ENABLED` builds (`cyd_4inch_sim`), which never use these credentials. When credentials load successfully, `ObdClient::taskLoop()` connects by MAC address (`BluetoothSerial::connect(uint8_t[6])`) — `mac` is guaranteed present at that point, so the device-name (`id`) connect path only remains as defensive fallback code.
 
 **Units feature** (added post-spec): Both the UI and CSV logging support independent metric/standard toggles. Display units are configured on the UI config page and affect how speed, temperature, and pressure are rendered on all dashboard pages and stepper increments on config pages. CSV logging units are configured independently on the LOGS config page; changing this setting deletes all existing log files to prevent unit-mixed rows. See `src/system/units.h` for the conversion helper library and the UI & SD Logging guides for detailed mode documentation.
 
@@ -344,7 +343,7 @@ Logging rules:
 
 ## Configuration and Secrets
 
-Place user-adjustable values in `app_config.h`, including default Bluetooth adapter identity or pairing configuration, units, gauge ranges, warning thresholds, display/log intervals, and boot mode defaults. The adapter name and PIN are also runtime-configurable via the Config: OBD ADAPTER page, where they persist to `/config.txt` through `ConfigStore` (most common use case), or via the compile-time `src/secrets/local_config.h` override for adapters outside the page's preset lists (takes priority when present). Centralize on-screen display text (labels, units, button/status strings, page titles) in `src/labels.h` (`namespace labels`) to keep rendered content audit-able and localization-ready. Do not hardcode personal adapter addresses, PINs, Wi-Fi credentials, or tokens in tracked source. Provide an ignored local configuration header or documented build flags for sensitive machine-specific settings.
+Place user-adjustable values in `app_config.h`, including units, gauge ranges, warning thresholds, display/log intervals, and boot mode defaults. The adapter's mac/id/password are **not** among these and have no default in `app_config.h`: they're mandatory install-time values read once at boot from `/obd_config.txt` on the SD card (`loadObdCredentials()`, `src/obd/obd_credentials.h/.cpp`). A missing, unreadable, or incomplete file is fatal — the device shows an on-screen error and halts before `loop()` ever runs (see the OBD-II Integration section above), rather than falling back to any built-in default. Centralize on-screen display text (labels, units, button/status strings, page titles) in `src/labels.h` (`namespace labels`) to keep rendered content audit-able and localization-ready. Do not hardcode personal adapter addresses, PINs, Wi-Fi credentials, or tokens in tracked source. Provide an ignored local configuration header or documented build flags for sensitive machine-specific settings.
 
 ## Implementation Sequence
 
@@ -369,10 +368,11 @@ Run these checks as implementation progresses:
 - Connect to a known ELM327 adapter and confirm RPM, speed, and at least one secondary PID update.
 - Turn off the adapter or leave vehicle range; verify that the UI becomes stale/disconnected without freezing or reporting false zero values.
 - Test an ECU/PID failure and verify only the affected field is invalid.
-- Insert an SD card, confirm a new CSV has one header and parseable rows, then inspect it on a host machine.
-- Repeat without an SD card and confirm the dashboard stays functional while reporting logging unavailable.
+- Insert an SD card **with a valid `/obd_config.txt`**, confirm a new CSV has one header and parseable rows, then inspect it on a host machine. (Note: unlike CSV logging itself, `/obd_config.txt` is mandatory on `cyd_4inch` — an SD-card-missing test below will halt on the OBD config error screen before reaching the logging path, which is expected.)
 - Observe display rendering and Bluetooth recovery for an extended bench session; confirm no uncontrolled memory growth, watchdog resets, or UI stalls.
-- On the Config: OBD ADAPTER page, tap-cycle the Adapter Name and PIN rows through their presets, then tap Save and confirm the status badge drops to CONNECTING and re-establishes LIVE (live reconnect with new credentials, no reboot).
+- With no SD card, or no `/obd_config.txt` on it, confirm `cyd_4inch` shows the red "OBD CONFIG ERROR" screen immediately after display init and halts (serial log shows the fatal message; `loop()` never runs). Confirm `cyd_4inch_sim` boots normally in the same scenario, since it skips this check.
+- Create `/obd_config.txt` missing one of `mac=`/`id=`/`password=` (or with a malformed `mac=`) and confirm the same halt/error behavior.
+- Create a fully valid `/obd_config.txt` (`mac=`/`id=`/`password=` all set) and confirm the serial log shows a MAC-address connect attempt and the status badge reaches LIVE.
 - On the Config: UI page, toggle Flip Screen and tap Save; confirm the device restarts, re-runs touch calibration automatically, and boots with the display and boot logo rotated 180° with taps landing correctly afterward. Toggle back and confirm it returns to normal, and that the setting survives a full power cycle either way.
 - On the Config: UI page, tap the Touch Calibration button twice (arm, then confirm) and verify the device restarts and re-runs the 4-corner calibration routine immediately, without needing a Save tap; confirm touch accuracy afterward.
 
@@ -384,6 +384,7 @@ This is an informational dashboard, not a vehicle control system. It must not tr
 
 - [CYD OBD-II UI Cluster Guide](cyd-obd2-ui-cluster-guide.md)
 - [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md)
+- [OBD adapter credentials file template](sd_card_templates/obd_config.example.txt)
 - [ESP32 Arduino Coding Standards](esp32-arduino-coding-standards.md)
 - [PlatformIO configuration](../platformio.ini)
 - [Project overview](../README.md)

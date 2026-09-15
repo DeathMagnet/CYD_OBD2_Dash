@@ -5,13 +5,6 @@
 
 #if !OBD_SIMULATION_ENABLED
 
-#if __has_include("secrets/local_config.h")
-#include "secrets/local_config.h"
-#define OBD_LOCAL_CONFIG_AVAILABLE 1
-#else
-#define OBD_LOCAL_CONFIG_AVAILABLE 0
-#endif
-
 namespace {
 
 // Secondary PIDs are round-robined one-per-cycle behind the always-polled
@@ -39,7 +32,7 @@ void decodeAllLinesForDtc(char* mutableBuffer, uint8_t modeAckByte, DtcList& out
 
 #endif // !OBD_SIMULATION_ENABLED
 
-bool ObdClient::begin(const char* adapterName, const char* adapterPin) {
+bool ObdClient::begin(const ObdCredentials& credentials) {
     mutex_ = xSemaphoreCreateMutex();
     if (mutex_ == nullptr) {
         Serial.println("[OBD] Failed to create mutex; OBD disabled.");
@@ -48,15 +41,16 @@ bool ObdClient::begin(const char* adapterName, const char* adapterPin) {
 
 #if !OBD_SIMULATION_ENABLED
     // Safe without locking: the task hasn't been created yet, so there's no
-    // concurrent reader of adapterName_/adapterPin_ until xTaskCreatePinnedToCore
-    // below returns.
-    strncpy(adapterName_, adapterName, sizeof(adapterName_) - 1);
+    // concurrent reader of adapterName_/adapterPin_/adapterMac_ until
+    // xTaskCreatePinnedToCore below returns.
+    strncpy(adapterName_, credentials.id, sizeof(adapterName_) - 1);
     adapterName_[sizeof(adapterName_) - 1] = '\0';
-    strncpy(adapterPin_, adapterPin, sizeof(adapterPin_) - 1);
+    strncpy(adapterPin_, credentials.password, sizeof(adapterPin_) - 1);
     adapterPin_[sizeof(adapterPin_) - 1] = '\0';
+    hasAdapterMac_ = credentials.hasMac;
+    memcpy(adapterMac_, credentials.mac, sizeof(adapterMac_));
 #else
-    (void)adapterName;
-    (void)adapterPin;
+    (void)credentials;
 #endif
 
     BaseType_t created = xTaskCreatePinnedToCore(
@@ -283,24 +277,6 @@ void ObdClient::performClearCodes() {
     dtcResultReady_.store(false); // Force a fresh read next time Page 5 asks.
 }
 
-void ObdClient::updateAdapterCredentials(const char* adapterName, const char* adapterPin) {
-#if OBD_LOCAL_CONFIG_AVAILABLE
-    // secrets/local_config.h always wins; a live UI change has nothing to apply.
-    (void)adapterName;
-    (void)adapterPin;
-    return;
-#else
-    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
-        strncpy(pendingAdapterName_, adapterName, sizeof(pendingAdapterName_) - 1);
-        pendingAdapterName_[sizeof(pendingAdapterName_) - 1] = '\0';
-        strncpy(pendingAdapterPin_, adapterPin, sizeof(pendingAdapterPin_) - 1);
-        pendingAdapterPin_[sizeof(pendingAdapterPin_) - 1] = '\0';
-        xSemaphoreGive(mutex_);
-    }
-    credentialsChanged_.store(true);
-#endif
-}
-
 #endif // !OBD_SIMULATION_ENABLED
 
 void ObdClient::getSnapshot(TelemetrySnapshot& out) const {
@@ -318,12 +294,6 @@ void ObdClient::getDtcList(DtcList& out) const {
 }
 
 #if OBD_SIMULATION_ENABLED
-
-void ObdClient::updateAdapterCredentials(const char* adapterName, const char* adapterPin) {
-    // The simulator doesn't pair over real Bluetooth; nothing to apply.
-    (void)adapterName;
-    (void)adapterPin;
-}
 
 void ObdClient::runSimulationBlip() {
     // Holds the last snapshot untouched long enough for main.cpp to derive STALE,
@@ -406,17 +376,8 @@ void ObdClient::simulationLoop() {
 #else
 
 void ObdClient::taskLoop() {
-#if OBD_LOCAL_CONFIG_AVAILABLE
-    // secrets/local_config.h always wins over whatever ConfigStore passed to
-    // begin(), so adapterName_/adapterPin_ (and any later updateAdapterCredentials()
-    // call, which no-ops in this build) are irrelevant here.
-    strncpy(adapterName_, localconfig::kObdAdapterName, sizeof(adapterName_) - 1);
-    adapterName_[sizeof(adapterName_) - 1] = '\0';
-    strncpy(adapterPin_, localconfig::kObdAdapterPin, sizeof(adapterPin_) - 1);
-    adapterPin_[sizeof(adapterPin_) - 1] = '\0';
-#endif
-    // Without a local_config.h override, adapterName_/adapterPin_ already hold
-    // what begin() was given (the persisted ConfigStore values).
+    // adapterName_/adapterPin_/adapterMac_ already hold what begin() was
+    // given (the validated /obd_config.txt values).
 
     btSerial_.begin("CYD_OBD_Dash", true); // Local device name; master role.
     btSerial_.setPin(adapterPin_);
@@ -424,33 +385,20 @@ void ObdClient::taskLoop() {
     bool initialized = false;
 
     for (;;) {
-#if !OBD_LOCAL_CONFIG_AVAILABLE
-        if (credentialsChanged_.exchange(false)) {
-            if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
-                strncpy(adapterName_, pendingAdapterName_, sizeof(adapterName_) - 1);
-                adapterName_[sizeof(adapterName_) - 1] = '\0';
-                strncpy(adapterPin_, pendingAdapterPin_, sizeof(adapterPin_) - 1);
-                adapterPin_[sizeof(adapterPin_) - 1] = '\0';
-                xSemaphoreGive(mutex_);
-            }
-            Serial.printf("[OBD] Adapter credentials updated to '%s'; reconnecting.\n", adapterName_);
-            if (btSerial_.connected()) {
-                btSerial_.disconnect();
-            }
-            btSerial_.setPin(adapterPin_);
-            initialized = false;
-            reconnectBackoffMs_ = 0;
-            connectionState_.store(ConnectionState::ObdConnecting);
-        }
-#endif
-
         if (!btSerial_.connected()) {
             initialized = false;
             connectionState_.store(ConnectionState::ObdConnecting);
             setSnapshotConnected(false);
 
-            Serial.printf("[OBD] Connecting to '%s'...\n", adapterName_);
-            if (!btSerial_.connect(String(adapterName_))) {
+            bool connected;
+            if (hasAdapterMac_) {
+                Serial.println("[OBD] Connecting by MAC address...");
+                connected = btSerial_.connect(adapterMac_);
+            } else {
+                Serial.printf("[OBD] Connecting to '%s'...\n", adapterName_);
+                connected = btSerial_.connect(String(adapterName_));
+            }
+            if (!connected) {
                 Serial.println("[OBD] Connect failed; backing off.");
                 connectionState_.store(ConnectionState::Reconnecting);
                 reconnectBackoffMs_ = (reconnectBackoffMs_ == 0)

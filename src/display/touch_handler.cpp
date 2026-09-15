@@ -31,7 +31,6 @@ bool ClusterTouchHandler::handleTap(uint16_t x, uint16_t y, uint32_t nowMs) {
         case ClusterPage::ConfigGauges: return handleConfigGaugesTap(x, y, nowMs);
         case ClusterPage::ConfigUserVars: return handleConfigUserVarsTap(x, y, nowMs);
         case ClusterPage::ConfigLogs: return handleConfigLogsTap(x, y, nowMs);
-        case ClusterPage::ConfigObd: return handleConfigObdTap(x, y, nowMs);
         case ClusterPage::Diagnostics: return handleDiagnosticsTap(x, y, nowMs);
         case ClusterPage::PerformanceTelemetry: return handlePerformanceTap(x, y);
         default: return false;
@@ -374,43 +373,6 @@ bool ClusterTouchHandler::handleConfigLogsTap(uint16_t x, uint16_t y, uint32_t n
     return false;
 }
 
-bool ClusterTouchHandler::handleConfigObdTap(uint16_t x, uint16_t y, uint32_t nowMs) {
-    (void)nowMs;
-    const AppSettings& settings = configStore_.settings();
-
-    int32_t row0 = layout::kConfigRow0Y + layout::kConfigButtonInsetY;
-    int32_t row0End = row0 + layout::kConfigButtonH;
-    if (within(x, y, layout::kConfigCycleX, row0, layout::kConfigCycleX + layout::kConfigCycleW, row0End)) {
-        size_t idx = 0;
-        for (size_t i = 0; i < config::kObdAdapterNameOptionCount; ++i) {
-            if (strcmp(config::kObdAdapterNameOptions[i], settings.obdAdapterName) == 0) {
-                idx = i;
-                break;
-            }
-        }
-        idx = (idx + 1) % config::kObdAdapterNameOptionCount;
-        configStore_.setObdAdapterName(config::kObdAdapterNameOptions[idx]);
-        return false;
-    }
-
-    int32_t row1 = layout::kConfigRow1Y + layout::kConfigButtonInsetY;
-    int32_t row1End = row1 + layout::kConfigButtonH;
-    if (within(x, y, layout::kConfigCycleX, row1, layout::kConfigCycleX + layout::kConfigCycleW, row1End)) {
-        size_t idx = 0;
-        for (size_t i = 0; i < config::kObdAdapterPinOptionCount; ++i) {
-            if (strcmp(config::kObdAdapterPinOptions[i], settings.obdAdapterPin) == 0) {
-                idx = i;
-                break;
-            }
-        }
-        idx = (idx + 1) % config::kObdAdapterPinOptionCount;
-        configStore_.setObdAdapterPin(config::kObdAdapterPinOptions[idx]);
-        return false;
-    }
-
-    return false;
-}
-
 bool ClusterTouchHandler::handleConfigFooterTap(uint16_t x, uint16_t y, uint32_t nowMs) {
     ClusterPageRuntimeState& state = clusterPages_.runtimeState();
 
@@ -419,7 +381,6 @@ bool ClusterTouchHandler::handleConfigFooterTap(uint16_t x, uint16_t y, uint32_t
     if (within(x, y, layout::kConfigSaveX, footerY, layout::kConfigSaveX + layout::kConfigSaveW, footerYEnd)) {
         bool logUnitsChanged = configStore_.isLogUnitsDirty();
         bool newMetricLogs = configStore_.settings().useMetricLogs;
-        bool credentialsChanged = configStore_.isObdCredentialsDirty();
         bool screenFlipChanged = configStore_.isScreenFlipDirty();
 
         configStore_.save();
@@ -428,11 +389,6 @@ bool ClusterTouchHandler::handleConfigFooterTap(uint16_t x, uint16_t y, uint32_t
             csvLogger_.setUnitsMetric(newMetricLogs);
             csvLogger_.deleteAllLogs();
             state.cfgLogSummaryNextScanMs = 0; // force the LOGS/MB summary to rescan and show the wipe immediately
-        }
-
-        if (credentialsChanged) {
-            obdClient_.updateAdapterCredentials(configStore_.settings().obdAdapterName,
-                                                 configStore_.settings().obdAdapterPin);
         }
 
         if (screenFlipChanged) {

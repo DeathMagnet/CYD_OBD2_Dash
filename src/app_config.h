@@ -39,21 +39,10 @@ constexpr uint32_t kTouchPollIntervalMs = 20;
 constexpr uint16_t kTouchPressureThreshold = 200;
 
 // ---- OBD-II / ELM327 Bluetooth Configuration ----
-// Adapter identity defaults; override per-device via src/secrets/local_config.h
-// (see src/secrets/local_config.example.h) rather than editing these. On-device,
-// the Config: OBD Adapter page lets a user pick from the preset lists below
-// instead, persisted via ConfigStore; local_config.h still always wins if present.
-constexpr const char* kObdDefaultAdapterName = "OBDII";
-constexpr const char* kObdDefaultAdapterPin = "1234";
-
-// Adapter name/PIN presets offered by the Config: OBD Adapter page's
-// tap-to-cycle rows (same interaction as the Logs page's log interval field).
-// kObdDefaultAdapterName/kObdDefaultAdapterPin above must equal options[0].
-constexpr const char* kObdAdapterNameOptions[] = {"OBDII", "OBDLink", "Vgate", "VEEPEAK", "OBD2"};
-constexpr size_t kObdAdapterNameOptionCount = 5;
-constexpr const char* kObdAdapterPinOptions[] = {"1234", "0000", "1111", "6789"};
-constexpr size_t kObdAdapterPinOptionCount = 4;
-
+// Adapter identity (mac/id/password) is mandatory and comes entirely from
+// /obd_config.txt on the SD card - see kObdConfigFilePath below and
+// src/obd/obd_credentials.h. There is no fallback default: a missing or
+// incomplete file halts boot with an on-screen error (see main.cpp).
 constexpr uint32_t kObdResetCommandTimeoutMs = 3000;   // ATZ reset needs extra settle time
 constexpr uint32_t kObdCommandTimeoutMs = 1000;        // Normal AT/PID command timeout
 constexpr uint32_t kObdReconnectBackoffMs = 3000;
@@ -199,5 +188,8 @@ constexpr uint32_t kUiRefreshIntervalMs = 100; // Throttled dynamic-region redra
 
 // ---- Persisted Config File ----
 constexpr const char* kConfigFilePath = "/config.txt";
+
+// ---- OBD-II Adapter Credentials File (see src/obd/obd_credentials.h) ----
+constexpr const char* kObdConfigFilePath = "/obd_config.txt";
 
 } // namespace config
