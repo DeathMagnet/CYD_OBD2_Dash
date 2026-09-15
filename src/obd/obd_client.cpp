@@ -1,7 +1,10 @@
 #include "obd/obd_client.h"
 #include <Arduino.h>
 #include <string.h>
+#include <cstdarg>
 #include "app_config.h"
+#include "storage/sd_manager.h"
+#include "logging/connection_logger.h"
 
 #if !OBD_SIMULATION_ENABLED
 
@@ -19,6 +22,14 @@ constexpr ObdPid kSecondaryPids[] = {
 };
 constexpr size_t kSecondaryPidCount = sizeof(kSecondaryPids) / sizeof(kSecondaryPids[0]);
 
+void sanitizeForLog(const char* src, char* out, size_t outCapacity) {
+    size_t n = 0;
+    for (const char* p = src; *p != '\0' && n < outCapacity - 1; ++p) {
+        out[n++] = (*p == '\r' || *p == '\n') ? ' ' : *p;
+    }
+    out[n] = '\0';
+}
+
 void decodeAllLinesForDtc(char* mutableBuffer, uint8_t modeAckByte, DtcList& out) {
     char* savePtr = nullptr;
     char* line = strtok_r(mutableBuffer, "\r\n", &savePtr);
@@ -32,7 +43,7 @@ void decodeAllLinesForDtc(char* mutableBuffer, uint8_t modeAckByte, DtcList& out
 
 #endif // !OBD_SIMULATION_ENABLED
 
-bool ObdClient::begin(const ObdCredentials& credentials) {
+bool ObdClient::begin(const ObdCredentials& credentials, SdManager& sdManager) {
     mutex_ = xSemaphoreCreateMutex();
     if (mutex_ == nullptr) {
         Serial.println("[OBD] Failed to create mutex; OBD disabled.");
@@ -49,8 +60,10 @@ bool ObdClient::begin(const ObdCredentials& credentials) {
     adapterPin_[sizeof(adapterPin_) - 1] = '\0';
     hasAdapterMac_ = credentials.hasMac;
     memcpy(adapterMac_, credentials.mac, sizeof(adapterMac_));
+    sdManager_ = &sdManager;
 #else
     (void)credentials;
+    (void)sdManager;
 #endif
 
     BaseType_t created = xTaskCreatePinnedToCore(
@@ -135,38 +148,75 @@ bool ObdClient::runInitSequence() {
         {"ATE0", config::kObdCommandTimeoutMs},
         {"ATL0", config::kObdCommandTimeoutMs},
         {"ATH0", config::kObdCommandTimeoutMs},
-        {"ATSP0", config::kObdCommandTimeoutMs},
     };
 
     char response[64];
     for (const InitCommand& initCommand : initCommands) {
         if (!sendCommand(initCommand.command, response, sizeof(response), initCommand.timeoutMs)) {
             Serial.printf("[OBD] Init command '%s' timed out.\n", initCommand.command);
+            logStatus("Init command '%s' timed out", initCommand.command);
             return false;
         }
     }
 
-    // Confirm the ECU actually answers mode 01 before declaring Live.
-    if (!sendCommand("0100", response, sizeof(response), config::kObdCommandTimeoutMs)) {
-        Serial.println("[OBD] ECU did not respond to PID-support probe (0100).");
-        return false;
-    }
+    // Cheap ELM327 clones frequently mishandle ATSP0 automatic protocol
+    // detection (some just reply "OK" to the 0100 probe instead of running
+    // a real search or reporting NO DATA/UNABLE TO CONNECT). Try auto first,
+    // then fall back to explicit ISO 15765-4 CAN variants, which cover the
+    // overwhelming majority of 2008+ vehicles.
+    struct ProtocolCandidate {
+        const char* atCommand;
+        uint8_t id;
+    };
+    const ProtocolCandidate protocols[] = {
+        {"ATSP0", 0}, // Automatic
+        {"ATSP6", 6}, // ISO 15765-4 CAN, 11-bit ID, 500 kbps
+        {"ATSP7", 7}, // ISO 15765-4 CAN, 29-bit ID, 500 kbps
+        {"ATSP8", 8}, // ISO 15765-4 CAN, 11-bit ID, 250 kbps
+        {"ATSP9", 9}, // ISO 15765-4 CAN, 29-bit ID, 250 kbps
+    };
 
+    char lastRaw[32] = {0};
     uint8_t data[8];
     uint8_t dataLen = 0;
-    char lineBuf[64];
-    strncpy(lineBuf, response, sizeof(lineBuf) - 1);
-    lineBuf[sizeof(lineBuf) - 1] = '\0';
-    char* savePtr = nullptr;
-    char* line = strtok_r(lineBuf, "\r\n", &savePtr);
-    while (line != nullptr) {
-        if (parseObdResponseLine(line, 0x00, data, sizeof(data), dataLen)) {
+
+    for (const ProtocolCandidate& proto : protocols) {
+        if (!sendCommand(proto.atCommand, response, sizeof(response), config::kObdCommandTimeoutMs)) {
+            Serial.printf("[OBD] Protocol %u: '%s' timed out.\n", proto.id, proto.atCommand);
+            continue;
+        }
+
+        if (!sendCommand("0100", response, sizeof(response), config::kObdProbeCommandTimeoutMs)) {
+            sanitizeForLog(response, lastRaw, sizeof(lastRaw));
+            Serial.printf("[OBD] Protocol %u: no response to 0100 probe. Partial: \"%s\"\n", proto.id, lastRaw);
+            continue;
+        }
+
+        char lineBuf[64];
+        strncpy(lineBuf, response, sizeof(lineBuf) - 1);
+        lineBuf[sizeof(lineBuf) - 1] = '\0';
+        char* savePtr = nullptr;
+        char* line = strtok_r(lineBuf, "\r\n", &savePtr);
+        bool acked = false;
+        while (line != nullptr) {
+            if (parseObdResponseLine(line, 0x00, data, sizeof(data), dataLen)) {
+                acked = true;
+                break;
+            }
+            line = strtok_r(nullptr, "\r\n", &savePtr);
+        }
+
+        if (acked) {
+            Serial.printf("[OBD] ELM327 locked protocol %u.\n", proto.id);
             return true;
         }
-        line = strtok_r(nullptr, "\r\n", &savePtr);
+
+        sanitizeForLog(response, lastRaw, sizeof(lastRaw));
+        Serial.printf("[OBD] Protocol %u: no valid mode 01 ack. Raw: \"%s\"\n", proto.id, lastRaw);
     }
 
-    Serial.println("[OBD] PID-support probe returned no valid mode 01 ack.");
+    Serial.printf("[OBD] All protocol attempts failed. Last raw: \"%s\"\n", lastRaw);
+    logStatus(lastRaw[0] != '\0' ? "All protocols failed; last: %s" : "All protocols failed; no response", lastRaw);
     return false;
 }
 
@@ -286,6 +336,16 @@ void ObdClient::getSnapshot(TelemetrySnapshot& out) const {
     }
 }
 
+void ObdClient::getLastStatusMessage(char* out, size_t capacity) const {
+    if (capacity == 0) return;
+    out[0] = '\0';
+    if (mutex_ != nullptr && xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
+        strncpy(out, lastStatusMessage_, capacity - 1);
+        out[capacity - 1] = '\0';
+        xSemaphoreGive(mutex_);
+    }
+}
+
 void ObdClient::getDtcList(DtcList& out) const {
     if (mutex_ != nullptr && xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
         out = dtcResult_;
@@ -375,6 +435,23 @@ void ObdClient::simulationLoop() {
 
 #else
 
+void ObdClient::logStatus(const char* fmt, ...) {
+    char buffer[64];
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(buffer, sizeof(buffer) - 1, fmt, args);
+    va_end(args);
+    if (len > 0) {
+        buffer[len] = '\0';
+        connection_log::write(*sdManager_, buffer);
+        if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(50)) == pdTRUE) {
+            strncpy(lastStatusMessage_, buffer, sizeof(lastStatusMessage_) - 1);
+            lastStatusMessage_[sizeof(lastStatusMessage_) - 1] = '\0';
+            xSemaphoreGive(mutex_);
+        }
+    }
+}
+
 void ObdClient::taskLoop() {
     // adapterName_/adapterPin_/adapterMac_ already hold what begin() was
     // given (the validated /obd_config.txt values).
@@ -393,13 +470,19 @@ void ObdClient::taskLoop() {
             bool connected;
             if (hasAdapterMac_) {
                 Serial.println("[OBD] Connecting by MAC address...");
+                logStatus("Connecting by MAC %02X:%02X:%02X:%02X:%02X:%02X",
+                          adapterMac_[0], adapterMac_[1], adapterMac_[2],
+                          adapterMac_[3], adapterMac_[4], adapterMac_[5]);
                 connected = btSerial_.connect(adapterMac_);
             } else {
                 Serial.printf("[OBD] Connecting to '%s'...\n", adapterName_);
+                logStatus("Connecting to '%s'", adapterName_);
                 connected = btSerial_.connect(String(adapterName_));
             }
             if (!connected) {
                 Serial.println("[OBD] Connect failed; backing off.");
+                logStatus("Connect failed; backing off %ums",
+                          reconnectBackoffMs_ == 0 ? config::kObdReconnectBackoffMs : reconnectBackoffMs_);
                 connectionState_.store(ConnectionState::Reconnecting);
                 reconnectBackoffMs_ = (reconnectBackoffMs_ == 0)
                     ? config::kObdReconnectBackoffMs
@@ -412,6 +495,7 @@ void ObdClient::taskLoop() {
             }
             reconnectBackoffMs_ = 0;
             Serial.println("[OBD] Bluetooth link established.");
+            logStatus("Bluetooth link established");
         }
 
         if (!initialized) {
@@ -427,6 +511,7 @@ void ObdClient::taskLoop() {
             consecutiveFailures_ = 0;
             connectionState_.store(ConnectionState::Live);
             Serial.println("[OBD] ELM327 initialized; polling PIDs.");
+            logStatus("ELM327 initialized; polling PIDs");
         }
 
         uint32_t nowMs = millis();
@@ -448,6 +533,7 @@ void ObdClient::taskLoop() {
 
         if (consecutiveFailures_ >= config::kObdConsecutiveFailuresForDisconnect) {
             Serial.println("[OBD] Too many consecutive failures; forcing reconnect.");
+            logStatus("Too many consecutive failures; forcing reconnect");
             btSerial_.disconnect();
             initialized = false;
             connectionState_.store(ConnectionState::Reconnecting);

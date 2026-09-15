@@ -1,11 +1,19 @@
 #include "storage/sd_manager.h"
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 SdManager::SdManager()
     : sdSpiBus_(VSPI) {
 }
 
 bool SdManager::begin() {
+    sdMutex_ = xSemaphoreCreateMutex();
+    if (sdMutex_ == nullptr) {
+        Serial.println("[SD] Failed to create SD mutex.");
+        return false;
+    }
+
     Serial.println("[SD] Initializing VSPI bus for SD card...");
     sdSpiBus_.begin(config::kSdSpiClkPin, config::kSdSpiMisoPin, config::kSdSpiMosiPin, config::kSdSpiCsPin);
 
@@ -26,6 +34,18 @@ bool SdManager::begin() {
     Serial.printf("[SD] Card mounted successfully. Size: %llu MB\n", cardSizeMb);
     isMounted_ = true;
     return true;
+}
+
+void SdManager::lock() const {
+    if (sdMutex_ != nullptr) {
+        xSemaphoreTake(sdMutex_, portMAX_DELAY);
+    }
+}
+
+void SdManager::unlock() const {
+    if (sdMutex_ != nullptr) {
+        xSemaphoreGive(sdMutex_);
+    }
 }
 
 bool SdManager::loadTouchCalibration(uint16_t calData[config::kTouchCalDataSize]) {

@@ -47,7 +47,7 @@ public:
     // Starts the background task. Call once from setup(), with the adapter
     // identity loaded from /obd_config.txt (see obd/obd_credentials.h;
     // ignored in simulation builds).
-    bool begin(const ObdCredentials& credentials);
+    bool begin(const ObdCredentials& credentials, SdManager& sdManager);
 
     // Thread-safe copy of the latest telemetry snapshot.
     void getSnapshot(TelemetrySnapshot& out) const;
@@ -55,6 +55,10 @@ public:
     // Transport state for the status badge. Only ever ObdConnecting,
     // Reconnecting, or Live; main.cpp derives Stale/Degraded/Boot itself.
     ConnectionState getConnectionState() const { return connectionState_.load(); }
+
+    // Thread-safe copy of the latest connection status message (e.g. "Connecting by MAC...", "Bluetooth link established").
+    // Returns an empty string if no message has been set yet (e.g. simulation builds, or before first connection event).
+    void getLastStatusMessage(char* out, size_t capacity) const;
 
     // Queues an on-demand Mode 03 + Mode 07 DTC read (Page 5). Safe to call
     // repeatedly; the background task clears the request once it runs it.
@@ -80,6 +84,7 @@ private:
     ObdSimulator simulator_;
 #else
     void taskLoop();
+    void logStatus(const char* fmt, ...);
 
     bool runInitSequence();
     bool sendCommand(const char* command, char* responseOut, size_t responseCapacity, uint32_t timeoutMs);
@@ -95,6 +100,7 @@ private:
     char adapterPin_[9] = {0};
     uint8_t adapterMac_[6] = {0};
     bool hasAdapterMac_ = false;
+    SdManager* sdManager_ = nullptr;
 #endif
 
     SemaphoreHandle_t mutex_ = nullptr;
@@ -102,6 +108,7 @@ private:
 
     TelemetrySnapshot snapshot_; // Guarded by mutex_
     DtcList dtcResult_;          // Guarded by mutex_
+    char lastStatusMessage_[64] = {0}; // Guarded by mutex_; connection status text for boot screen display
 
     std::atomic<ConnectionState> connectionState_{ConnectionState::ObdConnecting};
     std::atomic<bool> dtcReadRequested_{false};
