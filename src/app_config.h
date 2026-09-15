@@ -165,7 +165,8 @@ constexpr uint8_t kDefaultTickMode = 3; // TickMode::InsideAndOutside (display/t
 constexpr uint8_t kDefaultThemeId = 0; // ThemeId::S197 (display/theme.h)
 
 // ---- SD CSV Telemetry Logging ----
-constexpr const char* kLogFilePrefix = "/obd_log_";
+constexpr const char* kLogDirPath = "/logs";
+constexpr const char* kLogFilePrefix = "/logs/obd_log_";
 constexpr const char* kLogFileSuffix = ".csv";
 constexpr uint8_t kLogFileIndexDigits = 3;
 constexpr const char* kSessionIndexNamespace = "obd_dash";

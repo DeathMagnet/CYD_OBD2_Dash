@@ -41,7 +41,7 @@ public:
     bool isLoggingActive() const { return loggingActive_; }
     const char* currentFilePath() const { return currentFilePath_; }
 
-    // Scans the SD root for all session log files.
+    // Scans the SD /logs folder for all session log files.
     LogSummary getLogSummary() const;
 
     // Closes the active file, deletes every session log file, then reopens a
