@@ -180,11 +180,11 @@ A traditional needle-dial rendering of the 2005–2010 Ford Mustang instrument c
 
 #### S197 - Digital
 
-The classic "LED-style" rendering of the same 2005–2010 Ford Mustang cluster. Uses a 7-segment LED-look font for the readout numeral, an animated color-fill arc (that brightens as the value climbs), and tick marks that light up LED-green once the value passes them. Same chrome bezel, navy background, and red needle as S197 - Analog, but with the original all-arc gauge design. Positioned identically to the Analog variant but optimized for the animated fill aesthetic instead of a needle.
+The classic "LED-style" rendering of the same 2005–2010 Ford Mustang cluster. Uses a 7-segment LED-look font for the readout numeral, an animated color-fill arc (that brightens as the value climbs), and tick marks that light up once the value passes them. Same chrome bezel, and navy background as S197 - Analog, but with an all-arc gauge design. Positioned identically to the Analog variant but optimized for the animated fill aesthetic instead of a needle.
 
 #### Neon
 
-A high-contrast modern theme inspired by the Torque Pro OBD Android app. Black background with neon green primary gauge arcs, electric cyan accents, and hot-orange warning highlights. Crisp digital typography and a visually vibrant style for night driving or harsh sunlight conditions.
+A high-contrast modern theme. Black background with neon green primary gauge arcs, electric cyan accents, and hot-orange warning highlights. Crisp digital typography and a visually vibrant style for night driving or harsh sunlight conditions.
 
 #### Modern Flat
 
@@ -213,7 +213,7 @@ Navigate with the prev/next arrows in the header; cycles within the dashboard gr
 The main at-a-glance engine gauges:
 
 - **RPM gauge** (large arc, center): Displays engine speed (0 to "MAX RPM" setting). Arc color zones:
-  - **Green/primary**: 0 to "SHIFT LIGHT RPM" threshold
+  - **Theme/primary**: 0 to "SHIFT LIGHT RPM" threshold
   - **Orange/caution**: "SHIFT LIGHT RPM" to "REDLINE RPM" threshold
   - **Red/danger**: "REDLINE RPM" to "MAX RPM"
   - When RPM reaches "SHIFT LIGHT RPM", the text digits flash red at a 200 ms cadence (same as the onboard RGB LED shift-point flash).
