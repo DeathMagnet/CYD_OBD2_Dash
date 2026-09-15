@@ -134,6 +134,7 @@ constexpr const char* kStatusPairingTapDeviceFirst = "Scan first - tap DEVICE.";
 // ---- Theme ----
 constexpr const char* kThemeNameModernFlat = "Modern Flat";
 constexpr const char* kThemeNameNeon = "Neon";
-constexpr const char* kThemeNameS197 = "S197";
+constexpr const char* kThemeNameS197Digital = "S197 - Digital";
+constexpr const char* kThemeNameS197Analog = "S197 - Analog";
 
 } // namespace labels

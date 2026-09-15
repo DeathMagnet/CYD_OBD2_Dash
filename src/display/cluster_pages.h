@@ -88,6 +88,11 @@ struct ClusterPageRuntimeState {
     int32_t rpmTickLitCountDrawn = -1;
     int32_t speedTickLitCountDrawn = -1;
 
+    // Page 2 - same idea as rpmTickLitCountDrawn/speedTickLitCountDrawn, for
+    // the Engine Load gauge's ticks (only drawn by S197 - Analog's needle
+    // gauge; the other themes' Engine Load gauge has no tick marks).
+    int32_t loadTickLitCountDrawn = -1;
+
     // Page 4 - last-drawn sample timestamp for the MAF history graph, so
     // drawPage4Dynamic() only redraws it when a new sample has actually been
     // recorded (once per second) instead of every UI refresh tick. Sentinel

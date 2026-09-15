@@ -65,6 +65,33 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
                    float value, float maxValue, float cautionStart, float dangerStart, uint16_t bgColor,
                    const ThemeColors& theme);
 
+// Needle gauge pair for theme.useNeedleGauge (S197 - Analog): call both once
+// per frame, with any dynamic content that sits inside the needle's sweep
+// (the center numeral, drawGaugeTickLabels()) redrawn in between, so the
+// needle ends up drawn on top of it:
+//   eraseNeedle(...);          // erase the previous frame's needle
+//   ... redraw numeral, drawGaugeTickLabels() ...
+//   drawNeedle(...);           // draw this frame's needle on top
+// eraseNeedle() is a no-op before the first drawNeedle() call (nothing drawn
+// yet), and also a no-op whenever `value` would round to the same angle as
+// the last draw - erasing a needle that hasn't visibly moved just makes it
+// flicker for the gap until drawNeedle() redraws it a few lines below, with
+// nothing to show for it. Uses the same ArcGaugeState as drawArcGauge(), but
+// the two are never used on the same gauge (a theme either fills an arc or
+// draws a needle).
+void eraseNeedle(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t centerY, int32_t radius, float value,
+                  float maxValue, uint16_t bgColor);
+
+// Draws the needle at `value`'s angle (see drawArcGauge for the shared
+// value/maxValue/cautionStart/dangerStart/bgColor convention), plus the hub
+// cap on top. On the first call after invalidate() or a maxValue change,
+// first paints the static dial face (track ring + caution/danger redline
+// zone) - the fill-arc themes' equivalent, minus the value-fill arc itself,
+// which the needle replaces. Updates `state` for the next frame's
+// eraseNeedle() call.
+void drawNeedle(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t centerY, int32_t radius, float value,
+                 float maxValue, float cautionStart, float dangerStart, uint16_t bgColor, const ThemeColors& theme);
+
 // Radial tick marks at fixed value intervals along an arc gauge's scale,
 // straddling the arc's outer edge (tickLen px inside and outside). Ticks at
 // multiples of majorInterval are drawn longer ("a little bigger"). A tick is
@@ -73,11 +100,30 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
 // excludeFromValue are skipped entirely (pass >= maxValue to disable exclusion,
 // matching drawArcGauge's convention for gauges with no warning zone).
 // tickMode selects which segment(s) get drawn (Off is a no-op); the outer
-// segment is further gated by theme.showOuterTicks since some themes (S197)
+// segment is further gated by theme.showOuterTicks since some themes (both S197 variants)
 // have no room in their bezel art for it regardless of tickMode.
 void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, float value, float maxValue,
                      float minorInterval, float majorInterval, float excludeFromValue, TickMode tickMode,
                      const ThemeColors& theme);
+
+// Numeric labels at major-tick positions for a needle gauge (theme.useNeedleGauge),
+// e.g. "1".."9" around an RPM dial or "20".."140" around a speedometer, always
+// drawn in white regardless of theme. The labels' own values never change, but
+// the needle's tip can sweep across their radius (see eraseNeedle()/
+// drawNeedle()), and eraseNeedle()'s flat-color erase would otherwise punch a
+// permanent notch in them - so call this every frame from drawDynamic()
+// (sandwiched between eraseNeedle() and drawNeedle(), like the center
+// numeral) rather than once from drawStatic().
+// `labelScale` divides each tick's raw value before formatting with `format`
+// (e.g. scale=1000.0F, format="%.0f" prints "1000" as "1"); pass 1.0F/"%.0f" to
+// print the raw value unscaled. `excludeFromValue` matches drawGaugeTicks'
+// parameter of the same name (e.g. skip labels inside a redline zone).
+// `smallFont` switches from the default `FreeSansBold9pt7b` to the small
+// built-in GLCD font, for gauges (Speed, with its finer tick graduation) that
+// pack too many labels into the arc for the bold free font to stay legible.
+void drawGaugeTickLabels(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, float maxValue,
+                          float majorInterval, float excludeFromValue, float labelScale, const char* format,
+                          const ThemeColors& theme, uint16_t background, bool smallFont = false);
 
 // Decorative ring drawn just outside a round arc gauge's outer edge (OEM
 // chrome bezel look). No-op unless theme.showGaugeBezel is set, so callers

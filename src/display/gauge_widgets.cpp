@@ -1,5 +1,8 @@
 #include "display/gauge_widgets.h"
 #include <math.h>
+#include <stdio.h>
+
+extern const GFXfont FreeSansBold9pt7b;
 
 namespace gaugewidgets {
 
@@ -7,6 +10,15 @@ namespace {
 constexpr float kGaugeStartAngle = 30.0F;
 constexpr float kGaugeEndAngle = 330.0F;
 constexpr int32_t kArcThicknessPx = 12;
+constexpr float kDegToRad = 3.14159265F / 180.0F;
+
+// Needle geometry (S197 - Analog): the tip stops just past the tick marks'
+// inner edge (major tick length is 8px) so it reaches almost to the ring
+// without ever overlapping them; eraseNeedle()/drawNeedle() below share these
+// so a frame's erase always matches the previous frame's draw.
+constexpr int32_t kNeedleTipInsetPx = 11;
+constexpr float kNeedleWidthPx = 3.0F;
+constexpr int32_t kNeedleHubRadiusPx = 7;
 
 // Segmented-arc LED color for one wedge: danger/caution zones always win (they're a
 // fixed-position overlay, not "unlocked" by the value reaching them), otherwise lit
@@ -164,6 +176,96 @@ void drawArcGauge(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t 
     state.needsFullRedraw = false;
 }
 
+void eraseNeedle(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t centerY, int32_t radius, float value,
+                  float maxValue, uint16_t bgColor) {
+    if (state.needsFullRedraw) {
+        return; // Nothing drawn yet this page - nothing to erase.
+    }
+
+    int32_t innerRadius = radius - kArcThicknessPx;
+    int32_t tipRadius = innerRadius - kNeedleTipInsetPx;
+    if (tipRadius < kNeedleHubRadiusPx) {
+        tipRadius = kNeedleHubRadiusPx;
+    }
+
+    float clampedValue = value < 0.0F ? 0.0F : (value > maxValue ? maxValue : value);
+    float valueFraction = (maxValue > 0.0F) ? (clampedValue / maxValue) : 0.0F;
+    float valueAngle = kGaugeStartAngle + valueFraction * (kGaugeEndAngle - kGaugeStartAngle);
+    float angleRad = valueAngle * kDegToRad;
+    int32_t newTipX = centerX + static_cast<int32_t>(-sinf(angleRad) * tipRadius);
+    int32_t newTipY = centerY + static_cast<int32_t>(cosf(angleRad) * tipRadius);
+
+    float oldAngleRad = state.lastValueAngle * kDegToRad;
+    int32_t oldTipX = centerX + static_cast<int32_t>(-sinf(oldAngleRad) * tipRadius);
+    int32_t oldTipY = centerY + static_cast<int32_t>(cosf(oldAngleRad) * tipRadius);
+
+    // Compare actual pixel positions, not truncated degrees: a truncated-degree
+    // comparison can look "unchanged" for several consecutive ticks of slow,
+    // continuous movement even though the true (sub-degree) angle keeps
+    // drifting each tick - drawNeedle() below still draws every tick regardless,
+    // so those skipped ticks leave a trail of un-erased slivers, worse near the
+    // tip where the same angular drift covers more pixels. Comparing pixels
+    // instead still correctly skips a truly stationary needle (no flicker) while
+    // catching any real movement, however small.
+    if (newTipX == oldTipX && newTipY == oldTipY) {
+        return;
+    }
+
+    // Erase a hair wider than drawNeedle() draws, so any remaining sub-pixel
+    // anti-aliasing residue can't leave a 1px sliver of the old needle uncleaned.
+    tft.drawWideLine(centerX, centerY, oldTipX, oldTipY, kNeedleWidthPx + 2.0F, bgColor);
+}
+
+void drawNeedle(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t centerY, int32_t radius, float value,
+                 float maxValue, float cautionStart, float dangerStart, uint16_t bgColor, const ThemeColors& theme) {
+    float clampedValue = value < 0.0F ? 0.0F : (value > maxValue ? maxValue : value);
+    float valueFraction = (maxValue > 0.0F) ? (clampedValue / maxValue) : 0.0F;
+    float valueAngle = kGaugeStartAngle + valueFraction * (kGaugeEndAngle - kGaugeStartAngle);
+    int32_t innerRadius = radius - kArcThicknessPx;
+    int32_t tipRadius = innerRadius - kNeedleTipInsetPx;
+    if (tipRadius < kNeedleHubRadiusPx) {
+        tipRadius = kNeedleHubRadiusPx;
+    }
+
+    float clampedDangerStart = dangerStart > maxValue ? maxValue : dangerStart;
+    float clampedCautionStart = cautionStart > clampedDangerStart ? clampedDangerStart : cautionStart;
+    bool hasCaution = clampedCautionStart < clampedDangerStart;
+    bool hasDanger = clampedDangerStart < maxValue;
+
+    if (state.needsFullRedraw || maxValue != state.lastMaxValue) {
+        // Static dial face: track ring + the fixed caution/danger redline
+        // zone, same as the fill-arc themes' full-redraw path, minus the
+        // value-fill arc itself (that's what the needle replaces).
+        tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
+                           static_cast<uint32_t>(kGaugeStartAngle), static_cast<uint32_t>(kGaugeEndAngle),
+                           theme.secondaryGaugeArc, bgColor, false);
+
+        float zoneStartValue = hasCaution ? clampedCautionStart : clampedDangerStart;
+        float zoneStartAngle = kGaugeStartAngle + (zoneStartValue / maxValue) * (kGaugeEndAngle - kGaugeStartAngle);
+        float dangerStartAngle = kGaugeStartAngle + (clampedDangerStart / maxValue) * (kGaugeEndAngle - kGaugeStartAngle);
+        if (hasCaution) {
+            tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
+                               static_cast<uint32_t>(zoneStartAngle), static_cast<uint32_t>(dangerStartAngle),
+                               theme.cautionArc, bgColor, false);
+        }
+        if (hasDanger) {
+            tft.drawSmoothArc(centerX, centerY, radius, innerRadius,
+                               static_cast<uint32_t>(hasCaution ? dangerStartAngle : zoneStartAngle),
+                               static_cast<uint32_t>(kGaugeEndAngle), theme.dangerArc, bgColor, false);
+        }
+    }
+
+    float angleRad = valueAngle * kDegToRad;
+    int32_t tipX = centerX + static_cast<int32_t>(-sinf(angleRad) * tipRadius);
+    int32_t tipY = centerY + static_cast<int32_t>(cosf(angleRad) * tipRadius);
+    tft.drawWideLine(centerX, centerY, tipX, tipY, kNeedleWidthPx, theme.needle);
+    tft.fillCircle(centerX, centerY, kNeedleHubRadiusPx, theme.needleCap);
+
+    state.lastValueAngle = valueAngle;
+    state.lastMaxValue = maxValue;
+    state.needsFullRedraw = false;
+}
+
 void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, float value, float maxValue,
                      float minorInterval, float majorInterval, float excludeFromValue, TickMode tickMode,
                      const ThemeColors& theme) {
@@ -204,7 +306,13 @@ void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t rad
         int32_t xInner1 = centerX + static_cast<int32_t>(dirX * innerRadius);
         int32_t yInner1 = centerY + static_cast<int32_t>(dirY * innerRadius);
 
-        uint16_t tickColor = (value >= tickValue) ? theme.primaryGaugeArc : theme.tickInactiveColor;
+        // S197 - Analog's needle already shows the live value, so its ticks stay
+        // fixed/silver like printed markings on a real gauge face rather than
+        // lighting up as the value passes them (the other themes' behavior,
+        // which visually extends their animated fill arc).
+        uint16_t tickColor = theme.useNeedleGauge ? theme.tickInactiveColor
+                                                   : (value >= tickValue) ? theme.primaryGaugeArc
+                                                                          : theme.tickInactiveColor;
         if (drawOuter) {
             tft.drawLine(xOuter0, yOuter0, xOuter1, yOuter1, tickColor);  // outside: radius to radius+tickLen
         }
@@ -212,6 +320,52 @@ void drawGaugeTicks(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t rad
             tft.drawLine(xInner0, yInner0, xInner1, yInner1, tickColor);   // inside: innerRadius-tickLen to innerRadius
         }
     }
+}
+
+void drawGaugeTickLabels(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, float maxValue,
+                          float majorInterval, float excludeFromValue, float labelScale, const char* format,
+                          const ThemeColors& theme, uint16_t background, bool smallFont) {
+    (void)theme;
+    if (majorInterval <= 0.0F || maxValue <= 0.0F) {
+        return;
+    }
+    // Inset from innerRadius so labels clear drawGaugeTicks' inner tick segment
+    // (up to kMajorTickLenPx = 8px) with margin; the needle's tip stops even
+    // further in (see drawArcGauge's kNeedleTipInsetPx), so it never reaches here.
+    constexpr int32_t kLabelInsetPx = 21;
+    int32_t innerRadius = radius - kArcThicknessPx;
+    int32_t labelRadius = innerRadius - kLabelInsetPx;
+
+    if (smallFont) {
+        // Speed's finer 5/10 tick graduation packs far more labels into the same
+        // arc than RPM/Load's; FreeSansBold9pt7b is too wide for that density, so
+        // fall back to the small built-in GLCD font instead.
+        tft.setTextFont(1);
+        tft.setTextSize(1);
+    } else {
+        tft.setFreeFont(&FreeSansBold9pt7b);
+        tft.setTextSize(1);
+    }
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_WHITE, background);
+
+    int majorCount = static_cast<int>(maxValue / majorInterval);
+    char buf[8];
+    // Start at 1 (skip the "0" tick): the top end is already unlabeled
+    // wherever it falls inside excludeFromValue, so label neither end.
+    for (int i = 1; i <= majorCount; ++i) {
+        float tickValue = static_cast<float>(i) * majorInterval;
+        if (tickValue >= excludeFromValue) {
+            continue;
+        }
+        float angle = kGaugeStartAngle + (tickValue / maxValue) * (kGaugeEndAngle - kGaugeStartAngle);
+        float angleRad = angle * kDegToRad;
+        int32_t x = centerX + static_cast<int32_t>(-sinf(angleRad) * labelRadius);
+        int32_t y = centerY + static_cast<int32_t>(cosf(angleRad) * labelRadius);
+        snprintf(buf, sizeof(buf), format, tickValue / labelScale);
+        tft.drawString(buf, x, y);
+    }
+    tft.setTextFont(1);
 }
 
 void drawGaugeBezel(TFT_eSPI& tft, int32_t centerX, int32_t centerY, int32_t radius, const ThemeColors& theme) {

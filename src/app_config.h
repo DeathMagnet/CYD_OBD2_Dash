@@ -176,10 +176,19 @@ constexpr float kRpmTickIntervalMinor = 500.0F;
 constexpr float kRpmTickIntervalMajor = 1000.0F;
 constexpr float kSpeedTickIntervalMinor = 10.0F;
 constexpr float kSpeedTickIntervalMajor = 50.0F;
+// Speed gauge ticks for S197 - Analog's needle dial only - finer graduation
+// (every 5, major every 10) than the fill-arc themes above, which keep
+// kSpeedTickIntervalMinor/Major unchanged.
+constexpr float kSpeedTickIntervalMinorAnalog = 5.0F;
+constexpr float kSpeedTickIntervalMajorAnalog = 10.0F;
+// Engine Load gauge ticks: only drawn for the S197 - Analog needle gauge
+// (drawGaugeTicks isn't called for this gauge by the other themes).
+constexpr float kLoadTickIntervalMinor = 10.0F;
+constexpr float kLoadTickIntervalMajor = 20.0F;
 constexpr uint8_t kDefaultTickMode = 3; // TickMode::InsideAndOutside (display/theme.h)
 
 // ---- Theme Selection ----
-constexpr uint8_t kDefaultThemeId = 0; // ThemeId::S197 (display/theme.h)
+constexpr uint8_t kDefaultThemeId = 3; // ThemeId::S197Analog (display/theme.h)
 
 // ---- SD CSV Telemetry Logging ----
 constexpr const char* kLogDirPath = "/logs";

@@ -84,16 +84,17 @@ bool ClusterTouchHandler::handleHeaderTap(uint16_t x, uint16_t y) {
 bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t nowMs) {
     const AppSettings& settings = configStore_.settings();
 
-    // Active theme cycle row (row 0): cycles through all three themes in
-    // order, Modern Flat -> Neon -> S197 -> Modern Flat.
+    // Active theme cycle row (row 0): cycles through all four themes in
+    // order, Modern Flat -> Neon -> S197 - Digital -> S197 - Analog -> Modern Flat.
     int32_t row0 = layout::kConfigRow0Y + layout::kConfigButtonInsetY;
     int32_t row0End = row0 + layout::kConfigButtonH;
     if (within(x, y, layout::kConfigCycleX, row0, layout::kConfigCycleX + layout::kConfigCycleW, row0End)) {
         ThemeId newTheme;
         switch (static_cast<ThemeId>(settings.themeId)) {
             case ThemeId::ModernFlat: newTheme = ThemeId::Neon; break;
-            case ThemeId::Neon: newTheme = ThemeId::S197; break;
-            case ThemeId::S197:
+            case ThemeId::Neon: newTheme = ThemeId::S197Digital; break;
+            case ThemeId::S197Digital: newTheme = ThemeId::S197Analog; break;
+            case ThemeId::S197Analog:
             default: newTheme = ThemeId::ModernFlat; break;
         }
         configStore_.setThemeId(static_cast<uint8_t>(newTheme));
@@ -113,15 +114,15 @@ bool ClusterTouchHandler::handleConfigUiTap(uint16_t x, uint16_t y, uint32_t now
     }
 
     // Gauge tick mode cycle row (row 2): cycles Off -> Inside -> Outside ->
-    // Inside+Outside -> Off, except S197 (no outside-tick art) which
-    // only toggles Off <-> Inside.
+    // Inside+Outside -> Off, except either S197 variant (no outside-tick art)
+    // which only toggles Off <-> Inside.
     int32_t row2 = layout::kConfigRow2Y + layout::kConfigButtonInsetY;
     int32_t row2End = row2 + layout::kConfigButtonH;
     if (within(x, y, layout::kConfigCycleX, row2, layout::kConfigCycleX + layout::kConfigCycleW, row2End)) {
         ThemeId activeTheme = static_cast<ThemeId>(settings.themeId);
         TickMode current = static_cast<TickMode>(settings.tickMode);
         TickMode next;
-        if (activeTheme == ThemeId::S197) {
+        if (activeTheme == ThemeId::S197Digital || activeTheme == ThemeId::S197Analog) {
             next = (current == TickMode::Off) ? TickMode::InsideOnly : TickMode::Off;
         } else {
             switch (current) {
