@@ -70,6 +70,8 @@ The ELM327 adapter's Bluetooth identity is **not** configured on-device — ther
 
 To change credentials later, re-edit `/obd_config.txt` on the card (on a computer, or in-place) and reboot — there's no live reconnect from the UI.
 
+**Boot screen connection status:** While booting, the boot screen now shows live connection status text at the bottom (e.g. "Connecting by MAC...", "Bluetooth link established", "ELM327 initialized; polling PIDs") and waits for the link to go Live, or up to 15 seconds, before continuing to the dashboard. Every connection stage is also appended to `/logs/connection.log` on the SD card, so a failed live test (run untethered, without a laptop watching serial output) can be diagnosed after the fact by re-reading the card.
+
 **Exception**: the `cyd_4inch_sim` bench/demo build (see [Build Environments](#build-environments)) skips this requirement entirely, since it never connects to a real adapter.
 
 ### SD Card Contents
@@ -82,6 +84,7 @@ The dashboard reads/writes these files:
 | `/config.txt` | Dashboard settings (theme, gauge ranges, units, etc.), written by the Config pages' Save button. (Root directory.) |
 | `/touch_cal.dat` | Touch calibration data, written by the calibration routine. (Root directory.) |
 | `/logs/obd_log_*.csv` | CSV telemetry logs (one file per session), written when `SD_LOGGING_ENABLED` is set. (Stored in `/logs` folder.) |
+| `/logs/connection.log` | Append-only log of every OBD-II Bluetooth connection stage (connect attempts, failures, backoff, ELM327 init), timestamped by uptime. Useful for diagnosing a failed connection without a laptop/serial monitor attached. (Stored in `/logs` folder.) |
 
 ### CSV Telemetry Logs
 

@@ -1,6 +1,7 @@
 #include "display/display_manager.h"
 #include "assets/boot_logo_png.h"
 #include "labels.h"
+#include "display/gauge_widgets.h"
 #include <Arduino.h>
 
 DisplayManager::DisplayManager()
@@ -60,6 +61,13 @@ void DisplayManager::drawBootImage() {
     delete png_;
     png_ = nullptr;
     Serial.println("[Display] Static boot screen rendered.");
+}
+
+void DisplayManager::drawBootStatus(const char* message) {
+    tft_.setTextDatum(MC_DATUM);
+    tft_.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft_.setTextSize(1);
+    gaugewidgets::drawFieldText(tft_, message, tft_.width() / 2, tft_.height() - 16, tft_.width() - 40, TFT_BLACK);
 }
 
 void DisplayManager::showFatalError(const char* title, const char* line1, const char* line2) {

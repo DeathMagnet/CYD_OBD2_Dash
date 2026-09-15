@@ -13,6 +13,7 @@ constexpr uint8_t kTftBacklightPin = 27;
 
 // Boot Screen Timing
 constexpr uint32_t kBootScreenDurationMs = 2000;
+constexpr uint32_t kBootConnectTimeoutMs = 15000; // Max time to wait for OBD Live before showing the dashboard anyway
 
 // SD Card Pins (VSPI)
 constexpr uint8_t kSdSpiCsPin = 5;
@@ -45,6 +46,7 @@ constexpr uint16_t kTouchPressureThreshold = 200;
 // incomplete file halts boot with an on-screen error (see main.cpp).
 constexpr uint32_t kObdResetCommandTimeoutMs = 3000;   // ATZ reset needs extra settle time
 constexpr uint32_t kObdCommandTimeoutMs = 1000;        // Normal AT/PID command timeout
+constexpr uint32_t kObdProbeCommandTimeoutMs = 5000;   // First 0100 probe after ATSP0 can take longer: ELM327 auto protocol search
 constexpr uint32_t kObdReconnectBackoffMs = 3000;
 constexpr uint32_t kObdMaxReconnectBackoffMs = 30000;
 constexpr uint8_t kObdConsecutiveFailuresForDisconnect = 6;
@@ -171,6 +173,7 @@ constexpr const char* kLogFileSuffix = ".csv";
 constexpr uint8_t kLogFileIndexDigits = 3;
 constexpr const char* kSessionIndexNamespace = "obd_dash";
 constexpr const char* kSessionIndexKey = "session_idx";
+constexpr const char* kConnectionLogFilePath = "/logs/connection.log";
 
 constexpr uint32_t kLogRowIntervalOptionsMs[] = {50, 100, 250, 500, 1000};
 constexpr size_t kLogRowIntervalOptionCount = 5;

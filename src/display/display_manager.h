@@ -20,6 +20,10 @@ public:
 
     void drawBootImage();
 
+    // Draw a single line of connection status text at the bottom of the boot screen (e.g. "Connecting by MAC...", "Bluetooth link established").
+    // Uses fixed-width clearing so a shorter message doesn't leave ghost pixels from a previous longer one.
+    void drawBootStatus(const char* message);
+
     // Simple text-only fatal error screen for unrecoverable boot-time
     // failures (e.g. a missing/invalid /obd_config.txt): fills the screen
     // black, draws `title` centered near the top in warning red, and the two

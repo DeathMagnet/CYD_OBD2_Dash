@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <cstring>
 #include "app_config.h"
 #include "display/display_manager.h"
 #include "storage/sd_manager.h"
@@ -6,6 +7,7 @@
 #include "system/config_store.h"
 #include "system/connection_state.h"
 #include "logging/csv_logger.h"
+#include "logging/connection_logger.h"
 #include "obd/obd_client.h"
 #include "obd/obd_credentials.h"
 #include "obd/telemetry.h"
@@ -50,6 +52,7 @@ void setup() {
 
     // 1. Initialize SD Card over VSPI
     sdManager.begin();
+    connection_log::beginSession(sdManager); // Start with a fresh connection log each boot
 
     // 2. Load persisted settings (Config: UI/Gauges/User Vars/Logs pages),
     // falling back to defaults if the SD card or /config.txt is unavailable.
@@ -78,18 +81,42 @@ void setup() {
 #if !OBD_SIMULATION_ENABLED
     if (!loadObdCredentials(sdManager, obdCredentials)) {
         Serial.println("[OBD] Fatal: /obd_config.txt missing or invalid on SD card (mac/id/password all required).");
+        connection_log::write(sdManager, "Fatal: /obd_config.txt missing or invalid (mac/id/password required)");
         displayManager.showFatalError("OBD CONFIG ERROR", "/obd_config.txt missing or invalid on SD card.",
                                        "Set mac=, id=, and password=, then reboot.");
         for (;;) {
             delay(1000); // Halt here; never reaches the dashboard. delay() yields, so the watchdog stays happy.
         }
     }
+    connection_log::writef(sdManager, "Credentials loaded: id=%s", obdCredentials.id);
 #endif
 
+    // 5b. Start the ELM327 Bluetooth client on its own task (using the
+    // credentials validated in step 4) early, before the boot screen delay,
+    // so connection progress is visible during the boot logo display.
+    obdClient.begin(obdCredentials, sdManager);
+
     // 5. Render Static Boot Screen (PNG decoded via PNGdec into RGB565)
+    // and wait for OBD connection or timeout while showing status updates.
     Serial.println("[Boot] Displaying static boot image...");
     displayManager.drawBootImage();
-    delay(config::kBootScreenDurationMs);
+
+    char lastBootStatus[64] = {0};
+    uint32_t bootStartMs = millis();
+    while (obdClient.getConnectionState() != ConnectionState::Live &&
+           millis() - bootStartMs < config::kBootConnectTimeoutMs) {
+        char statusMsg[64];
+        obdClient.getLastStatusMessage(statusMsg, sizeof(statusMsg));
+        if (statusMsg[0] != '\0' && strcmp(statusMsg, lastBootStatus) != 0) {
+            strncpy(lastBootStatus, statusMsg, sizeof(lastBootStatus) - 1);
+            lastBootStatus[sizeof(lastBootStatus) - 1] = '\0';
+            displayManager.drawBootStatus(statusMsg);
+        }
+        delay(50);
+    }
+    if (millis() - bootStartMs < config::kBootScreenDurationMs) {
+        delay(config::kBootScreenDurationMs - (millis() - bootStartMs)); // Keep the logo up for its original minimum branding time even on a fast connect
+    }
 
     // 6. Initialize Touch & Run Calibration if missing from SD (now runs in
     // the correct orientation, since display rotation is already final)
@@ -103,11 +130,6 @@ void setup() {
 #else
     Serial.println("[Log] SD_LOGGING_ENABLED not defined; logging disabled.");
 #endif
-
-    // 8. Start the ELM327 Bluetooth client on its own task (using the
-    // credentials validated in step 4) so connecting/polling never blocks
-    // the render loop below.
-    obdClient.begin(obdCredentials);
 
     // 9. Draw Page 1 chrome; drawDynamic() in loop() fills in live values.
     // drawStatic() below already repaints every pixel it touches (header +

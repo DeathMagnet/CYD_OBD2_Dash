@@ -151,6 +151,8 @@ void CsvLogger::writeHeader() {
 }
 
 bool CsvLogger::openNewSessionFile() {
+    sdManager_.lock();
+
     Preferences prefs;
     prefs.begin(config::kSessionIndexNamespace, false);
     uint32_t sessionIdx = prefs.getUInt(config::kSessionIndexKey, 0) + 1;
@@ -163,11 +165,14 @@ bool CsvLogger::openNewSessionFile() {
     logFile_ = SD.open(currentFilePath_, FILE_WRITE);
     if (!logFile_) {
         Serial.printf("[Log] Failed to open %s for writing.\n", currentFilePath_);
+        sdManager_.unlock();
         return false;
     }
 
     writeHeader();
     Serial.printf("[Log] Logging session started: %s\n", currentFilePath_);
+
+    sdManager_.unlock();
     return true;
 }
 
@@ -176,12 +181,15 @@ void CsvLogger::enforceCapacity() {
         return;
     }
 
+    sdManager_.lock();
+
     constexpr uint8_t kMaxPruneIterations = 25; // Safety bound; never loop forever.
     for (uint8_t i = 0; i < kMaxPruneIterations; ++i) {
         uint64_t totalBytes = SD.totalBytes();
         uint64_t usedBytes = SD.usedBytes();
         uint64_t freeBytes = (totalBytes > usedBytes) ? (totalBytes - usedBytes) : 0;
         if (freeBytes >= config::kSdMinFreeBytes) {
+            sdManager_.unlock();
             return;
         }
 
@@ -190,12 +198,15 @@ void CsvLogger::enforceCapacity() {
         forEachLogFile(&oldestVisitor, &ctx);
         if (!ctx.found) {
             Serial.println("[Log] SD card low on space but no prunable logs remain.");
+            sdManager_.unlock();
             return;
         }
 
         Serial.printf("[Log] SD card low on space; deleting oldest log %s\n", ctx.bestPath);
         SD.remove(ctx.bestPath);
     }
+
+    sdManager_.unlock();
 }
 
 bool CsvLogger::begin() {
@@ -299,15 +310,19 @@ void CsvLogger::update(const TelemetrySnapshot& snapshot, uint32_t nowMs, uint32
         }
         formatIntField(dtcF, sizeof(dtcF), snapshot.dtcCount);
 
+        sdManager_.lock();
         logFile_.printf("%lu,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
                          static_cast<unsigned long>(nowMs), rpmF, speedF, coolantF, throttleF, fuelF,
                          voltageF, mapF, iatF, loadF, mafF, timingF, stftF, ltftF, fuelPresF,
                          o2b1F, o2b2F, baroF, celF, dtcF);
+        sdManager_.unlock();
     }
 
     if (nowMs - lastFlushMs_ >= config::kSdFlushIntervalMs) {
         lastFlushMs_ = nowMs;
+        sdManager_.lock();
         logFile_.flush();
+        sdManager_.unlock();
         enforceCapacity();
     }
 }
