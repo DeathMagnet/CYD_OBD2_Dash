@@ -20,6 +20,15 @@ public:
 
     void drawBootImage();
 
+    // Simple text-only fatal error screen for unrecoverable boot-time
+    // failures (e.g. a missing/invalid /obd_config.txt): fills the screen
+    // black, draws `title` centered near the top in warning red, and the two
+    // detail lines centered below it in white. Uses TFT_eSPI's built-in font
+    // directly rather than the theme engine, so it renders even if theme/
+    // label setup is the thing that failed. Callers are expected to halt
+    // afterward - this does not return control anywhere meaningful.
+    void showFatalError(const char* title, const char* line1, const char* line2);
+
     TFT_eSPI& getTft() { return tft_; }
 
 private:

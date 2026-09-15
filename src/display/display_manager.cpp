@@ -62,6 +62,22 @@ void DisplayManager::drawBootImage() {
     Serial.println("[Display] Static boot screen rendered.");
 }
 
+void DisplayManager::showFatalError(const char* title, const char* line1, const char* line2) {
+    tft_.fillScreen(TFT_BLACK);
+    tft_.setTextDatum(MC_DATUM);
+
+    tft_.setTextColor(TFT_RED, TFT_BLACK);
+    tft_.setTextSize(3);
+    tft_.drawString(title, tft_.width() / 2, tft_.height() / 2 - 40);
+
+    tft_.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft_.setTextSize(1);
+    tft_.drawString(line1, tft_.width() / 2, tft_.height() / 2 + 10);
+    tft_.drawString(line2, tft_.width() / 2, tft_.height() / 2 + 30);
+
+    Serial.printf("[Display] Fatal error screen shown: %s\n", title);
+}
+
 int DisplayManager::pngDrawCallback(PNGDRAW* pDraw) {
     DisplayManager* self = static_cast<DisplayManager*>(pDraw->pUser);
     uint16_t lineBuffer[config::kScreenWidth];

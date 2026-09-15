@@ -16,7 +16,6 @@ constexpr const char* kPageTitles[] = {
     "GAUGES",
     "USER VARS",
     "LOGS",
-    "OBD ADAPTER",
 };
 
 // ---- Page 1: Primary Cluster ----
@@ -93,11 +92,6 @@ constexpr const char* kLabelMaxSpeedKph = "MAX SPEED KM/H";
 constexpr const char* kLabelLogInterval = "LOG INTERVAL";
 constexpr const char* kLabelLogUnits = "LOG UNITS";
 constexpr const char* kWarningLogUnitsDeletesLogs = "CHANGING THIS DELETES ALL LOGS ON SAVE";
-
-// ---- Config: OBD Adapter ----
-constexpr const char* kLabelObdAdapterName = "ADAPTER NAME";
-constexpr const char* kLabelObdAdapterPin = "ADAPTER PIN";
-constexpr const char* kHintObdReconnectOnSave = "SAVE RECONNECTS IMMEDIATELY";
 
 // ---- Config: Buttons & Status ----
 constexpr const char* kStepperMinus = "-";

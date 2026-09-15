@@ -8,11 +8,11 @@ This document provides complete, technical design and implementation instruction
 
 ## ✅ Implementation Status
 
-The dashboard displays all five dashboard pages (1–5: Primary Cluster, Engine Load, Car-Specific, Performance, Diagnostics) plus five dedicated config pages (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER), with these deliberate deviations from the design above:
+The dashboard displays all five dashboard pages (1–5: Primary Cluster, Engine Load, Car-Specific, Performance, Diagnostics) plus four dedicated config pages (UI, GAUGES, USER VARS, LOGS), with these deliberate deviations from the design above:
 
 - **All on-screen text is centralized.** Every label, unit, button text, page title, and status string shown in this spec is sourced from `src/labels.h` (`namespace labels`) rather than hardcoded in drawing code. The source of truth for display text is the labels constants in that header file, not the literal strings you see documented below.
 - **All three themes are implemented.** `getTheme()` (`src/display/theme.cpp`) returns the S197, Neon, or Modern Flat palette for the corresponding `ThemeId`. The UI config page's "Active Theme" row has a tap-to-cycle button (mirroring the Units row) that rotates through all three themes (Modern Flat -> Neon -> S197 -> Modern Flat), persists the choice, and immediately recolors the visible page.
-- **Page organization: Dashboard group vs. Config group.** Dashboard pages (1–4, 6) form one group; config pages (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER) form another. The header includes a mode toggle button: a steering wheel icon when viewing dashboard pages (tap to switch to the last-visited config page), and a cog icon when viewing config pages (tap to switch to the last-visited dashboard page). Prev/next navigation arrows cycle only within the active group, never across both groups.
+- **Page organization: Dashboard group vs. Config group.** Dashboard pages (1–4, 6) form one group; config pages (UI, GAUGES, USER VARS, LOGS) form another. The header includes a mode toggle button: a steering wheel icon when viewing dashboard pages (tap to switch to the last-visited config page), and a cog icon when viewing config pages (tap to switch to the last-visited dashboard page). Prev/next navigation arrows cycle only within the active group, never across both groups.
 - **Direct-to-TFT rendering, not sprites.** This board's ESP32-32E has no PSRAM, and a full-frame RGB565 sprite (~300KB) does not fit in 320KB of SRAM alongside the Bluetooth stack and SD buffers. Each page has a `drawStatic()` pass (chrome/labels, called once per page change) and a `drawDynamic()` pass (values only, called on a throttled `config::kUiRefreshIntervalMs` cadence) that redraws its own bounded region using TFT_eSPI's background-color text redraw to avoid flicker. There is no slide/fade page-transition animation; page switches redraw immediately.
 - **OBDII connection status badge.** The badge in the header displays the connection state with context-sensitive colors: green for `Live` (connected), blue for `Reconnecting`/`ObdConnecting`/`DisplayReady` (in progress), and crimson for `Boot`/`SdInit`/`Stale`/`Degraded` (error/disconnected).
 - **RPM warning arc**: drawn as two solid zones, not a gradient, via `gaugewidgets::drawArcGauge`'s `cautionStart`/`dangerStart` parameters — orange (`theme.cautionArc`) from the GAUGES config page's "Shift Light RPM" setting (default 5800) up to its "Redline RPM" setting (default 6200), then red (`theme.dangerArc`) held from Redline RPM out to the end of the arc, so the sweep never drops back to unlit track.
@@ -20,7 +20,7 @@ The dashboard displays all five dashboard pages (1–5: Primary Cluster, Engine 
 - **Gauge tick marks** (Page 1 RPM/Speed gauges): radial tick marks drawn as two short segments flanking the arc ring — one just outside the outer edge, one just inside the inner edge — at fixed value intervals (RPM: every 500, major every 1000; Speed: every 10, major every 50). Each tick is colored `primaryGaugeArc` once the needle has passed that value and `theme.tickInactiveColor` while still short of it (a field independent of the arc's own `secondaryGaugeArc` track color, so a theme can give ticks a different "unlit" color than the track), providing an at-a-glance "how far past this mark" reference. Ticks are not drawn inside the RPM redline zone (where the arc is already solid red). The outer segment is itself gated by `theme.showOuterTicks` — S197 sets this false and shows only the inner segment, while the other two themes show both. Toggleable on the Config: UI page via a "GAUGE TICKS" ON/OFF button (default: ON).
 - **Round-gauge chrome bezel** (Page 1 RPM/Speed, Page 2 Engine Load, Page 3 Vacuum/Boost): `gaugewidgets::drawGaugeBezel()` draws a decorative ring just outside each round gauge's outer edge, gated by `theme.showGaugeBezel` — on (4px thick, chrome-colored) for S197, off for the other two themes.
 - **Diagnostics page DTC list shows codes only** (e.g. `P0133`), not human-readable descriptions — no DTC description database is included. A read is triggered automatically whenever the page is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
-- **Config pages: UI / GAUGES / USER VARS / LOGS / OBD ADAPTER.** Settings are organized into five focused pages with a shared Save button at the bottom. Each config page displays the Save button (green when any value differs from what's saved on SD, default color when everything matches); tapping it persists all settings across all config pages to `/config.txt` on the SD card and displays "SAVED!" feedback. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space. Saving the OBD ADAPTER page also forces an immediate Bluetooth reconnect using the newly saved adapter name/PIN (no reboot needed), unless `secrets/local_config.h` is present, which always takes priority over the on-device selection.
+- **Config pages: UI / GAUGES / USER VARS / LOGS.** Settings are organized into four focused pages with a shared Save button at the bottom. Each config page displays the Save button (green when any value differs from what's saved on SD, default color when everything matches); tapping it persists all settings across all config pages to `/config.txt` on the SD card and displays "SAVED!" feedback. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space. The OBD-II adapter's identity is not part of this system — it's read once at boot from a separate `/obd_config.txt` file (see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#obd-ii-integration)), not edited on-device.
 - **Actual source layout** differs from the "Proposed" structure at the bottom of this doc — see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#proposed-source-layout) for the as-built tree.
 
 ---
@@ -110,7 +110,7 @@ struct NeedlePhysics {
 
 ## 📱 Touch Navigation & Multi-Page Cluster Architecture
 
-The display is divided into two page groups: **Dashboard pages** (1–4, 6) and **Config pages** (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER). Prev/next navigation cycles only within the active group.
+The display is divided into two page groups: **Dashboard pages** (1–4, 6) and **Config pages** (UI, GAUGES, USER VARS, LOGS). Prev/next navigation cycles only within the active group.
 
 ```
 Dashboard Group:                        Config Group:
@@ -118,7 +118,7 @@ Dashboard Group:                        Config Group:
 [2] ENGINE LOAD & AIRFLOW               [GAUGES] Shift Light RPM, Redline RPM, Max RPM, Max Speed
 [3] CAR-SPECIFIC SENSORS                [USER VARS] Boost Baro Baseline, Warnings, 0-60 Target, HP Factor
 [4] PERFORMANCE & TELEMETRY             [LOGS] Log Interval, Delete Logs
-[5] DIAGNOSTICS (DTC)                   [OBD ADAPTER] Adapter Name, Adapter PIN
+[5] DIAGNOSTICS (DTC)
 ```
 
 Header layout:
@@ -206,9 +206,11 @@ Performance estimation and real-time intake history.
 
 ---
 
-### Config Pages — UI / GAUGES / USER VARS / LOGS / OBD ADAPTER
+### Config Pages — UI / GAUGES / USER VARS / LOGS
 
 All settings persist across reboots by saving to `/config.txt` on the SD card. A shared **Save** button appears at the bottom of every config page. The button is **green** when any value differs from what's currently saved to SD, and **default color** when all values match what's on disk (dirty-state tracking). Tapping Save writes all settings across all config pages to SD and displays "SAVED!" feedback.
+
+The OBD-II adapter's Bluetooth identity (`mac`/`id`/`password`) is not part of this system — there is no config page for it. It's required to be present and complete in a separate `/obd_config.txt` file on the SD card, read once at boot; a missing or incomplete file halts boot with an on-screen error instead of falling back to a default. See [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#obd-ii-integration) and the template at `docs/sd_card_templates/obd_config.example.txt`.
 
 #### Config Page: UI
 Settings for display appearance and unit system.
@@ -254,16 +256,6 @@ SD card logging configuration and management.
 | **Log Summary** | (display-only) | - | Live file count and total size of all session logs on SD |
 | **Log Units** | Standard (MPH/°F/PSI), Metric (KM/H/°C/KPA) | Standard | CSV logging unit system. **⚠️ CHANGING THIS DELETES ALL LOGS ON SAVE** (shown in red below the toggle) — the toggle stages a pending change; deletion happens when you tap SAVE TO SD, and only if the unit system actually changed since the last save. Toggling back to the original value before saving leaves existing logs untouched. This ensures no CSV file mixes units within its rows. Independent of the display Units setting (you can view the dashboard in one unit system while logging in another). |
 | **Delete All Logs** | [ DELETE ALL LOGS ] button | - | Closes active log file, deletes every `obd_log_*.csv`, opens fresh session. Requires second tap within 5 seconds to confirm. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for auto-pruning. |
-
-#### Config Page: OBD ADAPTER
-ELM327 Bluetooth adapter identity. Both fields are tap-to-cycle buttons (no on-screen keyboard/text entry exists anywhere in this UI), picking from a fixed list of common ELM327 clone values; an adapter outside these presets still requires the compile-time `secrets/local_config.h` override (see `src/secrets/local_config.example.h`), which always takes priority over this page's selection.
-
-| Setting Field | Options / Range | Default | Description |
-| --- | --- | --- | --- |
-| **Adapter Name** | OBDII, OBDLink, Vgate, VEEPEAK, OBD2 | OBDII | Bluetooth SPP device name to connect to |
-| **Adapter PIN** | 1234, 0000, 1111, 6789 | 1234 | Legacy pairing PIN sent to the adapter |
-
-Unlike other config fields, tapping SAVE TO SD on this page also forces `ObdClient` to immediately disconnect and reconnect using the newly saved name/PIN (no device reboot required) — but only if the values actually changed since the last save.
 
 ---
 
@@ -316,8 +308,8 @@ src/
 ## 🧪 Verification Checklist
 
 - [ ] All 5 dashboard pages (1–5: Primary Cluster, Engine Load, Car-Specific, Performance, Diagnostics) render cleanly at 480×320 landscape resolution.
-- [ ] All 5 config pages (UI, GAUGES, USER VARS, LOGS, OBD ADAPTER) render cleanly.
-- [ ] OBD ADAPTER page's Adapter Name/PIN tap-to-cycle buttons work, and tapping Save with a changed value forces an immediate Bluetooth reconnect without a reboot.
+- [ ] All 4 config pages (UI, GAUGES, USER VARS, LOGS) render cleanly.
+- [ ] With `/obd_config.txt` present on the SD card with valid `mac=`/`id=`/`password=`, the dashboard connects by MAC address at boot; with the file missing or any field blank/invalid, `cyd_4inch` shows the "OBD CONFIG ERROR" screen and halts instead of reaching any dashboard page.
 - [ ] Theme switching (Modern Flat -> Neon -> S197 -> Modern Flat, via the UI page's Active Theme cycle button) immediately recolors gauges, bezels, needles, and text, and the selection survives Save + reboot.
 - [ ] Page 1 RPM gauge correctly displays the orange Shift Light-to-Redline arc and the red Redline-to-max arc, holds the red zone to the end of the sweep, and triggers bezel shift light flash.
 - [ ] Shift Light RPM and Redline RPM on GAUGES page control the arc colors correctly.
