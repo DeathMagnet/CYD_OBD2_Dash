@@ -258,8 +258,8 @@ void drawNeedle(TFT_eSPI& tft, ArcGaugeState& state, int32_t centerX, int32_t ce
     float angleRad = valueAngle * kDegToRad;
     int32_t tipX = centerX + static_cast<int32_t>(-sinf(angleRad) * tipRadius);
     int32_t tipY = centerY + static_cast<int32_t>(cosf(angleRad) * tipRadius);
-    tft.drawWideLine(centerX, centerY, tipX, tipY, kNeedleWidthPx, theme.needle);
     tft.fillCircle(centerX, centerY, kNeedleHubRadiusPx, theme.needleCap);
+    tft.drawWideLine(centerX, centerY, tipX, tipY, kNeedleWidthPx, theme.needle);
 
     state.lastValueAngle = valueAngle;
     state.lastMaxValue = maxValue;
