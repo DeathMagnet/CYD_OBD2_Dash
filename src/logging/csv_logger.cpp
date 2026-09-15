@@ -90,16 +90,16 @@ void oldestVisitor(void* context, const char* path, uint32_t sessionIndex, size_
     }
 }
 
-struct FirstMatchContext {
-    char path[32] = {0};
-    bool found = false;
+struct DeleteContext {
+    uint32_t deletedCount = 0;
 };
 
-void firstMatchVisitor(void* context, const char* path, uint32_t /*sessionIndex*/, size_t /*fileSizeBytes*/) {
-    auto* ctx = static_cast<FirstMatchContext*>(context);
-    if (!ctx->found) {
-        strncpy(ctx->path, path, sizeof(ctx->path) - 1);
-        ctx->found = true;
+void deleteVisitor(void* context, const char* path, uint32_t /*sessionIndex*/, size_t /*fileSizeBytes*/) {
+    auto* ctx = static_cast<DeleteContext*>(context);
+    if (SD.remove(path)) {
+        ctx->deletedCount++;
+    } else {
+        Serial.printf("[Log] Failed to delete %s.\n", path);
     }
 }
 
@@ -115,15 +115,25 @@ void CsvLogger::forEachLogFile(LogFileVisitor visitor, void* context) const {
 
     File entry = root.openNextFile();
     while (entry) {
+        bool matched = false;
+        uint32_t sessionIndex = 0;
+        char path[32];
+        size_t fileSize = 0;
         if (!entry.isDirectory()) {
-            uint32_t sessionIndex = 0;
-            if (parseSessionIndexFromName(entry.name(), sessionIndex)) {
-                char path[32];
+            matched = parseSessionIndexFromName(entry.name(), sessionIndex);
+            if (matched) {
                 buildPathFromName(entry.name(), path, sizeof(path));
-                visitor(context, path, sessionIndex, entry.size());
+                fileSize = entry.size();
             }
         }
+        // Close the entry before invoking the visitor: a visitor that
+        // deletes the file (e.g. deleteAllLogs()) can fail or behave
+        // unpredictably on some SD/FAT stacks if the file handle is still
+        // open when SD.remove() is called.
         entry.close();
+        if (matched) {
+            visitor(context, path, sessionIndex, fileSize);
+        }
         entry = root.openNextFile();
     }
     root.close();
@@ -344,21 +354,13 @@ uint32_t CsvLogger::deleteAllLogs() {
     loggingActive_ = false;
     currentFilePath_[0] = '\0';
 
-    uint32_t deletedCount = 0;
-    constexpr uint16_t kMaxDeleteIterations = 999; // Matches the 3-digit session index ceiling.
-    for (uint16_t i = 0; i < kMaxDeleteIterations; ++i) {
-        FirstMatchContext ctx;
-        forEachLogFile(&firstMatchVisitor, &ctx);
-        if (!ctx.found) {
-            break;
-        }
-        if (SD.remove(ctx.path)) {
-            deletedCount++;
-        } else {
-            Serial.printf("[Log] Failed to delete %s; stopping.\n", ctx.path);
-            break;
-        }
-    }
+    // A single directory pass that deletes each matching file as it's found,
+    // rather than rescanning the whole SD directory from scratch per file
+    // (that O(n^2) pattern could stall loop()/touch input for a long time
+    // once a lot of session logs had accumulated).
+    DeleteContext ctx;
+    forEachLogFile(&deleteVisitor, &ctx);
+    uint32_t deletedCount = ctx.deletedCount;
 
     Serial.printf("[Log] Deleted %lu log file(s).\n", static_cast<unsigned long>(deletedCount));
 
