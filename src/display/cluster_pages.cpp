@@ -217,12 +217,28 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     lastFrameMs_ = nowMs;
 
     // Orange from Shift Light RPM (GAUGES config page) up to Redline RPM, then
-    // solid red from Redline RPM out to the end of the sweep.
-    gaugewidgets::drawArcGauge(tft_, rpmArc_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue, kRpmMax,
-                                static_cast<float>(settings.shiftLightRpm),
-                                static_cast<float>(settings.redlineRpm), theme_.background, theme_);
-    gaugewidgets::drawArcGauge(tft_, speedArc_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
-                                kSpeedMax, kSpeedMax, kSpeedMax, theme_.background, theme_);
+    // solid red from Redline RPM out to the end of the sweep. S197 - Analog
+    // draws a needle instead: eraseNeedle() now (before the numeral/tick
+    // labels below are redrawn) and drawNeedle() afterward (see the bottom of
+    // this function), so the needle ends up drawn on top of both.
+    if (theme_.useNeedleGauge) {
+        gaugewidgets::eraseNeedle(tft_, rpmArc_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue,
+                                   kRpmMax, theme_.background);
+        gaugewidgets::eraseNeedle(tft_, speedArc_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
+                                   kSpeedMax, theme_.background);
+    } else {
+        gaugewidgets::drawArcGauge(tft_, rpmArc_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue, kRpmMax,
+                                    static_cast<float>(settings.shiftLightRpm),
+                                    static_cast<float>(settings.redlineRpm), theme_.background, theme_);
+        gaugewidgets::drawArcGauge(tft_, speedArc_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
+                                    kSpeedMax, kSpeedMax, kSpeedMax, theme_.background, theme_);
+    }
+
+    // S197 - Analog's needle sweeps through the gauge's true center, so its
+    // digital numeral+unit shrink (theme's own tier-4 font, see theme.cpp) and
+    // move down into the dial's lower half, clear of the needle pivot.
+    int32_t numberY = kGaugeCy + (theme_.useNeedleGauge ? 45 : -5);
+    int32_t unitLabelY = kGaugeCy + (theme_.useNeedleGauge ? 73 : (35 + (theme_.numberedFonts[2] != 0 ? 8 : 0)));
 
     TickMode tickMode = static_cast<TickMode>(settings.tickMode);
     if (tickMode != TickMode::Off) {
@@ -239,12 +255,17 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
                                           static_cast<float>(settings.redlineRpm), tickMode, theme_);
             runtimeState_.rpmTickLitCountDrawn = rpmLitCount;
         }
+        // S197 - Analog uses a finer speed tick graduation (every 5, major
+        // every 10) than the other themes (every 10, major every 50).
+        float speedTickMinor = theme_.useNeedleGauge ? config::kSpeedTickIntervalMinorAnalog
+                                                       : config::kSpeedTickIntervalMinor;
+        float speedTickMajor = theme_.useNeedleGauge ? config::kSpeedTickIntervalMajorAnalog
+                                                       : config::kSpeedTickIntervalMajor;
         float speedLitValue = (speedNeedle_.currentValue < kSpeedMax) ? speedNeedle_.currentValue : kSpeedMax;
-        int32_t speedLitCount = static_cast<int32_t>(speedLitValue / config::kSpeedTickIntervalMinor);
+        int32_t speedLitCount = static_cast<int32_t>(speedLitValue / speedTickMinor);
         if (speedLitCount != runtimeState_.speedTickLitCountDrawn) {
             gaugewidgets::drawGaugeTicks(tft_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
-                                          kSpeedMax, config::kSpeedTickIntervalMinor, config::kSpeedTickIntervalMajor,
-                                          kSpeedMax, tickMode, theme_);
+                                          kSpeedMax, speedTickMinor, speedTickMajor, kSpeedMax, tickMode, theme_);
             runtimeState_.speedTickLitCountDrawn = speedLitCount;
         }
     }
@@ -261,7 +282,7 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     }
     // Reserve the field width from the widest expected reading (RPM can reach
     // 4 digits, e.g. up to kMaxMaxRpm = 9000) rather than a guessed constant:
-    // S197's 7-segment font is wider per digit than other themes'
+    // S197 - Digital's 7-segment font is wider per digit than other themes'
     // fonts, so a fixed 120px field left part of a 4-digit value undrawn by
     // the clear rect, leaving stale segments once the value dropped back to
     // 3 digits.
@@ -270,12 +291,11 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextDatum(MC_DATUM);
     tft_.setTextColor(rpmTextColor, theme_.background);
     applyValueFont(tft_, theme_, 4);
-    gaugewidgets::drawFieldText(tft_, rpmBuf, kRpmGaugeCx, kGaugeCy - 5, rpmFieldWidth, theme_.background);
+    gaugewidgets::drawFieldText(tft_, rpmBuf, kRpmGaugeCx, numberY, rpmFieldWidth, theme_.background);
     resetValueFont(tft_);
-    tft_.setTextSize(2);
+    tft_.setTextSize(theme_.useNeedleGauge ? 1 : 2);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
-    int32_t rpmLabelY = kGaugeCy + 35 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
-    tft_.drawString(labels::kUnitRpm, kRpmGaugeCx, rpmLabelY);
+    tft_.drawString(labels::kUnitRpm, kRpmGaugeCx, unitLabelY);
 
     char speedBuf[8];
     if (snapshot.speedMph.valid) {
@@ -291,12 +311,31 @@ void ClusterPages::drawPage1Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextDatum(MC_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
     applyValueFont(tft_, theme_, 4);
-    gaugewidgets::drawFieldText(tft_, speedBuf, kSpeedGaugeCx, kGaugeCy - 5, speedFieldWidth, theme_.background);
+    gaugewidgets::drawFieldText(tft_, speedBuf, kSpeedGaugeCx, numberY, speedFieldWidth, theme_.background);
     resetValueFont(tft_);
-    tft_.setTextSize(2);
+    tft_.setTextSize(theme_.useNeedleGauge ? 1 : 2);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
-    int32_t speedLabelY = kGaugeCy + 35 + (theme_.numberedFonts[2] != 0 ? 8 : 0);
-    tft_.drawString(units::speedUnitLabel(metric), kSpeedGaugeCx, speedLabelY);
+    tft_.drawString(units::speedUnitLabel(metric), kSpeedGaugeCx, unitLabelY);
+
+    if (theme_.useNeedleGauge) {
+        // Redraw the tick number labels every frame, immediately before the
+        // needle: eraseNeedle() above may have notched them (or the numeral)
+        // if the needle swept across their radius, so this repaints them
+        // before drawNeedle() paints the needle on top of both.
+        gaugewidgets::drawGaugeTickLabels(tft_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, kRpmMax,
+                                            config::kRpmTickIntervalMajor,
+                                            static_cast<float>(settings.redlineRpm), 1000.0F, "%.0f", theme_,
+                                            theme_.background);
+        gaugewidgets::drawGaugeTickLabels(tft_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, kSpeedMax,
+                                            config::kSpeedTickIntervalMajorAnalog, kSpeedMax, 1.0F, "%.0f", theme_,
+                                            theme_.background, /*smallFont=*/true);
+
+        gaugewidgets::drawNeedle(tft_, rpmArc_, kRpmGaugeCx, kGaugeCy, kGaugeRadius, rpmNeedle_.currentValue, kRpmMax,
+                                  static_cast<float>(settings.shiftLightRpm),
+                                  static_cast<float>(settings.redlineRpm), theme_.background, theme_);
+        gaugewidgets::drawNeedle(tft_, speedArc_, kSpeedGaugeCx, kGaugeCy, kGaugeRadius, speedNeedle_.currentValue,
+                                  kSpeedMax, kSpeedMax, kSpeedMax, theme_.background, theme_);
+    }
 
     constexpr int32_t kRowY = 250, kColW = 154, kColGap = 5;
     char valueBuf[16];
@@ -373,6 +412,7 @@ void ClusterPages::drawPage2Static() {
     loadArc_.invalidate();
     stftBar_.invalidate();
     ltftBar_.invalidate();
+    runtimeState_.loadTickLitCountDrawn = -1;
 
     // Must match the Engine Load gauge geometry in drawPage2Dynamic().
     constexpr int32_t kGaugeCx = 130, kGaugeCy = 130, kGaugeRadius = 78;
@@ -385,7 +425,10 @@ void ClusterPages::drawPage2Static() {
     int32_t loadUnitW = gaugewidgets::fixedUnitWidth(tft_, "%", 2);
     int32_t loadValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 5, "100");
     gaugewidgets::ValueUnitGroup loadGroup = gaugewidgets::centerValueUnitGroup(kGaugeCx, loadValueW, loadUnitW, 4);
-    gaugewidgets::drawFixedUnit(tft_, "%", loadGroup.unitRightX, kGaugeCy, MR_DATUM, 2, theme_, theme_.background);
+    // S197 - Analog's needle pivots at kGaugeCy; move the value/unit line down
+    // clear of it (see the matching offset in drawPage2Dynamic()).
+    int32_t loadValueY = kGaugeCy + (theme_.useNeedleGauge ? 30 : 0);
+    gaugewidgets::drawFixedUnit(tft_, "%", loadGroup.unitRightX, loadValueY, MR_DATUM, 2, theme_, theme_.background);
 
     // Must match the MAF/TIMING ADVANCE layout in drawPage2Dynamic().
     MafTimingLayout mafLayout = computeMafTimingLayout();
@@ -442,9 +485,30 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     char buf[24];
 
     float targetLoad = snapshot.engineLoadPct.valid ? snapshot.engineLoadPct.value : 0.0F;
-    gaugewidgets::drawArcGauge(tft_, loadArc_, kGaugeCx, kGaugeCy, kGaugeRadius, targetLoad, 100.0F, 100.0F, 100.0F,
-                                theme_.background, theme_);
+    // S197 - Analog draws a needle instead of the fill arc: eraseNeedle() now
+    // (before the numeral/tick labels below are redrawn) and drawNeedle()
+    // afterward, so the needle ends up drawn on top of both (see
+    // drawPage1Dynamic()'s matching RPM/Speed sequence).
+    if (theme_.useNeedleGauge) {
+        gaugewidgets::eraseNeedle(tft_, loadArc_, kGaugeCx, kGaugeCy, kGaugeRadius, targetLoad, 100.0F,
+                                   theme_.background);
+    } else {
+        gaugewidgets::drawArcGauge(tft_, loadArc_, kGaugeCx, kGaugeCy, kGaugeRadius, targetLoad, 100.0F, 100.0F,
+                                    100.0F, theme_.background, theme_);
+    }
 
+    if (theme_.useNeedleGauge) {
+        int32_t loadLitCount = static_cast<int32_t>(targetLoad / config::kLoadTickIntervalMinor);
+        if (loadLitCount != runtimeState_.loadTickLitCountDrawn) {
+            gaugewidgets::drawGaugeTicks(tft_, kGaugeCx, kGaugeCy, kGaugeRadius, targetLoad, 100.0F,
+                                          config::kLoadTickIntervalMinor, config::kLoadTickIntervalMajor, 100.0F,
+                                          static_cast<TickMode>(settings.tickMode), theme_);
+            runtimeState_.loadTickLitCountDrawn = loadLitCount;
+        }
+    }
+
+    // S197 - Analog's needle pivots at kGaugeCy; must match drawPage2Static()'s offset.
+    int32_t loadValueY = kGaugeCy + (theme_.useNeedleGauge ? 30 : 0);
     snprintf(buf, sizeof(buf), "%d", static_cast<int>(targetLoad));
     int32_t loadUnitW = gaugewidgets::fixedUnitWidth(tft_, "%", 2);
     int32_t loadValueW = gaugewidgets::reservedValueWidth(tft_, theme_, 5, "100");
@@ -452,13 +516,25 @@ void ClusterPages::drawPage2Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     tft_.setTextDatum(MR_DATUM);
     tft_.setTextColor(theme_.textPrimary, theme_.background);
     applyValueFont(tft_, theme_, 5);
-    gaugewidgets::drawFieldText(tft_, snapshot.engineLoadPct.valid ? buf : "--", loadGroup.valueRightX, kGaugeCy,
+    gaugewidgets::drawFieldText(tft_, snapshot.engineLoadPct.valid ? buf : "--", loadGroup.valueRightX, loadValueY,
                                  loadValueW, theme_.background);
     resetValueFont(tft_);
     tft_.setTextSize(1);
     tft_.setTextColor(theme_.textSecondary, theme_.background);
     tft_.setTextDatum(MC_DATUM);
-    tft_.drawString(labels::kLabelEngineLoad, kGaugeCx, kGaugeCy + 34);
+    int32_t loadCaptionGap = theme_.useNeedleGauge ? 28 : 34;
+    tft_.drawString(labels::kLabelEngineLoad, kGaugeCx, loadValueY + loadCaptionGap);
+
+    if (theme_.useNeedleGauge) {
+        // Same reasoning as drawPage1Dynamic(): repaint the tick labels
+        // (which the needle's erase step may have notched) before drawing
+        // the needle on top of them.
+        gaugewidgets::drawGaugeTickLabels(tft_, kGaugeCx, kGaugeCy, kGaugeRadius, 100.0F,
+                                            config::kLoadTickIntervalMajor, 100.0F, 1.0F, "%.0f", theme_,
+                                            theme_.background);
+        gaugewidgets::drawNeedle(tft_, loadArc_, kGaugeCx, kGaugeCy, kGaugeRadius, targetLoad, 100.0F, 100.0F, 100.0F,
+                                  theme_.background, theme_);
+    }
 
     // Must match the box geometry in drawPage2Static().
     MafTimingLayout mafLayout = computeMafTimingLayout();

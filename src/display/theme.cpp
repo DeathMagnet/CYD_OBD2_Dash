@@ -7,6 +7,7 @@ extern const GFXfont FreeSans9pt7b;
 extern const GFXfont FreeSans12pt7b;
 extern const GFXfont FreeSans18pt7b;
 extern const GFXfont FreeSans24pt7b;
+extern const GFXfont FreeSansBold9pt7b;
 
 namespace {
 
@@ -35,6 +36,7 @@ ThemeColors kModernFlatTheme = {
     false,  // useSevenSegmentFont
     false,  // useSegmentedBars
     false,  // useSegmentedArcs
+    false,  // useNeedleGauge
     labels::kThemeNameModernFlat,
     {},     // valueFonts: initialized via initializeThemeFonts()
     {},     // numberedFonts: not used
@@ -65,15 +67,16 @@ ThemeColors kNeonTheme = {
     false,  // useSevenSegmentFont
     false,  // useSegmentedBars
     false,  // useSegmentedArcs
+    false,  // useNeedleGauge
     labels::kThemeNameNeon,
     {},     // valueFonts: initialized via initializeThemeFonts()
     {},     // numberedFonts: not used
 };
 
-// S197: OEM 2005-2010 Ford Mustang instrument cluster look (see
+// S197 - Digital: OEM 2005-2010 Ford Mustang instrument cluster look (see
 // docs/cyd-obd2-ui-cluster-guide.md). Deep midnight background, LED-green
 // gauge arcs and text, chrome bezels, vibrant red needle.
-constexpr ThemeColors kS197Theme = {
+constexpr ThemeColors kS197DigitalTheme = {
     0x0821, // background: deep midnight navy
     0x10A5, // panel: slightly lighter navy card surface
     0x001F, // primaryGaugeArc: LED blue
@@ -95,9 +98,46 @@ constexpr ThemeColors kS197Theme = {
     true,   // useSevenSegmentFont: TFT_eSPI Font 7 for large readouts
     true,   // useSegmentedBars: OEM-style segmented LED bar look
     true,   // useSegmentedArcs: OEM-style segmented LED ring look
-    labels::kThemeNameS197,
+    false,  // useNeedleGauge
+    labels::kThemeNameS197Digital,
     {},     // valueFonts: nullptr array (use default GLCD font)
     {0, 7, 7}, // numberedFonts: Font 7 (7-segment LCD) for tiers 3/4 (boost/vacuum and RPM/Speed); tier 2 (drawValueBox) stays on default
+};
+
+// S197 - Analog: same OEM Mustang palette/bezel/segmented-bar look as S197 -
+// Digital, but the round gauges (RPM/Speed/Engine Load) sweep a needle over a
+// static dial face with labeled major ticks instead of an animated fill arc
+// (see gaugewidgets::eraseNeedle()/drawNeedle()). The center numeral shrinks
+// to FreeSansBold9pt7b (Font 7 has no smaller scale) and moves down so it
+// no longer competes with the needle pivot for the same space (see
+// ClusterPages' useNeedleGauge layout branch).
+ThemeColors kS197AnalogTheme = {
+    0x0821, // background: deep midnight navy
+    0x10A5, // panel: slightly lighter navy card surface
+    0x001F, // primaryGaugeArc: LED blue
+    0x39C7, // secondaryGaugeArc: dark grey
+    0xC618, // tickInactiveColor: silver (lights up LED blue once the needle passes)
+    0xF800, // needle: vibrant red
+    0xC618, // needleCap: chrome hub
+    0xFD20, // cautionArc: amber (Shift Light RPM -> Redline RPM zone)
+    0xF800, // dangerArc: red (Redline RPM -> end of sweep)
+    0xC618, // bezel: metallic chrome
+    0x07E0, // textPrimary: LED green
+    0x5D8D, // textSecondary: soft LED green
+    0xF8C0, // warningActive: amber-orange
+    0x559F, // touchHighlight: light ice-blue
+    0x062B, // unsavedActive: green (Save button, unsaved config changes)
+    0x062B, // liveActive: green (OBDII badge, connection live)
+    true,   // showGaugeBezel: OEM chrome ring around round gauges
+    false,  // showOuterTicks: only the inner tick segment is shown
+    true,   // useSevenSegmentFont: TFT_eSPI Font 7 for large readouts (non-gauge large text)
+    true,   // useSegmentedBars: OEM-style segmented LED bar look
+    false,  // useSegmentedArcs: superseded by the needle
+    true,   // useNeedleGauge: needle + labeled ticks instead of a fill arc
+    labels::kThemeNameS197Analog,
+    {},        // valueFonts: tier 4/5 (index 2/3) set to FreeSansBold18pt7b via initializeThemeFonts()
+    {0, 7, 0}, // numberedFonts: tier 3 (boost/vacuum, unrelated to the round gauges) stays Font 7 like S197 - Digital;
+               // tier 4 (index 2) is unused here since valueFonts[2] takes priority (see applyValueFont)
 };
 
 } // namespace
@@ -105,7 +145,8 @@ constexpr ThemeColors kS197Theme = {
 const ThemeColors& getTheme(ThemeId id) {
     switch (id) {
         case ThemeId::Neon: return kNeonTheme;
-        case ThemeId::S197: return kS197Theme;
+        case ThemeId::S197Digital: return kS197DigitalTheme;
+        case ThemeId::S197Analog: return kS197AnalogTheme;
         case ThemeId::ModernFlat:
         default: return kModernFlatTheme;
     }
@@ -168,8 +209,18 @@ void initializeThemeFonts() {
     kNeonTheme.valueFonts[1] = &Orbitron_Light_24_Fixed;
     kNeonTheme.valueFonts[2] = &Orbitron_Light_32_Fixed;
 
+    // S197 - Analog: RPM/Speed/Engine Load readouts (tiers 4/5, index 2/3)
+    // use a smaller free font instead of S197 - Digital's Font 7 (which has
+    // no smaller scale), so the center numeral doesn't crowd the needle
+    // pivot - matching FreeSansBold9pt7b, the same size already used for the
+    // RPM/Engine Load tick labels (gauge_widgets.cpp). Tier 3 (index 1,
+    // boost/vacuum - not a round gauge) is untouched and keeps Font 7 via
+    // numberedFonts, same as S197 - Digital.
+    kS197AnalogTheme.valueFonts[2] = &FreeSansBold9pt7b;
+
     // Tier 5: dedicated, larger Engine Load value font (reuses the RPM/Speed
     // tier-4 font) without changing Boost/Vacuum's shared tier-3 size.
     kModernFlatTheme.valueFonts[3] = &FreeSans24pt7b;
     kNeonTheme.valueFonts[3] = &Orbitron_Light_32_Fixed;
+    kS197AnalogTheme.valueFonts[3] = &FreeSansBold9pt7b;
 }

@@ -170,6 +170,26 @@ No build flags need to change. `DisplayManager::drawBootImage()` (`src/display/d
 
 ## UI Overview
 
+### Themes
+
+The dashboard supports four distinct visual themes, switchable on the Config: UI page and persisted across reboots. Tap the **Active Theme** button to cycle through the themes; the order cycles `Modern Flat` → `Neon` → `S197 - Digital` → `S197 - Analog` and wraps. **S197 - Analog is the default** on a fresh device with no saved configuration; any previously saved theme choice is always honored on reboot.
+
+#### S197 - Analog (Default)
+
+A traditional needle-dial rendering of the 2005–2010 Ford Mustang instrument cluster. The RPM, Speed, and Engine Load gauges display a sweeping needle (not an animated color-fill arc) against a static dial face with a chrome bezel. Major tick marks are labeled with white numerals (starting from the first interval in, not at zero) that stay permanently silver and do not change color as the needle passes — the needle itself is the value indicator. The caution/danger redline zone is a fixed amber/red band painted on the dial behind the needle. The digital readout (numeral + unit caption) is smaller than the other themes and positioned below each gauge's needle pivot to avoid overlap. LED-green palette (navy background, chrome bezel, red needle, white tick labels).
+
+#### S197 - Digital
+
+The classic "LED-style" rendering of the same 2005–2010 Ford Mustang cluster. Uses a 7-segment LED-look font for the readout numeral, an animated color-fill arc (that brightens as the value climbs), and tick marks that light up LED-green once the value passes them. Same chrome bezel, navy background, and red needle as S197 - Analog, but with the original all-arc gauge design. Positioned identically to the Analog variant but optimized for the animated fill aesthetic instead of a needle.
+
+#### Neon
+
+A high-contrast modern theme inspired by the Torque Pro OBD Android app. Black background with neon green primary gauge arcs, electric cyan accents, and hot-orange warning highlights. Crisp digital typography and a visually vibrant style for night driving or harsh sunlight conditions.
+
+#### Modern Flat
+
+A minimalist, flat-design theme for modern electric and performance vehicles. Slate-gray background, crisp white gauges, accent blue for secondary elements, and crimson warning badges. No chrome bezel decoration; geometric bar-gauge designs. Clean, contemporary look favoring clarity over retro aesthetic.
+
 ### Navigation
 
 The header bar at the top of every page (40px tall) contains these elements, left to right:
@@ -275,10 +295,10 @@ Navigate with the prev/next arrows; cycles within the config group only. All set
 
 #### UI Page
 
-- **Active Theme** (tap-to-cycle): Cycles through `Modern Flat` → `Neon` → `S197` → (wraps). Determines the color palette for gauges, fonts, and the MIL/shift-light warning colors. The entire visible page recolors immediately.
+- **Active Theme** (tap-to-cycle): Cycles through `Modern Flat` → `Neon` → `S197 - Digital` → `S197 - Analog` → (wraps). Determines the color palette for gauges, fonts, and the MIL/shift-light warning colors. The entire visible page recolors immediately. `S197 - Analog` renders the RPM/Speed/Engine Load gauges with a sweeping needle and numbered major tick marks instead of the other themes' animated color-fill arc; see the [UI Cluster Guide](docs/cyd-obd2-ui-cluster-guide.md#theme-engine-architecture) for details.
 - **Units** (tap-to-toggle): `STANDARD (MPH/°F/PSI)` ↔ `METRIC (KM/H/°C/KPA)`. Affects all displayed temperatures, pressures, and distances. The displayed gauge values and axis labels update immediately, but the internal configuration never changes — only the display multipliers swap.
 - **Gauge Ticks** (tap-to-cycle): `TICS OFF` → `INSIDE TICS ONLY` → `OUTSIDE TICS ONLY` → `INSIDE AND OUTSIDE TICS` → (wraps).
-  - **Constraint**: If the active theme is "S197", only the first two options are available (`OFF` ↔ `INSIDE ONLY`), because the S197 theme's bezel art lacks space for outer tick marks. Attempting to cycle past `INSIDE ONLY` wraps back to `OFF`.
+  - **Constraint**: If the active theme is `S197 - Digital` or `S197 - Analog`, only the first two options are available (`OFF` ↔ `INSIDE ONLY`), because neither S197 theme's bezel art has space for outer tick marks. Attempting to cycle past `INSIDE ONLY` wraps back to `OFF`.
 - **Touch Calibration** (tap-to-confirm): Immediately re-runs the 4-corner touch calibration routine — unlike the other UI settings, this isn't staged; it acts as soon as you confirm, independent of the Save button. First tap arms the button ("TAP TO CONFIRM", same pattern as Delete All Logs); tapping again within 5 seconds deletes the saved calibration and restarts the device, which then walks you through the calibration screen on boot.
 - **Flip Screen** (tap-to-toggle): `NORMAL` ↔ `FLIPPED 180`. Rotates the display 180° for boards mounted upside-down behind the gauge cluster.
   - **⚠️ Warning**: Changing this setting **restarts the device** when you save, and re-runs touch calibration in the new orientation (same as the first-boot calibration routine). Make sure you're ready to re-tap the 4 calibration corners after saving.
@@ -354,6 +374,6 @@ The onboard RGB status LED provides real-time visual feedback for shift point an
 **Theme-specific shift-flash colors and LED quantization:**
 - **Modern Flat theme**: Shift flash is pure red (`0xD800`); MIL red is also pure red — the LED renders both as red, distinguishable only by the flash cadence. Prioritizes the flash's clear on/off visibility.
 - **Neon theme**: Shift flash is hot orange (`0xFDA0`), which the LED quantizes to red + green (amber-ish); MIL red is pure red. Provides visual separation between shift and MIL even though the shift flash takes priority.
-- **S197 theme**: Shift flash is amber-orange (`0xF8C0`), which quantizes down to pure red on the LED's 3 fixed on/off channels (only the red channel exceeds the half-scale threshold). Like Modern Flat, both shift and MIL render as red; the flash cadence tells them apart.
+- **S197 - Digital and S197 - Analog themes**: Shift flash is amber-orange (`0xF8C0`), which quantizes down to pure red on the LED's 3 fixed on/off channels (only the red channel exceeds the half-scale threshold). Like Modern Flat, both shift and MIL render as red; the flash cadence tells them apart.
 
 All LED updates respect the active-low logic: `LOW` = channel on, `HIGH` = channel off.

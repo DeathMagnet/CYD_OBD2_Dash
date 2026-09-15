@@ -25,7 +25,7 @@ struct AppSettings {
     float hpEstimationFactor = config::kDefaultHpEstimationFactor;
     float fuelTrimRangePct = config::kDefaultFuelTrimRangePct;
     // Theme selection is persisted to /config.txt; see display/theme.h for
-    // the ThemeId values (S197=0, Neon=1, ModernFlat=2).
+    // the ThemeId values (S197Digital=0, Neon=1, ModernFlat=2, S197Analog=3).
     uint8_t themeId = config::kDefaultThemeId;
     bool useMetricUnits = false; // Display units (dashboard pages, config fields)
     bool useMetricLogs = false;  // CSV logging units
@@ -33,8 +33,9 @@ struct AppSettings {
     // Saving this setting triggers (see ConfigStore::isScreenFlipDirty);
     // see display/display_manager.h.
     bool screenFlipped = false;
-    // Page 1 RPM/Speed arc tick marks (TickMode, display/theme.h). S197
-    // only supports Off/InsideOnly; see ConfigStore::clampTickModeForTheme.
+    // Page 1 RPM/Speed arc tick marks (TickMode, display/theme.h). Either
+    // S197 variant only supports Off/InsideOnly; see
+    // ConfigStore::clampTickModeForTheme.
     uint8_t tickMode = config::kDefaultTickMode;
 
     AppSettings();
@@ -93,9 +94,10 @@ private:
     bool parseLine(const char* line);
 
     // Forces tickMode down to InsideOnly if it's currently Outside/
-    // InsideAndOutside while the active theme is S197, which has no
-    // room in its bezel art for outside ticks. Called after any change to
-    // themeId or tickMode, and once after loading from SD.
+    // InsideAndOutside while the active theme is S197Digital or
+    // S197Analog, neither of which has room in its bezel art for outside
+    // ticks. Called after any change to themeId or tickMode, and once after
+    // loading from SD.
     void clampTickModeForTheme();
 
     SdManager& sdManager_;

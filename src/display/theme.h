@@ -3,17 +3,18 @@
 #include <stdint.h>
 #include <TFT_eSPI.h>
 
-// Three themes are implemented (docs/cyd-obd2-ui-cluster-guide.md): S197,
-// Neon, and Modern Flat.
+// Four themes are implemented (docs/cyd-obd2-ui-cluster-guide.md): S197
+// Digital, S197 Analog, Neon, and Modern Flat.
 enum class ThemeId : uint8_t {
-    S197 = 0,
+    S197Digital = 0,
     Neon = 1,
     ModernFlat = 2,
+    S197Analog = 3,
 };
 
-// RPM/Speed gauge tick display mode (Config: UI page). S197 cannot
-// render outside ticks (ThemeColors::showOuterTicks is false), so only Off
-// and InsideOnly are valid while that theme is active.
+// RPM/Speed gauge tick display mode (Config: UI page). Neither S197 variant
+// can render outside ticks (ThemeColors::showOuterTicks is false), so only
+// Off and InsideOnly are valid while either is active.
 enum class TickMode : uint8_t {
     Off = 0,
     InsideOnly = 1,
@@ -45,6 +46,11 @@ struct ThemeColors {
                               // (discrete lit blocks) instead of a smooth continuous fill.
     bool useSegmentedArcs;    // Render round gauges as a segmented LED ring style
                               // (discrete lit wedges) instead of a smooth continuous arc.
+    bool useNeedleGauge;      // Render round gauges (drawArcGauge) with a needle pointer instead
+                              // of an animated value-fill arc. The static track ring and
+                              // caution/danger redline zone are still painted; only the fill arc
+                              // is replaced. Also enables numeric major-tick labels
+                              // (gaugewidgets::drawGaugeTickLabels).
     const char* name;
     const GFXfont* valueFonts[4]; // Fonts for setTextSize(2/3/4/5); indexed by (size - 2). nullptr = use default GLCD font.
                                    // Tier 5 (index 3) is reserved for Engine Load's optionally-enlarged value; a

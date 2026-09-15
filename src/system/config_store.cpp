@@ -78,7 +78,7 @@ bool ConfigStore::parseLine(const char* line) {
         settings_.fuelTrimRangePct = clampF(static_cast<float>(atof(valueStr)), config::kMinFuelTrimRangePct, config::kMaxFuelTrimRangePct);
     } else if (strcmp(key, "theme") == 0) {
         long theme = atol(valueStr);
-        settings_.themeId = (theme >= 0 && theme <= 2) ? static_cast<uint8_t>(theme) : config::kDefaultThemeId;
+        settings_.themeId = (theme >= 0 && theme <= 3) ? static_cast<uint8_t>(theme) : config::kDefaultThemeId;
     } else if (strcmp(key, "units") == 0) {
         settings_.useMetricUnits = (atol(valueStr) != 0);
     } else if (strcmp(key, "log_units") == 0) {
@@ -196,7 +196,7 @@ void ConfigStore::setFuelTrimRangePct(float pct) {
 }
 
 void ConfigStore::setThemeId(uint8_t id) {
-    settings_.themeId = (id <= 2) ? id : config::kDefaultThemeId;
+    settings_.themeId = (id <= 3) ? id : config::kDefaultThemeId;
     clampTickModeForTheme();
 }
 
@@ -218,7 +218,8 @@ void ConfigStore::setTickMode(uint8_t mode) {
 }
 
 void ConfigStore::clampTickModeForTheme() {
-    if (static_cast<ThemeId>(settings_.themeId) != ThemeId::S197) {
+    ThemeId activeTheme = static_cast<ThemeId>(settings_.themeId);
+    if (activeTheme != ThemeId::S197Digital && activeTheme != ThemeId::S197Analog) {
         return;
     }
     if (settings_.tickMode == static_cast<uint8_t>(TickMode::OutsideOnly) ||
