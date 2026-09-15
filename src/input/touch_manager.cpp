@@ -53,6 +53,41 @@ void TouchManager::calibrateAndSave() {
     tft_.fillScreen(TFT_BLACK);
 }
 
+namespace {
+// Mirrors TFT_eSPI's own Touch.cpp _RAWERR deadband, used to reject a noisy
+// XY sample pair without needing the library's delay()-based settle waits.
+constexpr uint16_t kTouchRawDeadband = 20;
+}  // namespace
+
 bool TouchManager::getTouch(uint16_t& x, uint16_t& y) {
-    return tft_.getTouch(&x, &y, config::kTouchPressureThreshold);
+    // TFT_eSPI's own tft_.getTouch() burns 5 full validation rounds per call,
+    // each with several ms of delay() while polling pressure/settle time, even
+    // when the screen isn't touched. That runs synchronously in the main loop
+    // and was the source of the sluggish/low-resolution feel. This reimplements
+    // the same public-API sampling (raw Z threshold, double-sampled XY deadband,
+    // calibrated conversion) without any delay() calls or redundant rounds.
+    if (tft_.getTouchRawZ() <= config::kTouchPressureThreshold) {
+        return false;
+    }
+
+    uint16_t x1, y1, x2, y2;
+    tft_.getTouchRaw(&x1, &y1);
+    tft_.getTouchRaw(&x2, &y2);
+    if (abs(static_cast<int32_t>(x1) - static_cast<int32_t>(x2)) > kTouchRawDeadband ||
+        abs(static_cast<int32_t>(y1) - static_cast<int32_t>(y2)) > kTouchRawDeadband) {
+        return false;
+    }
+
+    if (tft_.getTouchRawZ() <= config::kTouchPressureThreshold) {
+        return false;
+    }
+
+    tft_.convertRawXY(&x1, &y1);
+    if (x1 >= tft_.width() || y1 >= tft_.height()) {
+        return false;
+    }
+
+    x = x1;
+    y = y1;
+    return true;
 }
