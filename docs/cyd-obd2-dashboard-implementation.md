@@ -150,8 +150,9 @@ src/
   obd/
     telemetry.h              # TelemetryValue / TelemetrySnapshot (header only)
     obd_pids.h/.cpp          # PID table, decode formulas, response-line parser
-    obd_credentials.h/.cpp   # Loads mac/id/password from /obd_config.txt on SD at boot
+    obd_credentials.h/.cpp   # Loads/saves mac/id/password from /obd_config.txt on SD at boot
     obd_client.h/.cpp        # ELM327 Bluetooth client (see below)
+    obd_pairing.h/.cpp       # Boot-time-only Bluetooth pairing/recovery screen (Device/Password/Connect); own temporary BluetoothSerial, never touches obd_client's
     obd_simulator.h/.cpp     # Scripted drive-cycle generator (OBD_SIMULATION_ENABLED builds only)
   logging/
     csv_logger.h/.cpp        # Session files, buffered writes, capacity pruning, log summary/delete
@@ -171,6 +172,7 @@ Notable deviations from the original proposal, and why:
 - **No `scheduler.h`.** `loop()` uses plain `millis()`-delta checks per subsystem (touch poll, UI refresh, CSV row/flush), matching the coding standards' preference for plain direct code over a scheduling abstraction at this project's size.
 - **`config_store` and `dtc_decoder`** were not in the original proposal; they exist to back the config pages' persisted settings and the Diagnostics page's DTC list, respectively.
 - **`obd_simulator`** is bench-only. Building the `cyd_4inch_sim` environment defines `OBD_SIMULATION_ENABLED`, which compiles `BluetoothSerial` and the whole AT/PID path out of `obd_client.*` and runs `ObdClient::simulationLoop()` on the same task instead. Because the swap happens behind `ObdClient`'s existing public interface, `main.cpp`, `cluster_pages`, `touch_handler`, and `csv_logger` are untouched and the mutex/task timing under test matches production.
+- **`obd_pairing`** was not in the original proposal; it replaces what was originally a hard boot-time halt on a missing/invalid `/obd_config.txt` with a recovery UI. It deliberately does *not* live inside `ObdClient`/`obd_client.cpp` - it runs synchronously in `main.cpp`'s `setup()`, entirely before `ObdClient::begin()` is called, using its own `BluetoothSerial` instance. This keeps `ObdClient::taskLoop()`'s existing infinite-retry-with-backoff behavior completely untouched for the normal runtime case (a connection dropped while the dashboard is showing), and confines the new scan/pair/write-config logic to the one-time boot decision of *which* credentials to hand to `ObdClient::begin()` in the first place. Like `obd_simulator`, it compiles out entirely under `OBD_SIMULATION_ENABLED`.
 
 ## Simulated Telemetry Build
 
@@ -215,7 +217,7 @@ Boot -> SdInit -> DisplayReady -> BootAsset -> ObdConnecting -> Live
 1. Initialize serial output at the monitor speed configured by PlatformIO (`115200`).
 2. Mount the SD card and load persisted settings (`/config.txt`) - including the saved display orientation - before the display initializes below, so orientation is correct from the first frame instead of needing a second correction pass. A failed mount falls back to defaults; this early mount is independent of `SD_LOGGING_ENABLED` (see step 5).
 3. Initialize the display in the persisted orientation, set landscape rotation, clear the screen, and draw a minimal status screen.
-4. Load the OBD adapter identity from `/obd_config.txt` (mandatory; no fallback).
+4. Load the OBD adapter identity from `/obd_config.txt` (mandatory; no fallback default). **As built**, a missing/invalid file, or stored credentials that fail to connect `kPreflightMaxAttempts` (5) times in a row, no longer halts boot - it falls into an on-device Bluetooth pairing/recovery screen (`obd_pairing::run()`, see `src/obd/obd_pairing.h`) that scans for nearby adapters, lets the user pick a device + a common PIN, and writes a fresh `/obd_config.txt` on a successful connect. This runs entirely before step 5 below, using its own temporary `BluetoothSerial` instance so `ObdClient`'s runtime connect/retry/backoff logic is never touched; it is boot-time only and is never re-entered once the dashboard is showing.
 5. Start Bluetooth and attempt the configured ELM327 connection.
 6. Play the selected boot asset, but wait for OBD connection or timeout (15s max) while showing live status updates at the bottom of the screen. **As built**, this step has been reordered: Bluetooth start (step 5) now happens *before* the boot-asset display, and the boot screen blocks on `ObdClient::getConnectionState() == Live` or timeout, redrawing the latest connection message (e.g. "Connecting by MAC...", "Bluetooth link established") via `DisplayManager::drawBootStatus()` — replacing the originally-specified flat finite duration with a connection-aware bounded wait.
 7. Initialize touch calibration and start SD CSV logging (using the card already mounted in step 2) only when `SD_LOGGING_ENABLED` is defined. Unavailable logging must not affect dashboard functionality.
@@ -371,11 +373,14 @@ Run these checks as implementation progresses:
 - Connect to a known ELM327 adapter and confirm RPM, speed, and at least one secondary PID update.
 - Turn off the adapter or leave vehicle range; verify that the UI becomes stale/disconnected without freezing or reporting false zero values.
 - Test an ECU/PID failure and verify only the affected field is invalid.
-- Insert an SD card **with a valid `/obd_config.txt`**, confirm a new CSV has one header and parseable rows, then inspect it on a host machine. (Note: unlike CSV logging itself, `/obd_config.txt` is mandatory on `cyd_4inch` — an SD-card-missing test below will halt on the OBD config error screen before reaching the logging path, which is expected.)
+- Insert an SD card **with a valid `/obd_config.txt`**, confirm a new CSV has one header and parseable rows, then inspect it on a host machine. (Note: unlike CSV logging itself, `/obd_config.txt` is normally required on `cyd_4inch` to skip straight to the dashboard - see the pairing-screen checks below for what happens when it's missing.)
 - Observe display rendering and Bluetooth recovery for an extended bench session; confirm no uncontrolled memory growth, watchdog resets, or UI stalls.
-- With no SD card, or no `/obd_config.txt` on it, confirm `cyd_4inch` shows the red "OBD CONFIG ERROR" screen immediately after display init and halts (serial log shows the fatal message; `loop()` never runs). Confirm `cyd_4inch_sim` boots normally in the same scenario, since it skips this check.
-- Create `/obd_config.txt` missing one of `mac=`/`id=`/`password=` (or with a malformed `mac=`) and confirm the same halt/error behavior.
-- Create a fully valid `/obd_config.txt` (`mac=`/`id=`/`password=` all set) and confirm the serial log shows a MAC-address connect attempt and the status badge reaches LIVE.
+- With no SD card, or no `/obd_config.txt` on it, confirm `cyd_4inch` shows the Bluetooth pairing screen (DEVICE / PASSWORD / CONNECT buttons) instead of halting, and that it finds the bench ELM327 adapter during its scan (filtered list if the adapter's name matches a known pattern, full list otherwise). Confirm `cyd_4inch_sim` boots normally in the same scenario, since it skips this check entirely.
+- On the pairing screen, tap DEVICE and PASSWORD to cycle through the discovered devices and the four common PINs, then tap CONNECT with the correct combination; confirm `/obd_config.txt` is written with the expected `mac=`/`id=`/`password=` values and the dashboard proceeds to boot normally (`obdClient.begin()` picks up the just-verified credentials).
+- Create `/obd_config.txt` missing one of `mac=`/`id=`/`password=` (or with a malformed `mac=`) and confirm the same pairing-screen fallback (not a halt).
+- Put a **valid-format but wrong** `mac=`/`password=` in `/obd_config.txt` (a real field format, but not the adapter actually in range) and confirm the serial/connection log shows 5 failed preflight connect attempts before the pairing screen appears.
+- On the pairing screen, deliberately select the wrong PASSWORD against a real adapter and tap CONNECT 5 times; confirm the screen resets its selection and re-scans automatically rather than getting stuck, and that this is logged to `/logs/connection.log`.
+- Create a fully valid `/obd_config.txt` (`mac=`/`id=`/`password=` all set, matching a reachable adapter) and confirm the serial log shows a MAC-address connect attempt and the status badge reaches LIVE, with no pairing screen shown and no more than one preflight connect attempt.
 - On the Config: UI page, toggle Flip Screen and tap Save; confirm the device restarts, re-runs touch calibration automatically, and boots with the display and boot logo rotated 180° with taps landing correctly afterward. Toggle back and confirm it returns to normal, and that the setting survives a full power cycle either way.
 - On the Config: UI page, tap the Touch Calibration button twice (arm, then confirm) and verify the device restarts and re-runs the 4-corner calibration routine immediately, without needing a Save tap; confirm touch accuracy afterward.
 

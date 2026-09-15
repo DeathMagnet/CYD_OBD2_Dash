@@ -54,7 +54,7 @@ Vehicle OBD-II Port
 
 ## OBD-II Adapter Setup
 
-The ELM327 adapter's Bluetooth identity is **not** configured on-device — there's no config page for it. Instead, it's required to be present on the SD card and is read once at boot from a plain-text file. **All three fields are mandatory** — there is no fallback default for any of them:
+The ELM327 adapter's Bluetooth identity lives on the SD card, in a plain-text file read once at boot:
 
 1. Copy [docs/sd_card_templates/obd_config.example.txt](docs/sd_card_templates/obd_config.example.txt) to the **root of the SD card** and rename it to `obd_config.txt` (the path must be exactly `/obd_config.txt`).
 2. Edit it with your adapter's details — `mac`, `id`, and `password` must all be set:
@@ -66,13 +66,25 @@ The ELM327 adapter's Bluetooth identity is **not** configured on-device — ther
    - `mac` (**required**): your adapter's Bluetooth MAC address (colon-, dash-, or un-separated hex all work). The dashboard always connects by address, never by scanning for a device name, since it's more reliable.
    - `id` (**required**): the Bluetooth SPP device name, used for identification/logging (common values: `OBDII`, `OBDLink`, `Vgate`, `VEEPEAK`, `OBD2`).
    - `password` (**required**): the legacy numeric Bluetooth pairing PIN (common values: `1234`, `0000`).
-3. Re-insert the card and power on. **If the file is missing, unreadable, or any of the three fields is blank/invalid, the device shows a red on-screen error ("OBD CONFIG ERROR") and halts boot** — it never reaches the dashboard, touch calibration, or SD logging. Fix the file and reboot.
+3. Re-insert the card and power on.
 
-To change credentials later, re-edit `/obd_config.txt` on the card (on a computer, or in-place) and reboot — there's no live reconnect from the UI.
+Pre-filling this file is still the fastest way to get a known-good adapter connected on the first boot, but it's no longer strictly required — see the on-device pairing screen below for what happens if the file is missing or wrong.
 
-**Boot screen connection status:** While booting, the boot screen now shows live connection status text at the bottom (e.g. "Connecting by MAC...", "Bluetooth link established", "ELM327 initialized; polling PIDs") and waits for the link to go Live, or up to 15 seconds, before continuing to the dashboard. Every connection stage is also appended to `/logs/connection.log` on the SD card, so a failed live test (run untethered, without a laptop watching serial output) can be diagnosed after the fact by re-reading the card.
+### On-Device Bluetooth Pairing Screen
 
-**Exception**: the `cyd_4inch_sim` bench/demo build (see [Build Environments](#build-environments)) skips this requirement entirely, since it never connects to a real adapter.
+If `/obd_config.txt` is missing/unreadable, has a blank/invalid field, or the stored `mac`/`password` fail to connect **5 times in a row**, the dashboard no longer halts on an error screen. Instead it shows a full-screen touch UI with three buttons:
+
+- **DEVICE** — cycles through nearby Bluetooth devices found by scanning, filtered to names that look like an OBD-II adapter (`OBDII`, `OBDLink`, `Vgate`, `VEEPEAK`, `OBD2`); falls back to showing every discovered device if none match. Tapping DEVICE while the list is empty re-scans.
+- **PASSWORD** — cycles through the four most common ELM327 pairing PINs: `0000`, `1111`, `1234`, `6789`.
+- **CONNECT** — saves the currently selected device + password to `/obd_config.txt` and attempts to connect. On success, the dashboard proceeds to boot normally with those now-verified credentials. On failure, tap DEVICE/PASSWORD again and retry; after **5 failed CONNECT attempts**, the screen resets its selection and re-scans automatically.
+
+This screen loops until it connects — there's no skip/cancel button, since a dashboard with no adapter connected has nothing useful to show anyway. It's a boot-time-only recovery path: once the dashboard is actually running, a dropped connection just shows the `RECONNECTING` badge and keeps retrying in the background forever, exactly as before — it never interrupts a page you're looking at while driving.
+
+To change working credentials later without triggering the pairing screen, you can still re-edit `/obd_config.txt` directly on the card and reboot.
+
+**Boot screen connection status:** While booting, the boot screen now shows live connection status text at the bottom (e.g. "Connecting by MAC...", "Bluetooth link established", "ELM327 initialized; polling PIDs") and waits for the link to go Live, or up to 15 seconds, before continuing to the dashboard. Every connection stage — including pairing-screen scans and connect attempts — is also appended to `/logs/connection.log` on the SD card, so a failed live test (run untethered, without a laptop watching serial output) can be diagnosed after the fact by re-reading the card.
+
+**Exception**: the `cyd_4inch_sim` bench/demo build (see [Build Environments](#build-environments)) skips all of this entirely, since it never connects to a real adapter.
 
 ### SD Card Contents
 
@@ -80,7 +92,7 @@ The dashboard reads/writes these files:
 
 | File | Purpose |
 | --- | --- |
-| `/obd_config.txt` | OBD-II adapter identity (`mac`/`id`/`password`), read once at boot. See above. (Root directory.) |
+| `/obd_config.txt` | OBD-II adapter identity (`mac`/`id`/`password`), read once at boot; also written by the on-device pairing screen on a successful CONNECT. See above. (Root directory.) |
 | `/config.txt` | Dashboard settings (theme, gauge ranges, units, etc.), written by the Config pages' Save button. (Root directory.) |
 | `/touch_cal.dat` | Touch calibration data, written by the calibration routine. (Root directory.) |
 | `/logs/obd_log_*.csv` | CSV telemetry logs (one file per session), written when `SD_LOGGING_ENABLED` is set. (Stored in `/logs` folder.) |

@@ -278,10 +278,11 @@ Read and display OBD-II Diagnostic Trouble Codes.
 
 1. **SD Card & Config Load**: Mount the SD card and load saved preferences (`/config.txt`), including the display's persisted orientation (Flip Screen). Loaded first so the display and touch subsystems below can initialize directly in the correct, final orientation rather than needing a second correction pass.
 2. **Power On / Reset**: Initialize TFT display & SPI at 20MHz, in the loaded orientation.
-3. **Boot Screen**: Display the static boot splash image (`src/assets/boot_logo_png.h`, a 480×320 PNG decoded via PNGdec). The `BOOT_IMAGE_MODE` and `BOOT_RGB666_ASSETS_AVAILABLE` flags are currently defined but not branched on in code; only the static PNG path runs regardless of their values. The original design intended to support animated RGB666 sequences here, but that remains unimplemented.
-4. **Touch Calibration**: Load saved touch calibration from SD, or run the 4-corner calibration routine if it's missing (e.g. right after a Flip Screen save deletes it) — always in the display's final orientation from step 2.
-5. **Gauge Display**: Gauges interpolate smoothly to incoming OBD readings via spring-physics `NeedlePhysics` (see the "Gauge Needle Interpolation & Boot Sweep" section); there is no special boot-time sweep sequence.
-6. **OBD Connection**: Display connection status badge (starts `BOOT`, `DISPLAY READY`, then `CONNECTING` or `LIVE`) as the Bluetooth ELM327 handshake progresses.
+3. **Touch Calibration**: Load saved touch calibration from SD, or run the 4-corner calibration routine if it's missing (e.g. right after a Flip Screen save deletes it) — always in the display's final orientation from step 2. **As built**, this now runs before the OBD credentials step below (moved up from after the boot screen), so the Bluetooth pairing screen in step 4 always has working touch input if it's needed.
+4. **OBD Credentials / Bluetooth Pairing (conditional)**: Load `/obd_config.txt`. If it's missing/invalid, or its stored `mac`/`password` fail to connect 5 times in a row, show the on-device Bluetooth pairing screen (DEVICE / PASSWORD / CONNECT buttons; see the README's "On-Device Bluetooth Pairing Screen" section) instead of the boot splash below, and loop on it until a connection succeeds. Boot-time only — skipped entirely once valid, working credentials are found, and never re-entered once the dashboard is running.
+5. **Boot Screen**: Display the static boot splash image (`src/assets/boot_logo_png.h`, a 480×320 PNG decoded via PNGdec). The `BOOT_IMAGE_MODE` and `BOOT_RGB666_ASSETS_AVAILABLE` flags are currently defined but not branched on in code; only the static PNG path runs regardless of their values. The original design intended to support animated RGB666 sequences here, but that remains unimplemented.
+6. **Gauge Display**: Gauges interpolate smoothly to incoming OBD readings via spring-physics `NeedlePhysics` (see the "Gauge Needle Interpolation & Boot Sweep" section); there is no special boot-time sweep sequence.
+7. **OBD Connection**: Display connection status badge (starts `BOOT`, `DISPLAY READY`, then `CONNECTING` or `LIVE`) as the Bluetooth ELM327 handshake progresses.
 
 ---
 
@@ -309,7 +310,9 @@ src/
 
 - [ ] All 5 dashboard pages (1–5: Primary Cluster, Engine Load, Car-Specific, Performance, Diagnostics) render cleanly at 480×320 landscape resolution.
 - [ ] All 4 config pages (UI, GAUGES, USER VARS, LOGS) render cleanly.
-- [ ] With `/obd_config.txt` present on the SD card with valid `mac=`/`id=`/`password=`, the dashboard connects by MAC address at boot; with the file missing or any field blank/invalid, `cyd_4inch` shows the "OBD CONFIG ERROR" screen and halts instead of reaching any dashboard page.
+- [ ] With `/obd_config.txt` present on the SD card with valid, reachable `mac=`/`id=`/`password=`, the dashboard connects by MAC address at boot with no pairing screen shown; with the file missing, any field blank/invalid, or the stored `mac=`/`password=` unreachable after 5 preflight attempts, `cyd_4inch` shows the Bluetooth pairing screen instead of halting.
+- [ ] On the pairing screen, DEVICE cycles through discovered Bluetooth devices (filtered to known OBD-adapter name patterns, falling back to the full list) and re-scans when tapped with an empty list; PASSWORD cycles through `0000`/`1111`/`1234`/`6789`; CONNECT saves the selection to `/obd_config.txt` and attempts a connection, proceeding to the normal boot sequence on success.
+- [ ] Forcing 5 failed CONNECT attempts on the pairing screen (e.g. selecting a wrong password against a real adapter) resets the selection and re-scans automatically rather than getting stuck, and every scan/attempt is appended to `/logs/connection.log`.
 - [ ] Theme switching (Modern Flat -> Neon -> S197 -> Modern Flat, via the UI page's Active Theme cycle button) immediately recolors gauges, bezels, needles, and text, and the selection survives Save + reboot.
 - [ ] Page 1 RPM gauge correctly displays the orange Shift Light-to-Redline arc and the red Redline-to-max arc, holds the red zone to the end of the sweep, and triggers bezel shift light flash.
 - [ ] Shift Light RPM and Redline RPM on GAUGES page control the arc colors correctly.

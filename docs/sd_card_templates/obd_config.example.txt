@@ -2,14 +2,19 @@
 #
 # Copy this file to the ROOT of the SD card, rename it to "obd_config.txt"
 # (path must be exactly /obd_config.txt), and fill in the values below for
-# your own ELM327 adapter. The dashboard reads this file once at boot; there
-# is no on-device page to edit these values, so re-edit this file and
-# re-insert the card (or edit it on the card directly) to change them.
+# your own ELM327 adapter. The dashboard reads this file once at boot;
+# pre-filling it here is still the fastest way to connect on the first boot.
 #
-# ALL THREE FIELDS BELOW ARE REQUIRED. There is no fallback default for any
-# of them - if mac, id, or password is missing, blank, or invalid, the
-# device shows a red "OBD CONFIG ERROR" screen and halts at boot until this
-# file is fixed and the device is rebooted.
+# ALL THREE FIELDS BELOW ARE REQUIRED - but there's no need to hand-edit this
+# file if you don't already know your adapter's MAC address. If mac, id, or
+# password is missing, blank, or invalid, OR the values here fail to connect
+# 5 times in a row, the device no longer halts - it shows an on-device
+# Bluetooth pairing screen (DEVICE / PASSWORD / CONNECT buttons) that scans
+# for nearby adapters and rewrites this file itself once you tap CONNECT
+# successfully. See the README's "On-Device Bluetooth Pairing Screen"
+# section for details. You can still hand-edit this file directly (on a
+# computer, or in place) and reboot to change working credentials at any
+# time, without going through the pairing screen.
 #
 # Lines starting with "#" and blank lines are ignored.
 
