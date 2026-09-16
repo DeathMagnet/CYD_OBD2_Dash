@@ -112,79 +112,6 @@ The speed, coolant, MAP, IAT, fuel pressure, and barometric pressure columns ren
 
 **Row interval** (configurable 50–1000 ms) and **automatic pruning** (oldest file deleted when SD card free space drops below 5 MB) are managed on the LOGS config page. For full column definitions and sample CSV output, see [docs/cyd-obd2-sd-logging-guide.md](docs/cyd-obd2-sd-logging-guide.md).
 
-## Build Environments
-
-| Environment | Purpose |
-| --- | --- |
-| `cyd_4inch` | Default. Live telemetry over Bluetooth from an ELM327 adapter. |
-| `cyd_4inch_sim` | Bench/demo. Replaces the adapter with a scripted drive cycle, so the whole UI can be exercised with no adapter or vehicle connected. |
-
-```powershell
-pio run -e cyd_4inch_sim --target upload
-```
-
-The simulated ~95-second cycle runs idle → three gear pulls (crossing the shift light and redline) → cruise → decel fuel cut → stop-and-go → idle, and periodically drops the link so the badge walks LIVE → STALE → RECONNECTING → CONNECTING → LIVE. Page 5 (Diagnostics) serves a fixed set of fake DTCs that "Clear Codes" clears. Tunables live in the `kSim*` block of [src/app_config.h](src/app_config.h); add `-D SIM_TIME_SCALE=2.0F` to the environment's `build_flags` to sweep the cycle at double speed. SD logging is independent of simulation mode and stays enabled.
-
-### Serial Debugging
-
-To open a serial monitor and watch live debug output, use PlatformIO's device monitor. The baud rate is configured once in the shared `[env]` block of `platformio.ini` at 115200:
-
-```powershell
-pio device monitor
-pio device monitor -e cyd_4inch_sim
-```
-
-To build, upload, and immediately open the monitor in one step:
-
-```powershell
-pio run -e cyd_4inch_sim -t upload -t monitor
-```
-
-### Generating Assets
-
-The boot splash image is stored as a compressed indexed PNG in `src/assets/boot_logo_png.h` and decoded at runtime via the `PNGdec` library. To replace or regenerate the boot splash, follow this two-step pipeline:
-
-**Step 1: Quantize the source PNG**
-
-Your source image must already be exactly **480×320 pixels**. Quantize it to an indexed (≤256-color) PNG:
-
-```powershell
-python src/scripts/optimize_png.py <source.png> -o <quantized.png> --width 480 --height 320 --max-colors 256
-```
-
-**Requirements:**
-- Requires Python 3 + Pillow: `pip install pillow`
-- If the quantized output drifts from the source by more than `--max-avg-delta` (default 4.0 per channel) or `--max-channel-delta` (default 24 per channel), the script fails (non-zero exit) and prints a color-delta report so you can see where the drift happened. Adjust the source colors or raise these thresholds as needed.
-
-**Step 2: Convert to a PROGMEM C header**
-
-```powershell
-python src/scripts/png_to_header.py <quantized.png> -o src/assets/boot_logo_png.h --name boot_logo
-```
-
-This generates the exact PROGMEM byte array (`kBootLogoPng`, `kBootLogoPngSize`) consumed by `DisplayManager::drawBootImage()`. The header comment includes the original PNG's dimensions and color type, and notes the space savings vs. raw RGB565.
-
-**Step 3: Rebuild and upload**
-
-No build flags need to change. `DisplayManager::drawBootImage()` (`src/display/display_manager.cpp:39-60`) includes `src/assets/boot_logo_png.h` directly and decodes it via PNGdec at boot time.
-
-### Generating DTC Descriptions Database
-
-The Diagnostics page (Page 5) displays human-readable descriptions for every OBD-II DTC code by looking them up in a flash-resident table. To regenerate this table from the source CSV (normally only needed if `src/data/Mustang_DTC.csv` is edited):
-
-```powershell
-python src/scripts/csv_to_dtc_table.py src/data/Mustang_DTC.csv -o src/system
-```
-
-This generates two files:
-- `src/system/dtc_table.h` — extern declarations for the sorted, flash-resident lookup table
-- `src/system/dtc_table.cpp` — the generated const array (`kDtcTable`, `kDtcTableCount`), indexed by binary search for O(log n) code lookups
-
-**Requirements:**
-- Requires Python 3 (standard library only; no extra pip dependencies)
-- Uses the standard `csv` module to correctly handle quoted fields and escaped quotes in descriptions
-
-Like `boot_logo_png.h`, the generated `.h` and `.cpp` files are checked in to the repository and only need regeneration if the source CSV changes.
 
 ## UI Overview
 
@@ -395,3 +322,77 @@ The onboard RGB status LED provides real-time visual feedback for shift point an
 - **S197 - Digital and S197 - Analog themes**: Shift flash is amber-orange (`0xF8C0`), which quantizes down to pure red on the LED's 3 fixed on/off channels (only the red channel exceeds the half-scale threshold). Like Modern Flat, both shift and MIL render as red; the flash cadence tells them apart.
 
 All LED updates respect the active-low logic: `LOW` = channel on, `HIGH` = channel off.
+
+## Build Environments
+
+| Environment | Purpose |
+| --- | --- |
+| `cyd_4inch` | Default. Live telemetry over Bluetooth from an ELM327 adapter. |
+| `cyd_4inch_sim` | Bench/demo. Replaces the adapter with a scripted drive cycle, so the whole UI can be exercised with no adapter or vehicle connected. |
+
+```powershell
+pio run -e cyd_4inch_sim --target upload
+```
+
+The simulated ~95-second cycle runs idle → three gear pulls (crossing the shift light and redline) → cruise → decel fuel cut → stop-and-go → idle, and periodically drops the link so the badge walks LIVE → STALE → RECONNECTING → CONNECTING → LIVE. Page 5 (Diagnostics) serves a fixed set of fake DTCs that "Clear Codes" clears. Tunables live in the `kSim*` block of [src/app_config.h](src/app_config.h); add `-D SIM_TIME_SCALE=2.0F` to the environment's `build_flags` to sweep the cycle at double speed. SD logging is independent of simulation mode and stays enabled.
+
+### Serial Debugging
+
+To open a serial monitor and watch live debug output, use PlatformIO's device monitor. The baud rate is configured once in the shared `[env]` block of `platformio.ini` at 115200:
+
+```powershell
+pio device monitor
+pio device monitor -e cyd_4inch_sim
+```
+
+To build, upload, and immediately open the monitor in one step:
+
+```powershell
+pio run -e cyd_4inch_sim -t upload -t monitor
+```
+
+### Generating Assets
+
+The boot splash image is stored as a compressed indexed PNG in `src/assets/boot_logo_png.h` and decoded at runtime via the `PNGdec` library. To replace or regenerate the boot splash, follow this two-step pipeline:
+
+**Step 1: Quantize the source PNG**
+
+Your source image must already be exactly **480×320 pixels**. Quantize it to an indexed (≤256-color) PNG:
+
+```powershell
+python src/scripts/optimize_png.py <source.png> -o <quantized.png> --width 480 --height 320 --max-colors 256
+```
+
+**Requirements:**
+- Requires Python 3 + Pillow: `pip install pillow`
+- If the quantized output drifts from the source by more than `--max-avg-delta` (default 4.0 per channel) or `--max-channel-delta` (default 24 per channel), the script fails (non-zero exit) and prints a color-delta report so you can see where the drift happened. Adjust the source colors or raise these thresholds as needed.
+
+**Step 2: Convert to a PROGMEM C header**
+
+```powershell
+python src/scripts/png_to_header.py <quantized.png> -o src/assets/boot_logo_png.h --name boot_logo
+```
+
+This generates the exact PROGMEM byte array (`kBootLogoPng`, `kBootLogoPngSize`) consumed by `DisplayManager::drawBootImage()`. The header comment includes the original PNG's dimensions and color type, and notes the space savings vs. raw RGB565.
+
+**Step 3: Rebuild and upload**
+
+No build flags need to change. `DisplayManager::drawBootImage()` (`src/display/display_manager.cpp:39-60`) includes `src/assets/boot_logo_png.h` directly and decodes it via PNGdec at boot time.
+
+### Generating DTC Descriptions Database
+
+The Diagnostics page (Page 5) displays human-readable descriptions for every OBD-II DTC code by looking them up in a flash-resident table. To regenerate this table from the source CSV (normally only needed if `src/data/Mustang_DTC.csv` is edited):
+
+```powershell
+python src/scripts/csv_to_dtc_table.py src/data/Mustang_DTC.csv -o src/system
+```
+
+This generates two files:
+- `src/system/dtc_table.h` — extern declarations for the sorted, flash-resident lookup table
+- `src/system/dtc_table.cpp` — the generated const array (`kDtcTable`, `kDtcTableCount`), indexed by binary search for O(log n) code lookups
+
+**Requirements:**
+- Requires Python 3 (standard library only; no extra pip dependencies)
+- Uses the standard `csv` module to correctly handle quoted fields and escaped quotes in descriptions
+
+Like `boot_logo_png.h`, the generated `.h` and `.cpp` files are checked in to the repository and only need regeneration if the source CSV changes.
