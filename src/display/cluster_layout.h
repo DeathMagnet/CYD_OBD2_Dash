@@ -90,4 +90,13 @@ constexpr int32_t kDtcButtonH = 40;
 constexpr int32_t kDtcReadButtonX = 40, kDtcReadButtonW = 180;
 constexpr int32_t kDtcClearButtonX = 260, kDtcClearButtonW = 180;
 
+// Vertical start of the DTC list's content block, centered within the box's
+// kDtcListVisibleLines line span when fewer codes are shown than that (e.g. 2
+// codes center inside the 5-line box rather than hugging its top). Shared by
+// cluster_pages.cpp (drawing) and touch_handler.cpp (row hit-testing) so a
+// tapped row always maps to the row it visually appears to be.
+constexpr int32_t dtcContentStartY(uint8_t contentLines) {
+    return kDtcListY + (kDtcListVisibleLines - contentLines) * kDtcListLineHeight / 2;
+}
+
 } // namespace layout

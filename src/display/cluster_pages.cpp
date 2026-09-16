@@ -2,6 +2,7 @@
 #include "display/cluster_layout.h"
 #include "labels.h"
 #include "system/units.h"
+#include "system/dtc_lookup.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -1573,6 +1574,99 @@ bool dtcListsEqual(const DtcList& a, const DtcList& b) {
     return true;
 }
 
+constexpr size_t kDtcLineBufCap = 128;
+
+// Copies `fullText` into `out` (capacity kDtcLineBufCap), shortening it with
+// a trailing "..." until it fits maxWidthPx in tft's current font. Returns
+// true if it had to shorten. Safe against fullText longer than the buffer:
+// it's simply cut to fit the buffer first, same as any other overflow this
+// function already truncates for width.
+bool truncateToWidth(TFT_eSPI& tft, const char* fullText, char out[kDtcLineBufCap], int32_t maxWidthPx) {
+    size_t fullLen = strlen(fullText);
+    if (fullLen >= kDtcLineBufCap) {
+        fullLen = kDtcLineBufCap - 1;
+    }
+    memcpy(out, fullText, fullLen);
+    out[fullLen] = '\0';
+    if (tft.textWidth(out) <= maxWidthPx) {
+        return false;
+    }
+
+    size_t keep = fullLen;
+    while (keep > 0) {
+        --keep;
+        size_t suffixLen = (keep + 3 < kDtcLineBufCap) ? 3 : (kDtcLineBufCap - 1 - keep);
+        memcpy(out + keep, "...", suffixLen);
+        out[keep + suffixLen] = '\0';
+        if (tft.textWidth(out) <= maxWidthPx) {
+            break;
+        }
+    }
+    return true;
+}
+
+constexpr uint8_t kDtcWrapMaxLines = 4;
+constexpr size_t kDtcWrapLineCap = 64;
+
+// Greedy word-wrap of `text` into `lines` (each up to kDtcWrapLineCap-1
+// chars), breaking on spaces so words are never split unless a single word
+// alone is wider than maxWidthPx (none of this table's descriptions are).
+// Returns the number of lines used.
+uint8_t wrapText(TFT_eSPI& tft, const char* text, int32_t maxWidthPx, char lines[][kDtcWrapLineCap],
+                  uint8_t maxLines) {
+    size_t textLen = strlen(text);
+    size_t pos = 0;
+    uint8_t lineCount = 0;
+
+    while (pos < textLen && lineCount < maxLines) {
+        size_t lastSpace = pos;
+        bool sawSpace = false;
+        size_t i = pos;
+        for (; i < textLen; ++i) {
+            size_t len = i + 1 - pos;
+            if (len >= kDtcWrapLineCap) {
+                break;
+            }
+            char probe[kDtcWrapLineCap];
+            memcpy(probe, text + pos, len);
+            probe[len] = '\0';
+            if (tft.textWidth(probe) > maxWidthPx) {
+                break;
+            }
+            if (text[i] == ' ') {
+                lastSpace = i;
+                sawSpace = true;
+            }
+        }
+
+        size_t end;
+        if (i >= textLen) {
+            end = textLen;
+        } else if (sawSpace) {
+            end = lastSpace;
+        } else {
+            end = i;
+        }
+        if (end <= pos) {
+            end = (i > pos) ? i : pos + 1;
+        }
+
+        size_t len = end - pos;
+        if (len >= kDtcWrapLineCap) {
+            len = kDtcWrapLineCap - 1;
+        }
+        memcpy(lines[lineCount], text + pos, len);
+        lines[lineCount][len] = '\0';
+        ++lineCount;
+
+        pos = end;
+        while (pos < textLen && text[pos] == ' ') {
+            ++pos;
+        }
+    }
+    return lineCount;
+}
+
 } // namespace
 
 void ClusterPages::drawPage5Static() {
@@ -1597,6 +1691,11 @@ void ClusterPages::drawPage5Static() {
     runtimeState_.dtcHaveResultDrawn = -1;
     runtimeState_.dtcListDrawn = DtcList();
     runtimeState_.dtcClearConfirmDrawn = -1;
+    runtimeState_.dtcDetailIndex = -1;
+    runtimeState_.dtcDetailIndexDrawn = -2;
+    for (uint8_t i = 0; i < layout::kDtcListVisibleLines; ++i) {
+        runtimeState_.dtcLineTruncated[i] = false;
+    }
 
     // Kick off a fresh DTC read every time this page is opened.
     obdClient_.requestDtcRead();
@@ -1621,42 +1720,104 @@ void ClusterPages::drawPage5Dynamic(const TelemetrySnapshot& snapshot, uint32_t 
     bool dtcListChanged = runtimeState_.dtcHaveResultDrawn != static_cast<int8_t>(haveResult) ||
                            (haveResult && !dtcListsEqual(dtcList, runtimeState_.dtcListDrawn));
     if (dtcListChanged) {
-        applyValueFont(tft_, theme_, 2);
-        // Clear the whole box every time regardless of how many lines will actually be
-        // shown, so a shrinking list (fewer codes, or a fresh read) never leaves a stale
-        // line from a taller previous draw.
-        for (uint8_t line = 0; line < layout::kDtcListVisibleLines; ++line) {
-            int32_t y = layout::kDtcListY + line * layout::kDtcListLineHeight;
-            tft_.fillRect(30, y, 420, layout::kDtcListLineHeight - 2, theme_.background);
-        }
+        // A fresh read invalidates any open detail overlay - the row it was
+        // showing may no longer correspond to the same code once redrawn.
+        runtimeState_.dtcDetailIndex = -1;
+    }
 
-        // Center the actual content block vertically within the box's line span, and
-        // each line horizontally on the box's x-center (matches the drawRoundRect box in
-        // drawPage5Static: x 20..460).
-        uint8_t contentLines = 1;
-        if (haveResult && dtcList.count > 0) {
-            contentLines = dtcList.count < layout::kDtcListVisibleLines ? dtcList.count : layout::kDtcListVisibleLines;
-        }
-        int32_t startY = layout::kDtcListY + (layout::kDtcListVisibleLines - contentLines) * layout::kDtcListLineHeight / 2;
+    bool detailChanged = runtimeState_.dtcDetailIndex != runtimeState_.dtcDetailIndexDrawn;
+    if (dtcListChanged || detailChanged) {
+        // Clear the box's whole usable interior every time regardless of how much will
+        // actually be redrawn, so switching between the list, the detail overlay, or a
+        // shrinking list never leaves stale content from a previous draw. x stays inset
+        // 10px from the border (matches drawPage5Static's 20..460 box) to clear the
+        // rounded corners; y stops 8px short of the border on both ends for the same reason.
+        constexpr int32_t kDtcBoxBottom =
+            layout::kDtcListY - 10 + layout::kDtcListLineHeight * layout::kDtcListVisibleLines + 20;
+        tft_.fillRect(30, layout::kDtcListY - 2, 420, (kDtcBoxBottom - 8) - (layout::kDtcListY - 2),
+                      theme_.background);
+
+        constexpr int32_t kDtcTextX = 36;
+        constexpr int32_t kDtcTextMaxWidth = 404; // stays clear of the box's right inset (x 450)
         constexpr int32_t kDtcCenterX = 20 + 440 / 2;
+        applyLabelFont(tft_);
 
-        tft_.setTextDatum(MC_DATUM);
-        if (!haveResult) {
-            tft_.setTextColor(theme_.textSecondary, theme_.background);
-            tft_.drawString(labels::kStatusReadingCodes, kDtcCenterX, startY + layout::kDtcListLineHeight / 2);
-        } else if (dtcList.count == 0) {
-            tft_.setTextColor(theme_.textSecondary, theme_.background);
-            tft_.drawString(labels::kStatusNoCodes, kDtcCenterX, startY + layout::kDtcListLineHeight / 2);
-        } else {
+        if (runtimeState_.dtcDetailIndex >= 0 &&
+            static_cast<uint8_t>(runtimeState_.dtcDetailIndex) < dtcList.count) {
+            // Detail overlay: the tapped row's code plus its full,
+            // word-wrapped (not truncated) description.
+            uint8_t idx = static_cast<uint8_t>(runtimeState_.dtcDetailIndex);
+            const char* code = dtcList.codes[idx];
+            const char* desc = lookupDtcDescription(code);
+
+            tft_.setTextDatum(TL_DATUM);
             tft_.setTextColor(theme_.textPrimary, theme_.background);
-            for (uint8_t line = 0; line < contentLines; ++line) {
-                int32_t y = startY + line * layout::kDtcListLineHeight + layout::kDtcListLineHeight / 2;
-                tft_.drawString(dtcList.codes[line], kDtcCenterX, y);
+            int32_t y = layout::kDtcListY;
+            tft_.drawString(code, kDtcTextX, y);
+            y += layout::kDtcListLineHeight;
+
+            tft_.setTextColor(theme_.textSecondary, theme_.background);
+            int32_t wrapLineHeight = tft_.fontHeight() + 4;
+            if (desc != nullptr) {
+                char wrapped[kDtcWrapMaxLines][kDtcWrapLineCap];
+                uint8_t lineCount = wrapText(tft_, desc, kDtcTextMaxWidth, wrapped, kDtcWrapMaxLines);
+                for (uint8_t i = 0; i < lineCount; ++i) {
+                    tft_.drawString(wrapped[i], kDtcTextX, y);
+                    y += wrapLineHeight;
+                }
+            }
+
+            tft_.setTextDatum(TC_DATUM);
+            tft_.drawString(labels::kHintTapToClose, kDtcCenterX, y);
+        } else {
+            // Center the actual content block vertically within the box's line span, and
+            // each line horizontally on the box's x-center (matches the drawRoundRect box in
+            // drawPage5Static: x 20..460).
+            uint8_t contentLines = 1;
+            if (haveResult && dtcList.count > 0) {
+                contentLines =
+                    dtcList.count < layout::kDtcListVisibleLines ? dtcList.count : layout::kDtcListVisibleLines;
+            }
+            int32_t startY = layout::dtcContentStartY(contentLines);
+
+            if (!haveResult) {
+                tft_.setTextDatum(MC_DATUM);
+                tft_.setTextColor(theme_.textSecondary, theme_.background);
+                tft_.drawString(labels::kStatusReadingCodes, kDtcCenterX, startY + layout::kDtcListLineHeight / 2);
+            } else if (dtcList.count == 0) {
+                tft_.setTextDatum(MC_DATUM);
+                tft_.setTextColor(theme_.textSecondary, theme_.background);
+                tft_.drawString(labels::kStatusNoCodes, kDtcCenterX, startY + layout::kDtcListLineHeight / 2);
+            } else {
+                tft_.setTextDatum(ML_DATUM);
+                for (uint8_t line = 0; line < contentLines; ++line) {
+                    int32_t y = startY + line * layout::kDtcListLineHeight + layout::kDtcListLineHeight / 2;
+                    const char* code = dtcList.codes[line];
+                    const char* desc = lookupDtcDescription(code);
+                    char lineBuf[kDtcLineBufCap];
+                    bool truncated = false;
+                    tft_.setTextColor(theme_.textPrimary, theme_.background);
+                    if (desc != nullptr && desc[0] != '\0') {
+                        char full[kDtcLineBufCap];
+                        snprintf(full, sizeof(full), "%s  %s", code, desc);
+                        truncated = truncateToWidth(tft_, full, lineBuf, kDtcTextMaxWidth);
+                    } else {
+                        strncpy(lineBuf, code, sizeof(lineBuf) - 1);
+                        lineBuf[sizeof(lineBuf) - 1] = '\0';
+                    }
+                    runtimeState_.dtcLineTruncated[line] = truncated;
+                    tft_.drawString(lineBuf, kDtcTextX, y);
+                }
+                for (uint8_t line = contentLines; line < layout::kDtcListVisibleLines; ++line) {
+                    runtimeState_.dtcLineTruncated[line] = false;
+                }
             }
         }
+
         resetValueFont(tft_);
         runtimeState_.dtcHaveResultDrawn = static_cast<int8_t>(haveResult);
         runtimeState_.dtcListDrawn = dtcList;
+        runtimeState_.dtcDetailIndexDrawn = runtimeState_.dtcDetailIndex;
     }
 
     bool confirmArmed =

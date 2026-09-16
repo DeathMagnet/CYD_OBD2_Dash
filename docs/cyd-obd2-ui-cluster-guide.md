@@ -19,7 +19,7 @@ The dashboard displays all five dashboard pages (1–5: Primary Cluster, Engine 
 - **Onboard RGB status LED** (`StatusLed::update()` in `src/system/status_led.cpp`): Mirrors the shift/MIL indication with a three-state behavior — flashes the theme's `warningActive` color (same 200 ms cadence as the Page-1 shift-light RPM text flash) whenever RPM is at or above Shift Light RPM, taking priority over a steady-red Check Engine (MIL) indication so the flash is never visually masked; falls back to steady red for MIL alone (when RPM is below Shift Light RPM); off otherwise.
 - **Gauge tick marks** (Page 1 RPM/Speed gauges, plus Page 2 Engine Load on S197 - Analog only): radial tick marks drawn as two short segments flanking the arc ring — one just outside the outer edge, one just inside the inner edge — at fixed value intervals (RPM: every 500, major every 1000; Speed: every 10, major every 50 — except S197 - Analog, which uses a finer every-5/major-every-10 graduation via its own `config::kSpeedTickIntervalMinorAnalog`/`kSpeedTickIntervalMajorAnalog` constants; Engine Load, S197 - Analog only: every 10%, major every 20%). For all themes except S197 - Analog, each tick is colored `primaryGaugeArc` once the value has passed that tick and `theme.tickInactiveColor` while still short of it (a field independent of the arc's own `secondaryGaugeArc` track color, so a theme can give ticks a different "unlit" color than the track), providing an at-a-glance "how far past this mark" reference. **S197 - Analog is the one exception**: its ticks stay permanently `tickInactiveColor` (silver/white) and never change color as the needle passes, since the needle itself is already the live value indicator and a static tick appearance matches the "printed dial face" aesthetic of a real OEM gauge. Ticks are not drawn inside the RPM redline zone (where the arc is already solid red). The outer segment is itself gated by `theme.showOuterTicks` — both S197 variants set this false and show only the inner segment, while Neon and Modern Flat show both. Toggleable on the Config: UI page via a "GAUGE TICKS" ON/OFF button (default: ON). S197 - Analog additionally labels each major tick with its numeric value (`gaugewidgets::drawGaugeTickLabels()`) — redrawn every Dynamic tick (not just once statically), since the needle's tip can sweep across their radius and a one-time static draw would be vulnerable to permanent erase damage from `eraseNeedle()`'s flat-color erase.
 - **Round-gauge chrome bezel** (Page 1 RPM/Speed, Page 2 Engine Load, Page 3 Vacuum/Boost): `gaugewidgets::drawGaugeBezel()` draws a decorative ring just outside each round gauge's outer edge, gated by `theme.showGaugeBezel` — on (4px thick, chrome-colored) for both S197 variants, off for Neon and Modern Flat.
-- **Diagnostics page DTC list shows codes only** (e.g. `P0133`), not human-readable descriptions — no DTC description database is included. A read is triggered automatically whenever the page is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
+- **Diagnostics page displays DTC codes with descriptions.** A flash-resident lookup table generated from `src/data/Mustang_DTC.csv` (`src/scripts/csv_to_dtc_table.py` → `src/system/dtc_table.h`/`.cpp`, binary-searched via `src/system/dtc_lookup.h`/`.cpp`) provides descriptions for all standard Mustang DTCs. Each code row displays as `CODE  Description`, with long descriptions automatically truncated with `...` (still tappable for the full text in a detail overlay). Codes not found in the table (manufacturer-specific/unmapped) display as a bare code. A read is triggered automatically whenever the page is opened, plus on-demand via "REFRESH CODES"; "CLEAR CODES" requires a second tap within 5 seconds to confirm.
 - **Config pages: UI / GAUGES / USER VARS / LOGS.** Settings are organized into four focused pages with a shared Save button at the bottom. Each config page displays the Save button (green when any value differs from what's saved on SD, default color when everything matches); tapping it persists all settings across all config pages to `/config.txt` on the SD card and displays "SAVED!" feedback. See [CYD OBD-II SD Card Telemetry Logging Guide](cyd-obd2-sd-logging-guide.md) for the auto-pruning behavior when the card runs low on space. The OBD-II adapter's identity is not part of this system — it's read once at boot from a separate `/obd_config.txt` file (see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#obd-ii-integration)), not edited on-device.
 - **Actual source layout** differs from the "Proposed" structure at the bottom of this doc — see [CYD OBD-II Dashboard Implementation Guide](cyd-obd2-dashboard-implementation.md#proposed-source-layout) for the as-built tree.
 
@@ -267,16 +267,12 @@ SD card logging configuration and management.
 ---
 
 ### Page 5 — Diagnostics (DTC Reader)
-Read and display OBD-II Diagnostic Trouble Codes.
+Read and display OBD-II Diagnostic Trouble Codes with human-readable descriptions.
 - **Check Engine Light (MIL) Status**: `MIL ACTIVE (ON)` or `MIL INACTIVE (OFF)`.
-- **DTC Decoding**:
+- **DTC Decoding and Display**:
   - Requests Mode 03 (`03`) stored trouble codes and Mode 07 (`07`) pending codes from ELM327.
-  - Decodes raw 2-byte response into standard OBD-II format:
-    - `0x00` -> `P0xxx` (Powertrain)
-    - `0x01` -> `C0xxx` (Chassis)
-    - `0x02` -> `B0xxx` (Body)
-    - `0x03` -> `U0xxx` (Network)
-  - Displays formatted code list (e.g. `P0420 - Catalyst System Efficiency Below Threshold`).
+  - Decodes raw 2-byte response into standard OBD-II format (P/C/B/U codes) and looks up each code in the bundled description database (`src/system/dtc_lookup.h`).
+  - Each row displays as `CODE  Description` in a smaller proportional font (FreeSans9pt7b). Long descriptions that don't fit on one line are truncated with `...` (e.g., `P0133  O2 Sensor Circuit Slow Response...`). Tapping a truncated row opens a detail overlay showing the code as a header and the full description word-wrapped (tap again or elsewhere in the box to close). Codes not found in the database display as a bare code (no truncation, not tappable).
 - **Clear Codes Touch Zone**: [ CLEAR CODES ] button issues Mode 04 (`04`) command with confirmation prompt.
 
 ---
@@ -309,7 +305,11 @@ src/
   system/
     config_store.h / .cpp            # Persistence manager for SD card configuration
     dtc_decoder.h / .cpp             # OBD Mode 03/07 DTC parser (P/C/B/U format)
+    dtc_lookup.h / .cpp              # Binary-search description lookup; queries dtc_table.h
+    dtc_table.h / .cpp               # Generated flash-resident DTC lookup table (sorted by code)
 ```
+
+**Note:** `dtc_table.h` and `dtc_table.cpp` are generated by `src/scripts/csv_to_dtc_table.py` from `src/data/Mustang_DTC.csv` and checked in to the repository; they are not hand-edited.
 
 ---
 
@@ -337,5 +337,5 @@ src/
 - [ ] Touch Calibration button on the Config: UI page arms on first tap (shows red "TAP TO CONFIRM"), reverts after 5s if not confirmed, and on confirm restarts the device and re-runs the 4-corner calibration routine; touch works correctly afterward on every page.
 - [ ] Calculated Horsepower, Torque, Vacuum/Boost, and 0-60 timer update correctly on Pages 3 & 4.
 - [ ] Config page settings save to SD card and persist after power cycle.
-- [ ] Page 5 (Diagnostics) correctly decodes and displays DTCs in `P0xxx` / `C0xxx` format.
+- [ ] Page 5 (Diagnostics) correctly decodes and displays DTCs in `P0xxx` / `C0xxx` format with descriptions looked up and displayed (or bare code if not found); long descriptions are truncated with `...`, tapping opens a detail overlay with the full text, and tapping the overlay again closes it.
 - [ ] Boot screen displays the static splash image and transitions cleanly to the cluster UI.

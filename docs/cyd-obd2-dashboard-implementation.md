@@ -162,6 +162,7 @@ src/
     connection_state.h       # ConnectionState enum (header only)
     status_led.h/.cpp        # Onboard RGB LED: shift-flash (priority) / MIL steady red / off
     dtc_decoder.h/.cpp       # Mode 03/07 DTC byte-pair decoding
+    dtc_lookup.h/.cpp        # Binary-search DTC description lookup; queries dtc_table.h
     config_store.h/.cpp      # Config page settings (theme, gauge calibration, user vars, logging), persisted to /config.txt
 ```
 
@@ -281,6 +282,8 @@ Treat the snapshot as the renderer and logger boundary. The OBD client updates i
 The adapter's identity is not configured on-device — there is no config page for it. Instead, `loadObdCredentials()` (`src/obd/obd_credentials.h/.cpp`) reads `mac`/`id`/`password` from `/obd_config.txt` on the SD card once at boot (see `docs/sd_card_templates/obd_config.example.txt` for the install-time template). **All three fields are mandatory — there is no fallback default.** `main.cpp` calls `loadObdCredentials()` immediately after display init (before the boot animation, touch calibration, or SD logging start) and, if it returns `false` (SD not mounted, file missing/unreadable, or any of `mac`/`id`/`password` blank or invalid), calls `DisplayManager::showFatalError()` to show a red "OBD CONFIG ERROR" screen and then halts in an infinite `delay()` loop — `loop()` is never entered, and `ObdClient::begin()` is never called. This mandatory check is skipped only for `OBD_SIMULATION_ENABLED` builds (`cyd_4inch_sim`), which never use these credentials. When credentials load successfully, `ObdClient::taskLoop()` connects by MAC address (`BluetoothSerial::connect(uint8_t[6])`) — `mac` is guaranteed present at that point, so the device-name (`id`) connect path only remains as defensive fallback code.
 
 **Units feature** (added post-spec): Both the UI and CSV logging support independent metric/standard toggles. Display units are configured on the UI config page and affect how speed, temperature, and pressure are rendered on all dashboard pages and stepper increments on config pages. CSV logging units are configured independently on the LOGS config page; changing this setting deletes all existing log files to prevent unit-mixed rows. See `src/system/units.h` for the conversion helper library and the UI & SD Logging guides for detailed mode documentation.
+
+**DTC descriptions feature** (added post-spec): The Diagnostics page displays human-readable descriptions alongside every DTC code by looking them up in a flash-resident, binary-searchable table generated from `src/data/Mustang_DTC.csv` (see `src/scripts/csv_to_dtc_table.py` for the generation pipeline — standard Python `csv` module, no extra dependencies). Each code row on the display shows `CODE  Description` in a smaller proportional font (`FreeSans9pt7b`). Descriptions longer than the visible line are automatically truncated with `...` and become tappable to open a detail overlay with the full description word-wrapped; tapping the overlay again closes it. Codes not found in the lookup table (manufacturer-specific or unmapped) display as a bare code and are not tappable. See the [UI Cluster Guide's Page 5 section](cyd-obd2-ui-cluster-guide.md#page-5--diagnostics-dtc-reader) for the complete on-screen behavior and truncation/overlay mechanics.
 
 ## Display and Gauge Behavior
 

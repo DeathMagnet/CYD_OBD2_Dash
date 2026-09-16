@@ -5,6 +5,7 @@
 
 #include "display/theme.h"
 #include "display/gauge_widgets.h"
+#include "display/cluster_layout.h"
 #include "obd/telemetry.h"
 #include "obd/obd_client.h"
 #include "system/connection_state.h"
@@ -69,6 +70,18 @@ struct ClusterPageRuntimeState {
     int8_t dtcHaveResultDrawn = -1;
     DtcList dtcListDrawn;
     int8_t dtcClearConfirmDrawn = -1;
+
+    // Page 5 - DTC description detail overlay. dtcDetailIndex is the row
+    // (into dtcListDrawn) whose full untruncated description is showing;
+    // -1 means the normal list is showing. dtcDetailIndexDrawn is the
+    // last-painted value, using a sentinel distinct from -1 so the first
+    // frame always paints. dtcLineTruncated[line] records whether that row's
+    // "<code>  <description>" text was cut short with "...", which is what
+    // touch_handler.cpp checks to decide whether tapping the row does
+    // anything.
+    int8_t dtcDetailIndex = -1;
+    int8_t dtcDetailIndexDrawn = -2;
+    bool dtcLineTruncated[layout::kDtcListVisibleLines] = {};
 
     // Header MIL icon - last-drawn state, so drawDynamic() only repaints the
     // icon when milOn actually changes instead of every UI refresh tick.

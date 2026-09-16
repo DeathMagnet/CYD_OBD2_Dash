@@ -108,6 +108,7 @@ constexpr const char* kStatusMilInactive = "MIL: INACTIVE (OFF)";
 constexpr const char* kStatusReadingCodes = "Reading codes...";
 constexpr const char* kStatusNoCodes = "No stored or pending codes.";
 constexpr const char* kButtonClearCodes = "CLEAR CODES";
+constexpr const char* kHintTapToClose = "(tap to close)";
 
 // ---- Connection Status Badge ----
 constexpr const char* kStatusBoot = "BOOT";

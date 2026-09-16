@@ -1,6 +1,6 @@
 # CYD OBD-II Dashboard
 
-A feature-rich, real-time automotive dashboard for the **Hosyond 4.0-inch ESP32-32E CYD** with a 320×480 ST7796S TFT, used in **480×320 landscape** orientation. Displays live OBD-II data with configurable themes, SD card CSV logging, DTC read/clear, and a fully customizable on-device configuration system—purpose-built for Ford Mustang enthusiasts.
+A feature-rich, real-time automotive dashboard for the **Hosyond 4.0-inch ESP32-32E CYD** with a 320×480 ST7796S TFT, used in **480×320 landscape** orientation. Displays live OBD-II data with configurable themes, SD card CSV logging, DTC read/clear with descriptions, and a fully customizable on-device configuration system—purpose-built for Ford Mustang enthusiasts.
 
 ## Hardware Requirements & Wiring
 
@@ -168,6 +168,24 @@ This generates the exact PROGMEM byte array (`kBootLogoPng`, `kBootLogoPngSize`)
 
 No build flags need to change. `DisplayManager::drawBootImage()` (`src/display/display_manager.cpp:39-60`) includes `src/assets/boot_logo_png.h` directly and decodes it via PNGdec at boot time.
 
+### Generating DTC Descriptions Database
+
+The Diagnostics page (Page 5) displays human-readable descriptions for every OBD-II DTC code by looking them up in a flash-resident table. To regenerate this table from the source CSV (normally only needed if `src/data/Mustang_DTC.csv` is edited):
+
+```powershell
+python src/scripts/csv_to_dtc_table.py src/data/Mustang_DTC.csv -o src/system
+```
+
+This generates two files:
+- `src/system/dtc_table.h` — extern declarations for the sorted, flash-resident lookup table
+- `src/system/dtc_table.cpp` — the generated const array (`kDtcTable`, `kDtcTableCount`), indexed by binary search for O(log n) code lookups
+
+**Requirements:**
+- Requires Python 3 (standard library only; no extra pip dependencies)
+- Uses the standard `csv` module to correctly handle quoted fields and escaped quotes in descriptions
+
+Like `boot_logo_png.h`, the generated `.h` and `.cpp` files are checked in to the repository and only need regeneration if the source CSV changes.
+
 ## UI Overview
 
 ### Themes
@@ -285,7 +303,7 @@ Calculated performance estimates and a rolling airflow history:
 Read, interpret, and clear OBD-II Diagnostic Trouble Codes (DTCs):
 
 - **MIL status line**: Shows either `MIL: ACTIVE (ON)` or `MIL: INACTIVE (OFF)`.
-- **Code list**: Automatically reads both stored codes (OBD Mode 03) and pending codes (OBD Mode 07) when the page is opened. Codes are decoded and displayed as P-codes, C-codes, B-codes, or U-codes (e.g., `P0101` for an MAF sensor range error). No description text is provided — look up the code online for details.
+- **Code list**: Automatically reads both stored codes (OBD Mode 03) and pending codes (OBD Mode 07) when the page is opened. Codes are decoded and displayed as P-codes, C-codes, B-codes, or U-codes (e.g., `P0101` for an MAF sensor range error) with human-readable descriptions looked up from a bundled database (generated from `src/data/Mustang_DTC.csv`). Each row displays `CODE  Description`; long descriptions are truncated with `...` and become tappable to open a detail overlay showing the full text. Tapping the overlay again closes it. Codes not in the database (manufacturer-specific or unmapped) display as a bare code.
 - **REFRESH CODES**: Re-read the code list from the adapter immediately.
 - **CLEAR CODES**: Two-tap confirm pattern. First tap arms the button (it highlights in the warning color and changes its label to "TAP TO CONFIRM"); tapping again within 5 seconds sends OBD Mode 04 (clear DTCs) to the adapter. The confirmation times out after 5 seconds if not confirmed.
 
