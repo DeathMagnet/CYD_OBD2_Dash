@@ -448,6 +448,31 @@ bool ClusterTouchHandler::handleDiagnosticsTap(uint16_t x, uint16_t y, uint32_t 
         return false;
     }
 
+    // A detail overlay is showing (see ClusterPages::drawPage5Dynamic): any
+    // other tap in the content area closes it back to the list.
+    if (state.dtcDetailIndex >= 0) {
+        if (within(x, y, 20, layout::kDtcListY - 10, 460,
+                    layout::kDtcListY - 10 + layout::kDtcListLineHeight * layout::kDtcListVisibleLines + 20)) {
+            state.dtcDetailIndex = -1;
+        }
+        return false;
+    }
+
+    // Otherwise, a tap on a truncated row opens its full description.
+    uint8_t contentLines = 1;
+    if (state.dtcHaveResultDrawn == 1 && state.dtcListDrawn.count > 0) {
+        contentLines = state.dtcListDrawn.count < layout::kDtcListVisibleLines ? state.dtcListDrawn.count
+                                                                                : layout::kDtcListVisibleLines;
+    }
+    int32_t startY = layout::dtcContentStartY(contentLines);
+    if (state.dtcHaveResultDrawn == 1 && state.dtcListDrawn.count > 0 && within(x, y, 20, startY, 460,
+                startY + contentLines * layout::kDtcListLineHeight)) {
+        uint8_t row = static_cast<uint8_t>((static_cast<int32_t>(y) - startY) / layout::kDtcListLineHeight);
+        if (row < contentLines && row < layout::kDtcListVisibleLines && state.dtcLineTruncated[row]) {
+            state.dtcDetailIndex = row;
+        }
+    }
+
     return false;
 }
 
